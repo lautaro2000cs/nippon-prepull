@@ -461,8 +461,27 @@ async function showApp(){
   buildFilters();
   await cargarTodo();
   if(cu.rol==='admin') renderUsers();
+  iniciarRealtime();
 }
-function doLogout(){cu=null;document.getElementById('s-app').classList.remove('active');document.getElementById('s-login').classList.add('active');['lu','lp'].forEach(id=>document.getElementById(id).value='');document.getElementById('lr').value='';}
+
+// ============================================
+// ACTUALIZACIÓN AUTOMÁTICA (REALTIME)
+// ============================================
+let realtimeChannel=null;
+function iniciarRealtime(){
+  if(realtimeChannel) return; // ya está escuchando, no duplicar
+  realtimeChannel=sb
+    .channel('turnos-cambios')
+    .on('postgres_changes',{event:'*',schema:'public',table:'turnos'},async(payload)=>{
+      await cargarTurnos();
+      renderTurnos();renderRepuestos();renderNoShow();renderDash();
+    })
+    .subscribe();
+}
+function detenerRealtime(){
+  if(realtimeChannel){sb.removeChannel(realtimeChannel);realtimeChannel=null;}
+}
+function doLogout(){detenerRealtime();cu=null;document.getElementById('s-app').classList.remove('active');document.getElementById('s-login').classList.add('active');['lu','lp'].forEach(id=>document.getElementById(id).value='');document.getElementById('lr').value='';}
 
 // ============================================
 // CARGA DE DATOS DESDE SUPABASE
