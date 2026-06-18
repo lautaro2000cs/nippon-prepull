@@ -538,19 +538,20 @@ function renderTurnos(){
   const f=sel?sel.value:'';
   const items=turnos.filter(t=>!f||t.sucursal===f);
   renderGroups('grupos-turnos',items,gi=>`<table><thead><tr>
-    <th style="width:8%">Pre-Or</th><th style="width:13%">Cliente</th><th style="width:8%">Dominio</th><th style="width:9%">Modelo</th>
-    <th style="width:9%">Fecha del turno</th><th style="width:8%">Sucursal</th><th style="width:11%">Tipo</th>
-    <th style="width:6%">Prior.</th><th style="width:7%">No Show</th><th style="width:21%">Acciones</th>
+    <th style="width:7%">Pre-Or</th><th style="width:11%">Cliente</th><th style="width:7%">Dominio</th><th style="width:8%">Modelo</th>
+    <th style="width:8%">Fecha del turno</th><th style="width:7%">Sucursal</th><th style="width:9%">Tipo</th>
+    <th style="width:5%">Prior.</th><th style="width:6%">No Show</th><th style="width:6%">Vale</th><th style="width:8%">Obs. Rep.</th><th style="width:18%">Acciones</th>
   </tr></thead><tbody>${gi.map(t=>{
     const rT=t.reprogramado?`<span class="pill p-repr" style="font-size:10px;margin-right:3px">Reprog.</span>`:'';
     const cC=cu&&(cu.rol==='citas'||cu.rol==='admin');
     const nsBadge=t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i> No Show</span>':'—';
+    const obsRepTag=t.obs_rep?`<span class="obs-badge" title="${t.obs_rep}"><i class="ti ti-message" style="font-size:11px"></i></span>`:'—';
     const acc=cC?`<div class="act-group">
       <button class="btn-sm btn-edit" onclick="openModal('${t.id}')"><i class="ti ti-edit" style="font-size:12px"></i></button>
       <button class="btn-sm btn-repr" onclick="openRepr('${t.id}')"><i class="ti ti-calendar-event" style="font-size:12px"></i> Reprog.</button>
       <button class="btn-sm btn-noshow" onclick="openNsModal('${t.id}')" title="Marcar No Show"><i class="ti ti-square-check" style="font-size:12px"></i></button>
     </div>`:'—';
-    return`<tr><td><strong>${t.preor}</strong></td><td>${rT}${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${fmtD(t.fecha)}</td><td>${t.sucursal}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${nsBadge}</td><td>${acc}</td></tr>`;
+    return`<tr><td><strong>${t.preor}</strong></td><td>${rT}${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${fmtD(t.fecha)}</td><td>${t.sucursal}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${nsBadge}</td><td>${valePill(t.vale)}</td><td>${obsRepTag}</td><td>${acc}</td></tr>`;
   }).join('')}</tbody></table>`);
 }
 
@@ -558,20 +559,22 @@ function renderRepuestos(){
   const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-r')?document.getElementById('fil-suc-r').value:'');
   const items=turnos.filter(t=>!f||t.sucursal===f);
   renderGroups('grupos-repuestos',items,gi=>`<table><thead><tr>
-    <th style="width:8%">Pre-Or</th><th style="width:12%">Cliente</th><th style="width:7%">Dominio</th><th style="width:8%">Modelo</th>
-    <th style="width:8%">Sucursal</th><th style="width:9%">Fecha del turno</th><th style="width:9%">Tipo</th><th style="width:6%">Prior.</th>
-    <th style="width:7%">Vale</th><th style="width:7%">No Show</th><th style="width:7%">Obs.</th><th style="width:7%">Estado</th><th style="width:18%">Acciones</th>
+    <th style="width:7%">Pre-Or</th><th style="width:11%">Cliente</th><th style="width:6%">Dominio</th><th style="width:7%">Modelo</th>
+    <th style="width:7%">Sucursal</th><th style="width:8%">Fecha del turno</th><th style="width:8%">Tipo</th><th style="width:5%">Prior.</th>
+    <th style="width:6%">Vale</th><th style="width:6%">No Show</th><th style="width:7%">Obs. Cita</th><th style="width:6%">Obs.</th><th style="width:6%">Estado</th><th style="width:16%">Acciones</th>
   </tr></thead><tbody>${gi.map(t=>{
     const cR=cu&&(cu.rol==='repuestos'||cu.rol==='admin');
     const nsBadge=t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i></span>':'—';
     const obsTag=t.obs_rep?`<span class="obs-badge" onclick="openRepModal('${t.id}')" title="${t.obs_rep}"><i class="ti ti-message" style="font-size:11px"></i></span>`:'—';
+    const obsCitaTag=t.obs?`<span class="obs-badge" style="background:#E6F1FB;color:#0C447C" title="${t.obs}"><i class="ti ti-notes" style="font-size:11px"></i></span>`:'—';
     const acc=cR?`<div class="act-group">
       <button class="btn-sm btn-rep-mark" onclick="openRepModal('${t.id}')"><i class="ti ti-edit" style="font-size:12px"></i> ${t.estado==='pendiente'?'Marcar':'Editar'}</button>
       <button class="btn-sm ${t.vale?'btn-vale-on':'btn-vale-off'}" onclick="openVModal('${t.id}')"><i class="ti ti-receipt" style="font-size:12px"></i> Vale</button>
     </div>`:`<div class="act-group">${estPill(t.estado)}</div>`;
-    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${valePill(t.vale)}</td><td>${nsBadge}</td><td>${obsTag}</td><td>${estPill(t.estado)}</td><td>${acc}</td></tr>`;
+    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${valePill(t.vale)}</td><td>${nsBadge}</td><td>${obsCitaTag}</td><td>${obsTag}</td><td>${estPill(t.estado)}</td><td>${acc}</td></tr>`;
   }).join('')}</tbody></table>`);
 }
+
 
 function renderNoShow(){
   const items=turnos.filter(t=>t.no_show);
