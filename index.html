@@ -360,6 +360,15 @@ tr:hover td{background:var(--color-background-secondary)}
   </div>
 </div>
 
+<div class="modal-ov" id="obsov">
+  <div class="modal sm">
+    <h3 id="obs-modal-title"><i class="ti ti-message-2" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Observación</h3>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:.85rem" id="obs-modal-subtitle"></div>
+    <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px 14px;font-size:13px;color:var(--color-text-primary);line-height:1.6;white-space:pre-wrap;min-height:50px" id="obs-modal-texto"></div>
+    <div class="mfooter"><button class="btn-cancel" onclick="closeObsModal()">Cerrar</button></div>
+  </div>
+</div>
+
 <script>
 // ============================================
 // CONEXIÓN A SUPABASE
@@ -545,7 +554,7 @@ function renderTurnos(){
     const rT=t.reprogramado?`<span class="pill p-repr" style="font-size:10px;margin-right:3px">Reprog.</span>`:'';
     const cC=cu&&(cu.rol==='citas'||cu.rol==='admin');
     const nsBadge=t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i> No Show</span>':'—';
-    const obsRepTag=t.obs_rep?`<span class="obs-badge" title="${t.obs_rep}"><i class="ti ti-message" style="font-size:11px"></i></span>`:'—';
+    const obsRepTag=t.obs_rep?`<span class="obs-badge" onclick="verObs('${t.id}','rep')"><i class="ti ti-message" style="font-size:11px"></i> Ver</span>`:'—';
     const acc=cC?`<div class="act-group">
       <button class="btn-sm btn-edit" onclick="openModal('${t.id}')"><i class="ti ti-edit" style="font-size:12px"></i></button>
       <button class="btn-sm btn-repr" onclick="openRepr('${t.id}')"><i class="ti ti-calendar-event" style="font-size:12px"></i> Reprog.</button>
@@ -566,7 +575,7 @@ function renderRepuestos(){
     const cR=cu&&(cu.rol==='repuestos'||cu.rol==='admin');
     const nsBadge=t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i></span>':'—';
     const obsTag=t.obs_rep?`<span class="obs-badge" onclick="openRepModal('${t.id}')" title="${t.obs_rep}"><i class="ti ti-message" style="font-size:11px"></i></span>`:'—';
-    const obsCitaTag=t.obs?`<span class="obs-badge" style="background:#E6F1FB;color:#0C447C" title="${t.obs}"><i class="ti ti-notes" style="font-size:11px"></i></span>`:'—';
+    const obsCitaTag=t.obs?`<span class="obs-badge" style="background:#E6F1FB;color:#0C447C" onclick="verObs('${t.id}','cita')"><i class="ti ti-notes" style="font-size:11px"></i> Ver</span>`:'—';
     const acc=cR?`<div class="act-group">
       <button class="btn-sm btn-rep-mark" onclick="openRepModal('${t.id}')"><i class="ti ti-edit" style="font-size:12px"></i> ${t.estado==='pendiente'?'Marcar':'Editar'}</button>
       <button class="btn-sm ${t.vale?'btn-vale-on':'btn-vale-off'}" onclick="openVModal('${t.id}')"><i class="ti ti-receipt" style="font-size:12px"></i> Vale</button>
@@ -700,11 +709,24 @@ async function guardar(){
 }
 function showAlert(t,m){document.getElementById('alert-title').textContent=t;document.getElementById('alert-msg').textContent=m;document.getElementById('aov').classList.add('open');}
 function closeAlert(){document.getElementById('aov').classList.remove('open');}
+
+function verObs(id,tipo){
+  const t=findTurno(id);
+  if(!t) return;
+  const esRep=tipo==='rep';
+  const texto=esRep?t.obs_rep:t.obs;
+  document.getElementById('obs-modal-title').innerHTML=`<i class="ti ti-message-2" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>${esRep?'Observación de Repuestos':'Observación de Citas'}`;
+  document.getElementById('obs-modal-subtitle').textContent=`${t.preor} · ${t.cliente}`;
+  document.getElementById('obs-modal-texto').textContent=texto&&texto.trim()?texto:'Sin observaciones.';
+  document.getElementById('obsov').classList.add('open');
+}
+function closeObsModal(){document.getElementById('obsov').classList.remove('open');}
 document.getElementById('mov').addEventListener('click',function(e){if(e.target===this)closeModal();});
 document.getElementById('nsmov').addEventListener('click',function(e){if(e.target===this)closeNsModal();});
 document.getElementById('vmov').addEventListener('click',function(e){if(e.target===this)closeVModal();});
 document.getElementById('repmov').addEventListener('click',function(e){if(e.target===this)closeRepModal();});
 document.getElementById('aov').addEventListener('click',function(e){if(e.target===this)closeAlert();});
+document.getElementById('obsov').addEventListener('click',function(e){if(e.target===this)closeObsModal();});
 </script>
 </body>
 </html>
