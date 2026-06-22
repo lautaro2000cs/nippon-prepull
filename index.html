@@ -293,7 +293,7 @@ tr:hover td{background:var(--color-background-secondary)}
       <div class="ley-item"><div class="ley-dot" style="background:#7C3AED"></div><span class="ley-lbl">Pedido especial</span></div>
       <div class="ley-item"><div class="ley-dot" style="background:#16A34A"></div><span class="ley-lbl">Reparación</span></div>
       <div class="ley-item"><div class="ley-dot" style="background:#DC2626"></div><span class="ley-lbl">Servicio</span></div>
-      <div class="ley-item"><div class="ley-dot" style="background:#0EA5E9"></div><span class="ley-lbl">Parabrisa</span></div>
+      <div class="ley-item"><div class="ley-dot" style="background:#0EA5E9"></div><span class="ley-lbl">Cristales</span></div>
       <div class="ley-item"><div class="ley-dot" style="background:#C19A1B"></div><span class="ley-lbl">Siniestros</span></div>
       <div class="ley-sep">
         <h4>Horizonte</h4>
@@ -322,7 +322,7 @@ tr:hover td{background:var(--color-background-secondary)}
       </div>
       <div><label>Sucursal</label><select id="f-suc"><option value="">Seleccionar...</option><option>Roca</option><option>Perticone</option><option>Aguado</option></select></div>
       <div><label>Tipo de turno</label>
-        <select id="f-tipo"><option value="">Seleccionar...</option><option>Campaña</option><option>Pedido especial</option><option>Reparación</option><option>Servicio</option><option>Parabrisa</option><option>Siniestros</option></select>
+        <select id="f-tipo"><option value="">Seleccionar...</option><option>Campaña</option><option>Pedido especial</option><option>Reparación</option><option>Servicio</option><option>Cristales</option><option>Siniestros</option></select>
       </div>
       <div><label>Prioridad</label><select id="f-pri"><option value="">Seleccionar...</option><option>Alta</option><option>Mediana</option><option>Baja</option></select></div>
       <div><label>Cargado por</label><select id="f-quien"><option value="">Seleccionar...</option></select></div>
@@ -489,7 +489,7 @@ function diffHabil(s){
 function esTurnoFueraDeSemana(s){return esFinDeSemana(parseD(s));}
 
 const SUCURSALES=['Roca','Perticone','Aguado'];
-const TIPOS={'Campaña':'#E91E8C','Pedido especial':'#7C3AED','Reparación':'#16A34A','Servicio':'#DC2626','Parabrisa':'#0EA5E9','Siniestros':'#C19A1B'};
+const TIPOS={'Campaña':'#E91E8C','Pedido especial':'#7C3AED','Reparación':'#16A34A','Servicio':'#DC2626','Cristales':'#0EA5E9','Siniestros':'#C19A1B'};
 function tipoDot(t){if(!t)return'<span style="font-size:11px;color:var(--color-text-secondary)">—</span>';return`<div class="tipo-cell"><div class="tipo-dot" style="background:${TIPOS[t]||'#888'}"></div><span style="font-size:11px;color:var(--color-text-secondary)">${t}</span></div>`;}
 const DAY_GROUPS=[{key:'finde',lbl:'⚠ Fin de semana / feriado — revisar',cls:'dh-nx',test:(d,s)=>esTurnoFueraDeSemana(s)||esFeriado(parseD(s))},{key:'hoy',lbl:'Hoy',cls:'dh-today',test:d=>d===0},{key:'n1',lbl:'N-1 — Próximo día hábil',cls:'dh-n1',test:d=>d===1},{key:'n2',lbl:'N-2 — En 2 días hábiles',cls:'dh-n2',test:d=>d===2},{key:'n3',lbl:'N-3 — En 3 días hábiles',cls:'dh-n3',test:d=>d===3},{key:'nx',lbl:'N-X — Más de 3 días hábiles',cls:'dh-nx',test:d=>d>3},{key:'pas',lbl:'Pasados',cls:'dh-nx',test:d=>d<0}];
 function getGroup(s){
@@ -975,27 +975,16 @@ function descargarReporteExcel(){
 
 function descargarReportePDF(){
   const items=turnosParaReporte().slice().sort((a,b)=>a.fecha.localeCompare(b.fecha));
-  const r=resumenReporte(items);
   const fSuc=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-d')?document.getElementById('fil-suc-d').value:'');
 
   const doc=new jspdf.jsPDF({orientation:'landscape'});
   doc.setFontSize(16);
   doc.text('Reporte Nippon Car — Pre Pull',14,15);
   doc.setFontSize(10);
-  doc.text(`Sucursal: ${fSuc||'Todas'}  ·  Generado el ${new Date().toLocaleString('es-AR')}`,14,22);
+  doc.text(`Sucursal: ${fSuc||'Todas'}  ·  Generado el ${new Date().toLocaleString('es-AR')}  ·  ${items.length} turno(s)`,14,22);
 
   doc.autoTable({
     startY:28,
-    head:[['Total','Hoy','Pendientes','B/O','No Shows']],
-    body:[[r.total,r.hoy,r.pendientes,r.bo,r.noShows]],
-    theme:'grid',
-    styles:{fontSize:9},
-    headStyles:{fillColor:[24,95,165]}
-  });
-
-  const startY2=doc.lastAutoTable.finalY+10;
-  doc.autoTable({
-    startY:startY2,
     head:[['Pre-Or','Cliente','Dominio','Modelo','Fecha','Sucursal','Tipo','Estado','No Show','Vale']],
     body:items.map(t=>[
       t.preor,t.cliente,t.dominio,t.modelo||'-',fmtD(t.fecha),t.sucursal,t.tipo||'-',
