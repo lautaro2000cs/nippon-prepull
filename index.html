@@ -324,6 +324,12 @@ tr:hover td{background:var(--color-background-secondary)}
       <div><label>Cargado por</label><select id="f-quien"><option value="">Seleccionar...</option></select></div>
       <div class="full" id="f-repr-wrap" style="display:none"><label>Motivo de reprogramación</label><input type="text" id="f-repr-mot" placeholder="Ej: cliente no disponible"/></div>
       <div class="full"><label>Observaciones</label><textarea id="f-obs" placeholder="Notas del turno..."></textarea></div>
+      <div class="full" id="f-adj-wrap" style="display:none">
+        <label>Archivos adjuntos (fotos, presupuestos, etc.)</label>
+        <input type="file" id="f-adj-input" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onchange="subirAdjuntos()">
+        <div id="f-adj-lista" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
+        <div id="f-adj-subiendo" style="display:none;font-size:12px;color:var(--color-text-secondary);margin-top:6px"><i class="ti ti-loader-2" style="font-size:13px;vertical-align:-2px"></i> Subiendo archivo...</div>
+      </div>
     </div>
     <div class="mfooter"><button class="btn-cancel" onclick="closeModal()">Cancelar</button><button class="btn-save" id="btn-guardar-turno" onclick="guardar()">Guardar</button></div>
   </div>
@@ -375,6 +381,15 @@ tr:hover td{background:var(--color-background-secondary)}
     <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:.85rem" id="obs-modal-subtitle"></div>
     <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px 14px;font-size:13px;color:var(--color-text-primary);line-height:1.6;white-space:pre-wrap;min-height:50px" id="obs-modal-texto"></div>
     <div class="mfooter"><button class="btn-cancel" onclick="closeObsModal()">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="modal-ov" id="adjov">
+  <div class="modal sm">
+    <h3><i class="ti ti-paperclip" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Archivos adjuntos</h3>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:.85rem" id="adj-modal-subtitle"></div>
+    <div id="adj-modal-lista" style="display:flex;flex-direction:column;gap:6px;min-height:40px"></div>
+    <div class="mfooter"><button class="btn-cancel" onclick="closeAdjModal()">Cerrar</button></div>
   </div>
 </div>
 
@@ -447,6 +462,7 @@ function esHistorico(t){return diff(t.fecha)<0 && !t.reprogramado && !t.no_show;
 
 let cu=null, turnos=[], usuarios=[];
 let editId=null,isReprMode=false,nsId=null,vId=null,repId=null;
+let currentAdjuntos=[]; // adjuntos del turno que se está creando/editando en el modal
 
 // ============================================
 // VERIFICAR CONEXIÓN AL CARGAR LA PÁGINA
@@ -603,6 +619,7 @@ function renderTurnos(){
   </tr></thead><tbody>${gi.map(t=>{
     const rT=t.reprogramado?`<span class="pill p-repr" style="font-size:10px;margin-right:3px">Reprog.</span>`:'';
     const vT=esHistorico(t)?`<span class="pill p-vencido" style="font-size:10px;margin-right:3px"><i class="ti ti-clock-x" style="font-size:10px"></i> Vencido</span>`:'';
+    const adjT=(Array.isArray(t.adjuntos)&&t.adjuntos.length)?`<span class="obs-badge" style="margin-left:4px" onclick='verAdjuntos(${JSON.stringify(t.id)})' title="Ver archivos adjuntos"><i class="ti ti-paperclip" style="font-size:11px"></i> ${t.adjuntos.length}</span>`:'';
     const cC=cu&&(cu.rol==='citas'||cu.rol==='admin');
     const cA=cu&&cu.rol==='admin';
     const nsBadge=t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i> No Show</span>':'—';
@@ -613,7 +630,7 @@ function renderTurnos(){
       <button class="btn-sm btn-noshow" onclick="openNsModal('${t.id}')" title="Marcar No Show"><i class="ti ti-square-check" style="font-size:12px"></i></button>
       ${cA?`<button class="btn-sm btn-delete" onclick="openDeleteModal('${t.id}')" title="Eliminar turno"><i class="ti ti-trash" style="font-size:12px"></i></button>`:''}
     </div>`:'—';
-    return`<tr><td><strong>${t.preor}</strong></td><td>${rT}${vT}${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${fmtD(t.fecha)}</td><td>${t.sucursal}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${nsBadge}</td><td>${valePill(t.vale)}</td><td>${obsRepTag}</td><td>${acc}</td></tr>`;
+    return`<tr><td><strong>${t.preor}</strong></td><td>${rT}${vT}${t.cliente}${adjT}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${fmtD(t.fecha)}</td><td>${t.sucursal}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${nsBadge}</td><td>${valePill(t.vale)}</td><td>${obsRepTag}</td><td>${acc}</td></tr>`;
   }).join('')}</tbody></table>`);
 }
 
@@ -775,14 +792,60 @@ function refrescarHorizontes(){
   if(typeof renderDash==='function')renderDash();
 }
 
+// --- Adjuntos de turnos (Supabase Storage, bucket "turnos-adjuntos") ---
+async function subirAdjuntos(){
+  const input=document.getElementById('f-adj-input');
+  const files=Array.from(input.files||[]);
+  if(!files.length)return;
+  document.getElementById('f-adj-subiendo').style.display='block';
+  for(const file of files){
+    try{
+      const path=`${Date.now()}_${Math.random().toString(36).slice(2,8)}_${file.name}`;
+      const {error:upErr}=await sb.storage.from('turnos-adjuntos').upload(path,file);
+      if(upErr) throw upErr;
+      const {data:urlData}=sb.storage.from('turnos-adjuntos').getPublicUrl(path);
+      currentAdjuntos.push({nombre:file.name,url:urlData.publicUrl,path,tipo:file.type});
+    }catch(err){
+      alert(`No se pudo subir "${file.name}": `+err.message);
+    }
+  }
+  document.getElementById('f-adj-subiendo').style.display='none';
+  input.value='';
+  renderAdjuntosForm();
+}
+
+function renderAdjuntosForm(){
+  const cont=document.getElementById('f-adj-lista');
+  if(!cont)return;
+  if(!currentAdjuntos.length){cont.innerHTML='';return;}
+  cont.innerHTML=currentAdjuntos.map((a,i)=>{
+    const esImg=(a.tipo||'').startsWith('image/');
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);font-size:12px">
+      <i class="ti ti-${esImg?'photo':'file'}" style="font-size:14px;flex-shrink:0"></i>
+      <a href="${a.url}" target="_blank" style="flex:1;color:#185FA5;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.nombre}</a>
+      <button type="button" onclick="eliminarAdjunto(${i})" style="background:none;border:none;color:#A32D2D;cursor:pointer;padding:2px"><i class="ti ti-x" style="font-size:13px"></i></button>
+    </div>`;
+  }).join('');
+}
+
+async function eliminarAdjunto(i){
+  const a=currentAdjuntos[i];
+  if(!a)return;
+  if(a.path){ try{ await sb.storage.from('turnos-adjuntos').remove([a.path]); }catch(e){/* si falla el borrado físico, igual lo sacamos de la lista */} }
+  currentAdjuntos.splice(i,1);
+  renderAdjuntosForm();
+}
+
 function openModal(id){
   editId=id;isReprMode=false;
   const iE=id!==null;
   document.getElementById('modal-title').innerHTML=`<i class="ti ti-calendar-plus" style="font-size:16px;vertical-align:-3px;margin-right:6px"></i>${iE?'Editar turno':'Nuevo turno'}`;
   document.getElementById('repr-box').style.display='none';
   document.getElementById('f-repr-wrap').style.display='none';
-  if(iE){const t=findTurno(id);document.getElementById('f-preor').value=t.preor;document.getElementById('f-fecha').value=t.fecha;document.getElementById('f-cliente').value=t.cliente;document.getElementById('f-dominio').value=t.dominio;document.getElementById('f-modelo').value=t.modelo||'';document.getElementById('f-suc').value=t.sucursal;document.getElementById('f-tipo').value=t.tipo||'';document.getElementById('f-pri').value=t.prioridad;document.getElementById('f-quien').value=t.quien;document.getElementById('f-obs').value=t.obs;}
-  else{['f-preor','f-fecha','f-cliente','f-dominio','f-obs','f-repr-mot'].forEach(id=>document.getElementById(id).value='');['f-modelo','f-suc','f-tipo','f-pri','f-quien'].forEach(id=>document.getElementById(id).value='');}
+  document.getElementById('f-adj-wrap').style.display=(cu&&(cu.rol==='citas'||cu.rol==='admin'))?'block':'none';
+  if(iE){const t=findTurno(id);document.getElementById('f-preor').value=t.preor;document.getElementById('f-fecha').value=t.fecha;document.getElementById('f-cliente').value=t.cliente;document.getElementById('f-dominio').value=t.dominio;document.getElementById('f-modelo').value=t.modelo||'';document.getElementById('f-suc').value=t.sucursal;document.getElementById('f-tipo').value=t.tipo||'';document.getElementById('f-pri').value=t.prioridad;document.getElementById('f-quien').value=t.quien;document.getElementById('f-obs').value=t.obs;currentAdjuntos=Array.isArray(t.adjuntos)?JSON.parse(JSON.stringify(t.adjuntos)):[];}
+  else{['f-preor','f-fecha','f-cliente','f-dominio','f-obs','f-repr-mot'].forEach(id=>document.getElementById(id).value='');['f-modelo','f-suc','f-tipo','f-pri','f-quien'].forEach(id=>document.getElementById(id).value='');currentAdjuntos=[];}
+  renderAdjuntosForm();
   document.getElementById('mov').classList.add('open');
 }
 function openRepr(id){
@@ -790,7 +853,9 @@ function openRepr(id){
   const t=findTurno(id);
   document.getElementById('modal-title').innerHTML=`<i class="ti ti-calendar-event" style="font-size:16px;vertical-align:-3px;margin-right:6px"></i>Reprogramar turno`;
   document.getElementById('repr-box').style.display='block';document.getElementById('f-repr-wrap').style.display='block';
+  document.getElementById('f-adj-wrap').style.display='none';
   document.getElementById('f-preor').value=t.preor;document.getElementById('f-fecha').value=t.fecha;document.getElementById('f-cliente').value=t.cliente;document.getElementById('f-dominio').value=t.dominio;document.getElementById('f-modelo').value=t.modelo||'';document.getElementById('f-suc').value=t.sucursal;document.getElementById('f-tipo').value=t.tipo||'';document.getElementById('f-pri').value=t.prioridad;document.getElementById('f-quien').value=t.quien;document.getElementById('f-obs').value=t.obs;document.getElementById('f-repr-mot').value='';
+  currentAdjuntos=Array.isArray(t.adjuntos)?JSON.parse(JSON.stringify(t.adjuntos)):[]; // se conservan tal cual, no se editan acá
   document.getElementById('mov').classList.add('open');
 }
 function closeModal(){document.getElementById('mov').classList.remove('open');}
@@ -809,12 +874,12 @@ async function guardar(){
       if(error) throw error;
       closeModal();showAlert('Turno reprogramado',`El turno de ${cliente} (${preor}) fue reprogramado al ${fmtD(fecha)} en ${suc}. Motivo: ${reprMot}.`);
     } else if(editId!==null){
-      const {error}=await sb.from('turnos').update({preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad:pri,quien,obs}).eq('id',editId);
+      const {error}=await sb.from('turnos').update({preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad:pri,quien,obs,adjuntos:currentAdjuntos}).eq('id',editId);
       if(error) throw error;
       closeModal();
     } else {
       const d=diff(fecha);
-      const {error}=await sb.from('turnos').insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad:pri,quien,obs,estado:'pendiente',reprogramado:false,motivo_repr:'',no_show:false,vale:false,obs_rep:''}]);
+      const {error}=await sb.from('turnos').insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad:pri,quien,obs,estado:'pendiente',reprogramado:false,motivo_repr:'',no_show:false,vale:false,obs_rep:'',adjuntos:currentAdjuntos}]);
       if(error) throw error;
       if(d===1||d===2)showAlert('Turno urgente',`El turno de ${cliente} (${preor}) está agendado para ${d===1?'mañana':'en 2 días'}. Avisá a repuestos de inmediato.`);
       closeModal();
@@ -841,6 +906,22 @@ function verObs(id,tipo){
 }
 function closeObsModal(){document.getElementById('obsov').classList.remove('open');}
 
+function verAdjuntos(id){
+  const t=findTurno(id);
+  if(!t) return;
+  const arr=Array.isArray(t.adjuntos)?t.adjuntos:[];
+  document.getElementById('adj-modal-subtitle').textContent=`${t.preor} · ${t.cliente}`;
+  document.getElementById('adj-modal-lista').innerHTML=arr.length?arr.map(a=>{
+    const esImg=(a.tipo||'').startsWith('image/');
+    return `<a href="${a.url}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);font-size:13px;color:#185FA5;text-decoration:none">
+      <i class="ti ti-${esImg?'photo':'file'}" style="font-size:15px;flex-shrink:0"></i>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.nombre}</span>
+    </a>`;
+  }).join(''):'<div style="font-size:13px;color:var(--color-text-secondary)">Sin archivos adjuntos.</div>';
+  document.getElementById('adjov').classList.add('open');
+}
+function closeAdjModal(){document.getElementById('adjov').classList.remove('open');}
+
 let delId=null;
 function openDeleteModal(id){
   const t=findTurno(id);
@@ -864,6 +945,7 @@ document.getElementById('vmov').addEventListener('click',function(e){if(e.target
 document.getElementById('repmov').addEventListener('click',function(e){if(e.target===this)closeRepModal();});
 document.getElementById('aov').addEventListener('click',function(e){if(e.target===this)closeAlert();});
 document.getElementById('obsov').addEventListener('click',function(e){if(e.target===this)closeObsModal();});
+document.getElementById('adjov').addEventListener('click',function(e){if(e.target===this)closeAdjModal();});
 document.getElementById('delov').addEventListener('click',function(e){if(e.target===this)closeDeleteModal();});
 </script>
 </body>
