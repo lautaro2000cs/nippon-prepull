@@ -465,7 +465,8 @@ const TODAY=new Date();TODAY.setHours(0,0,0,0);
 function toStr(d){return d.toISOString().slice(0,10)}
 function parseD(s){const d=new Date(s+'T12:00:00');d.setHours(0,0,0,0);return d}
 function diff(s){return Math.round((parseD(s)-TODAY)/86400000)}
-function fmtD(s){return parseD(s).toLocaleDateString('es-AR')}
+function fmtD(s){const d=parseD(s);const dd=String(d.getDate()).padStart(2,'0');const mm=String(d.getMonth()+1).padStart(2,'0');return`${dd}/${mm}/${d.getFullYear()}`;}
+function fmtFechaHora(d){const dd=String(d.getDate()).padStart(2,'0');const mm=String(d.getMonth()+1).padStart(2,'0');const hh=String(d.getHours()).padStart(2,'0');const mi=String(d.getMinutes()).padStart(2,'0');return`${dd}/${mm}/${d.getFullYear()} ${hh}:${mi}`;}
 
 // --- Feriados (guardados en este navegador por ahora; a futuro pasan a Supabase) ---
 function getFeriados(){try{return JSON.parse(localStorage.getItem('nippon_feriados')||'[]')}catch(e){return[]}}
@@ -949,7 +950,7 @@ function descargarReporteExcel(){
   const resumenRows=[
     ['Reporte Nippon Car — Pre Pull'],
     ['Sucursal',fSuc||'Todas'],
-    ['Generado el',new Date().toLocaleString('es-AR')],
+    ['Generado el',fmtFechaHora(new Date())],
     [],
     ['Total de turnos',r.total],
     ['Turnos de hoy',r.hoy],
@@ -981,7 +982,7 @@ function descargarReportePDF(){
   doc.setFontSize(16);
   doc.text('Reporte Nippon Car — Pre Pull',14,15);
   doc.setFontSize(10);
-  doc.text(`Sucursal: ${fSuc||'Todas'}  ·  Generado el ${new Date().toLocaleString('es-AR')}  ·  ${items.length} turno(s)`,14,22);
+  doc.text(`Sucursal: ${fSuc||'Todas'}  ·  Generado el ${fmtFechaHora(new Date())}  ·  ${items.length} turno(s)`,14,22);
 
   doc.autoTable({
     startY:28,
