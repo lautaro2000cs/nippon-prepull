@@ -103,6 +103,8 @@ tr:hover td{background:var(--color-background-secondary)}
 .p-pend{background:#FAEEDA;color:#854F0B}
 .p-arr{background:#EAF3DE;color:#3B6D11}
 .p-falt{background:#FCEBEB;color:#A32D2D}
+.p-bo{background:#5B21B6;color:#fff;font-weight:700;animation:bo-pulse 1.8s infinite}
+@keyframes bo-pulse{0%,100%{box-shadow:0 0 0 0 rgba(91,33,182,.55)}50%{box-shadow:0 0 0 4px rgba(91,33,182,0)}}
 .p-repr{background:#E6F1FB;color:#0C447C}
 .p-noshow{background:#FDF0DC;color:#8A5A0B}
 .p-vencido{background:#E2E1DB;color:#444441}
@@ -204,7 +206,6 @@ tr:hover td{background:var(--color-background-secondary)}
       </div>
       <button class="btn-in" id="btn-login" onclick="doLogin()">Ingresar</button>
       <p class="login-err" id="lerr">Usuario, contraseña o sector incorrecto.</p>
-      
       <div class="conn-status conn-loading" id="conn-status"><i class="ti ti-loader-2" style="font-size:13px;vertical-align:-2px"></i> Conectando con la base de datos...</div>
     </div>
   </div>
@@ -270,6 +271,15 @@ tr:hover td{background:var(--color-background-secondary)}
         <div class="sec-hdr"><h2>Gestión de usuarios y permisos</h2></div>
         <div class="access-note"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0"></i><div>Cada usuario tiene un <strong>sector</strong> (qué solapas ve) y opcionalmente una <strong>sucursal fija</strong> (el filtro queda bloqueado).</div></div>
         <div id="lista-usuarios"></div>
+
+        <div class="sec-hdr" style="margin-top:2rem"><h2>Feriados</h2></div>
+        <div class="access-note"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0"></i><div>Los días marcados aquí se saltean en el cálculo de N-1, N-2 y N-3. Por ahora se guardan solo en este navegador.</div></div>
+        <div style="display:flex;gap:8px;align-items:center;margin:14px 0 16px;flex-wrap:wrap">
+          <input type="date" id="f-feriado-fecha" style="padding:9px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:13px;max-width:170px">
+          <input type="text" id="f-feriado-nombre" placeholder="Nombre del feriado (opcional)" style="padding:9px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:13px;max-width:240px;flex:1">
+          <button class="btn-add" onclick="agregarFeriado()"><i class="ti ti-plus"></i> Agregar</button>
+        </div>
+        <div id="lista-feriados"></div>
       </div>
     </div>
 
@@ -342,7 +352,7 @@ tr:hover td{background:var(--color-background-secondary)}
     <h3><i class="ti ti-package" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Marcar repuesto</h3>
     <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem" id="rep-subtitle"></div>
     <div style="margin-bottom:.85rem"><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Estado del repuesto</label>
-      <select id="rep-estado"><option value="arribo">Arribó</option><option value="faltante">Faltante</option></select>
+      <select id="rep-estado"><option value="arribo">Arribó</option><option value="faltante">Faltante</option><option value="bo">B/O</option></select>
     </div>
     <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Observación <span>(opcional)</span></label>
       <textarea id="rep-obs" placeholder="Ej: separado en estantería A3..."></textarea>
@@ -400,11 +410,37 @@ function toStr(d){return d.toISOString().slice(0,10)}
 function parseD(s){const d=new Date(s+'T12:00:00');d.setHours(0,0,0,0);return d}
 function diff(s){return Math.round((parseD(s)-TODAY)/86400000)}
 function fmtD(s){return parseD(s).toLocaleDateString('es-AR')}
+
+// --- Feriados (guardados en este navegador por ahora; a futuro pasan a Supabase) ---
+function getFeriados(){try{return JSON.parse(localStorage.getItem('nippon_feriados')||'[]')}catch(e){return[]}}
+function setFeriados(arr){localStorage.setItem('nippon_feriados',JSON.stringify(arr))}
+function esFeriado(d){return getFeriados().some(f=>f.fecha===toStr(d))}
+function esFinDeSemana(d){const dia=d.getDay();return dia===0||dia===6}
+function esDiaHabil(d){return !esFinDeSemana(d) && !esFeriado(d)}
+// Cuenta cuántos días HÁBILES hay entre hoy y la fecha del turno (salteando sábados, domingos y feriados).
+// Si el turno cae en fin de semana o feriado, devuelve null para que se trate aparte (alerta).
+function diffHabil(s){
+  const target=parseD(s);
+  if(!esDiaHabil(target))return null;
+  const dirAdelante=target>=TODAY;
+  let cursor=new Date(TODAY),cont=0;
+  while(toStr(cursor)!==toStr(target)){
+    cursor=new Date(cursor.getTime()+(dirAdelante?86400000:-86400000));
+    if(esDiaHabil(cursor))cont+=dirAdelante?1:-1;
+  }
+  return cont;
+}
+function esTurnoFueraDeSemana(s){return esFinDeSemana(parseD(s));}
+
 const SUCURSALES=['Roca','Perticone','Aguado'];
 const TIPOS={'Campaña':'#E91E8C','Pedido especial':'#7C3AED','Reparación':'#16A34A','Servicio':'#DC2626','Parabrisa':'#0EA5E9','Siniestros':'#C19A1B'};
 function tipoDot(t){if(!t)return'<span style="font-size:11px;color:var(--color-text-secondary)">—</span>';return`<div class="tipo-cell"><div class="tipo-dot" style="background:${TIPOS[t]||'#888'}"></div><span style="font-size:11px;color:var(--color-text-secondary)">${t}</span></div>`;}
-const DAY_GROUPS=[{key:'hoy',lbl:'Hoy',cls:'dh-today',test:d=>d===0},{key:'n1',lbl:'N-1 — Mañana',cls:'dh-n1',test:d=>d===1},{key:'n2',lbl:'N-2 — En 2 días',cls:'dh-n2',test:d=>d===2},{key:'n3',lbl:'N-3 — En 3 días',cls:'dh-n3',test:d=>d===3},{key:'nx',lbl:'N-X — Más de 3 días',cls:'dh-nx',test:d=>d>3},{key:'pas',lbl:'Pasados',cls:'dh-nx',test:d=>d<0}];
-function getGroup(s){const d=diff(s);return DAY_GROUPS.find(g=>g.test(d))||DAY_GROUPS[4];}
+const DAY_GROUPS=[{key:'finde',lbl:'⚠ Fin de semana / feriado — revisar',cls:'dh-nx',test:(d,s)=>esTurnoFueraDeSemana(s)||esFeriado(parseD(s))},{key:'hoy',lbl:'Hoy',cls:'dh-today',test:d=>d===0},{key:'n1',lbl:'N-1 — Próximo día hábil',cls:'dh-n1',test:d=>d===1},{key:'n2',lbl:'N-2 — En 2 días hábiles',cls:'dh-n2',test:d=>d===2},{key:'n3',lbl:'N-3 — En 3 días hábiles',cls:'dh-n3',test:d=>d===3},{key:'nx',lbl:'N-X — Más de 3 días hábiles',cls:'dh-nx',test:d=>d>3},{key:'pas',lbl:'Pasados',cls:'dh-nx',test:d=>d<0}];
+function getGroup(s){
+  if(esTurnoFueraDeSemana(s)||esFeriado(parseD(s)))return DAY_GROUPS[0];
+  const d=diffHabil(s);
+  return DAY_GROUPS.find(g=>g.key!=='finde'&&g.test(d,s))||DAY_GROUPS[5];
+}
 // Un turno queda como Vencido/Histórico cuando su fecha ya pasó y nadie tomó acción
 // (no fue reprogramado y no se marcó No Show). Es un estado calculado, no se guarda en la base.
 function esHistorico(t){return diff(t.fecha)<0 && !t.reprogramado && !t.no_show;}
@@ -550,7 +586,7 @@ function buildFilters(){
 }
 
 function priPill(p){const m={Alta:'pri-alta',Mediana:'pri-med',Baja:'pri-baja'};return`<span class="pill ${m[p]||'pri-baja'}">${p||'-'}</span>`;}
-function estPill(e){const m={pendiente:['p-pend','Pendiente'],arribo:['p-arr','Arribó'],faltante:['p-falt','Faltante']};const[c,l]=m[e]||['p-pend','Pendiente'];return`<span class="pill ${c}">${l}</span>`;}
+function estPill(e){const m={pendiente:['p-pend','Pendiente'],arribo:['p-arr','Arribó'],faltante:['p-falt','Faltante'],bo:['p-bo','<i class="ti ti-alert-triangle" style="font-size:12px;vertical-align:-1px"></i> B/O']};const[c,l]=m[e]||['p-pend','Pendiente'];return`<span class="pill ${c}">${l}</span>`;}
 function valePill(v){return v?'<span class="pill vale-yes"><i class="ti ti-check" style="font-size:11px"></i> Con vale</span>':'<span class="pill vale-no"><i class="ti ti-x" style="font-size:11px"></i> Sin vale</span>';}
 function rolPill(r){const m={admin:['rol-admin','Admin'],citas:['rol-citas','Citas'],repuestos:['rol-rep','Repuestos']};const[c,l]=m[r];return`<span class="pill ${c}">${l}</span>`;}
 
@@ -662,6 +698,7 @@ function renderDash(){
   const noShows=turnos.filter(t=>t.no_show);
   const sinVale=turnos.filter(t=>!t.vale);
   const vencidos=turnos.filter(esHistorico);
+  const enBO=turnos.filter(t=>t.estado==='bo');
   const total=turnos.length;
   const diasSem=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -671,6 +708,7 @@ function renderDash(){
     <div class="dash-stat"><div class="ds-lbl"><i class="ti ti-calendar"></i>Total</div><div class="ds-val">${total}</div><div class="ds-sub">turnos</div></div>
     <div class="dash-stat"><div class="ds-lbl"><i class="ti ti-calendar-event"></i>Hoy</div><div class="ds-val">${hoy.length}</div><div class="ds-sub">del día</div></div>
     <div class="dash-stat"><div class="ds-lbl"><i class="ti ti-package"></i>Pendientes</div><div class="ds-val" style="color:#854F0B">${pend.length}</div><div class="ds-sub">repuestos</div></div>
+    <div class="dash-stat" style="border-color:#5B21B6"><div class="ds-lbl"><i class="ti ti-alert-triangle"></i>B/O</div><div class="ds-val" style="color:#5B21B6">${enBO.length}</div><div class="ds-sub">pedidos a fábrica</div></div>
     <div class="dash-stat"><div class="ds-lbl"><i class="ti ti-user-x"></i>No Shows</div><div class="ds-val" style="color:#8A5A0B">${noShows.length}</div><div class="ds-sub">sin presentarse</div></div>
     <div class="dash-stat"><div class="ds-lbl"><i class="ti ti-clock-x"></i>Vencidos</div><div class="ds-val" style="color:#444441">${vencidos.length}</div><div class="ds-sub">sin resolver</div></div>
     <div class="dash-stat"><div class="ds-lbl"><i class="ti ti-receipt"></i>Sin vale</div><div class="ds-val" style="color:#5F5E5A">${sinVale.length}</div><div class="ds-sub">pre órdenes</div></div>
@@ -688,6 +726,53 @@ function renderUsers(){
         </div>
       </div>
     </div>`).join('');
+  renderFeriados();
+}
+
+function renderFeriados(){
+  const arr=getFeriados().slice().sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const cont=document.getElementById('lista-feriados');
+  if(!cont)return;
+  if(!arr.length){cont.innerHTML='<div class="empty" style="padding:1.2rem"><i class="ti ti-calendar-off"></i>No hay feriados cargados</div>';return;}
+  cont.innerHTML=arr.map(f=>`
+    <div class="user-card">
+      <div class="user-card-left">
+        <div class="avatar" style="background:#5B21B6"><i class="ti ti-calendar-event" style="font-size:14px"></i></div>
+        <div class="user-info">
+          <div class="un">${fmtD(f.fecha)}</div>
+          <div class="us">${f.nombre?f.nombre:'<span style="color:var(--color-text-secondary)">Sin nombre</span>'}</div>
+        </div>
+      </div>
+      <button class="btn-sm" onclick="eliminarFeriado('${f.fecha}')" style="color:#A32D2D"><i class="ti ti-trash" style="font-size:13px"></i></button>
+    </div>`).join('');
+}
+
+function agregarFeriado(){
+  const fecha=document.getElementById('f-feriado-fecha').value;
+  const nombre=document.getElementById('f-feriado-nombre').value.trim();
+  if(!fecha){alert('Elegí una fecha primero.');return;}
+  const arr=getFeriados();
+  if(arr.some(f=>f.fecha===fecha)){alert('Esa fecha ya está cargada como feriado.');return;}
+  arr.push({fecha,nombre});
+  setFeriados(arr);
+  document.getElementById('f-feriado-fecha').value='';
+  document.getElementById('f-feriado-nombre').value='';
+  renderFeriados();
+  refrescarHorizontes(); // recalcula el horizonte de días con el nuevo feriado
+}
+
+function eliminarFeriado(fecha){
+  setFeriados(getFeriados().filter(f=>f.fecha!==fecha));
+  renderFeriados();
+  refrescarHorizontes();
+}
+
+function refrescarHorizontes(){
+  if(typeof renderTurnos==='function')renderTurnos();
+  if(typeof renderRepuestos==='function')renderRepuestos();
+  if(typeof renderNoShow==='function')renderNoShow();
+  if(typeof renderHistorico==='function')renderHistorico();
+  if(typeof renderDash==='function')renderDash();
 }
 
 function openModal(id){
