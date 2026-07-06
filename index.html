@@ -232,6 +232,7 @@ tr:hover td{background:var(--color-background-secondary)}
         <button class="tab-btn" id="tab-turnos" onclick="swTab('turnos',this)"><i class="ti ti-calendar" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Turnos</button>
         <button class="tab-btn" id="tab-rep" onclick="swTab('repuestos',this)"><i class="ti ti-package" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Repuestos</button>
         <button class="tab-btn" id="tab-usr" style="display:none" onclick="swTab('usuarios',this)"><i class="ti ti-users" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Usuarios</button>
+        <button class="tab-btn" id="tab-compras" style="display:none" onclick="swTab('compras',this)"><i class="ti ti-shopping-cart" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Compras</button>
       </div>
 
       <div class="tc act" id="tc-dash">
@@ -284,6 +285,22 @@ tr:hover td{background:var(--color-background-secondary)}
           <button class="btn-add" onclick="agregarFeriado()"><i class="ti ti-plus"></i> Agregar</button>
         </div>
         <div id="lista-feriados"></div>
+      </div>
+
+      <div class="tc" id="tc-compras">
+        <div class="sec-hdr">
+          <h2>Registro de pedidos de compras</h2>
+          <div class="hdr-actions" id="fil-compras-wrap"></div>
+        </div>
+        <div id="filtros-compras" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+          <input type="date" id="fil-comp-desde" onchange="renderCompras()" style="padding:8px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:13px">
+          <span style="font-size:13px;color:var(--color-text-secondary)">hasta</span>
+          <input type="date" id="fil-comp-hasta" onchange="renderCompras()" style="padding:8px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:13px">
+          <select id="fil-comp-suc" class="filter-sel" onchange="renderCompras()"><option value="">Todas las sucursales</option><option>Roca</option><option>Perticone</option><option>Aguado</option></select>
+          <select id="fil-comp-tipo" class="filter-sel" onchange="renderCompras()"><option value="">Todos los tipos</option><option>Reposición</option><option>Especial</option><option>Emergencia</option><option>Firm</option><option>VOR</option></select>
+          <button class="btn-sm" onclick="limpiarFiltrosCompras()" style="font-size:12px">Limpiar filtros</button>
+        </div>
+        <div id="tabla-compras"></div>
       </div>
     </div>
 
@@ -438,6 +455,23 @@ tr:hover td{background:var(--color-background-secondary)}
   </div>
 </div>
 
+<div class="modal-ov" id="compov">
+  <div class="modal">
+    <h3 id="comp-modal-title"><i class="ti ti-shopping-cart" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Nuevo pedido</h3>
+    <div class="mgrid">
+      <div><label>Fecha del pedido</label><input type="date" id="f-comp-fecha"/></div>
+      <div><label>N° de Orden</label><input type="text" id="f-comp-orden" placeholder="Ej: OC-2026-001"/></div>
+      <div><label>Sucursal</label><select id="f-comp-suc"><option value="">Seleccionar...</option><option>Roca</option><option>Perticone</option><option>Aguado</option></select></div>
+      <div><label>Tipo de Orden</label><select id="f-comp-tipo"><option value="">Seleccionar...</option><option>Reposición</option><option>Especial</option><option>Emergencia</option><option>Firm</option><option>VOR</option></select></div>
+      <div><label>Valor del pedido ($)</label><input type="number" id="f-comp-valor" placeholder="0.00" min="0" step="0.01"/></div>
+      <div><label>Cantidades</label><input type="number" id="f-comp-cant" placeholder="0" min="0" step="1"/></div>
+      <div class="full"><label>Observaciones <span style="color:var(--color-text-secondary);font-weight:400">(opcional)</span></label><textarea id="f-comp-obs" placeholder="Notas adicionales sobre el pedido..."></textarea></div>
+    </div>
+    <p class="login-err" id="comp-err" style="display:none"></p>
+    <div class="mfooter"><button class="btn-cancel" onclick="closeCompModal()">Cancelar</button><button class="btn-save" onclick="guardarPedido()">Guardar pedido</button></div>
+  </div>
+</div>
+
 <div class="modal-ov" id="delov">
   <div class="modal sm">
     <h3><i class="ti ti-trash" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#A32D2D"></i>Eliminar turno</h3>
@@ -559,17 +593,19 @@ async function showApp(){
   document.getElementById('s-login').classList.remove('active');
   document.getElementById('s-app').classList.add('active');
   document.getElementById('tb-user').textContent=cu.nombre;
-  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos'}[cu.rol];
+  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras'}[cu.rol]||cu.rol;
   const sucEl=document.getElementById('tb-suc');
   if(cu.sucursalFija){sucEl.style.display='inline-flex';sucEl.innerHTML=`<i class="ti ti-map-pin" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${cu.sucursalFija}`;}
   else sucEl.style.display='none';
 
-  document.getElementById('tab-turnos').style.display=(cu.rol==='citas'||cu.rol==='admin')?'':'none';
-  document.getElementById('tab-rep').style.display=(cu.rol==='repuestos'||cu.rol==='admin')?'':'none';
+  document.getElementById('tab-turnos').style.display=(cu.rol==='citas'||cu.rol==='admin'||cu.rol==='compras')?'':'none';
+  document.getElementById('tab-rep').style.display=(cu.rol==='repuestos'||cu.rol==='admin'||cu.rol==='compras')?'':'none';
   document.getElementById('tab-usr').style.display=cu.rol==='admin'?'':'none';
+  document.getElementById('tab-compras').style.display=(cu.rol==='compras'||cu.rol==='admin')?'':'none';
 
   let startTab='dash';
   if(cu.rol==='repuestos') startTab='repuestos';
+  if(cu.rol==='compras') startTab='compras';
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('act'));
   document.querySelectorAll('.tc').forEach(c=>c.classList.remove('act'));
   document.getElementById('tab-'+(startTab==='repuestos'?'rep':startTab)).classList.add('act');
@@ -578,6 +614,7 @@ async function showApp(){
   buildFilters();
   await cargarTodo();
   if(cu.rol==='admin') renderUsers();
+  if(cu.rol==='compras'||cu.rol==='admin') await cargarPedidos();
   iniciarRealtime();
 }
 
@@ -627,6 +664,7 @@ function swTab(t,el){
   el.classList.add('act');document.getElementById('tc-'+t).classList.add('act');
   if(t==='usuarios') renderUsers();
   if(t==='dash') renderDash();
+  if(t==='compras') renderCompras();
 }
 function swSubTab(t,el){document.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('act'));document.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));el.classList.add('act');document.getElementById('subtc-'+t).classList.add('act');if(t==='noshow')renderNoShow();if(t==='historico')renderHistorico();}
 
@@ -658,6 +696,8 @@ function buildFilters(){
       :`<select class="filter-sel" id="fil-suc-d" onchange="renderDash()"><option value="">Todas las sucursales</option>${SUCURSALES.map(s=>`<option>${s}</option>`).join('')}</select>`)
       +`<button class="btn-add" onclick="abrirModalReporte()"><i class="ti ti-download"></i> Descargar reporte</button>`;
   }
+  const fc=document.getElementById('fil-compras-wrap');
+  if(fc) fc.innerHTML=`<button class="btn-add" onclick="openCompModal(null)"><i class="ti ti-plus"></i> Nuevo pedido</button>`;
 }
 
 function priPill(p){const m={Alta:'pri-alta',Mediana:'pri-med',Baja:'pri-baja'};return`<span class="pill ${m[p]||'pri-baja'}">${p||'-'}</span>`;}
@@ -1000,6 +1040,150 @@ function descargarReportePDF(){
   doc.save(`reporte_nippon_${toStr(TODAY)}.pdf`);
 }
 
+// ============================================
+// MÓDULO DE COMPRAS
+// ============================================
+let pedidos=[], editPedidoId=null;
+
+async function cargarPedidos(){
+  const {data,error}=await sb.from('pedidos_compras').select('*').order('fecha_pedido',{ascending:false});
+  if(error){console.error('Error al cargar pedidos:',error);pedidos=[];return;}
+  pedidos=data;
+  renderCompras();
+}
+
+function tipoOrdenPill(t){
+  const m={
+    'Reposición':['#E6F1FB','#0C447C'],
+    'Especial':['#EAF3DE','#27500A'],
+    'Emergencia':['#FCEBEB','#791F1F'],
+    'Firm':['#FAEEDA','#633806'],
+    'VOR':['#5B21B6','#fff']
+  };
+  const [bg,color]=m[t]||['#f0f0ee','#444'];
+  return`<span class="pill" style="background:${bg};color:${color}">${t}</span>`;
+}
+
+function fmtPesos(v){if(!v&&v!==0)return'—';return'$'+Number(v).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+function renderCompras(){
+  const desde=document.getElementById('fil-comp-desde')?.value;
+  const hasta=document.getElementById('fil-comp-hasta')?.value;
+  const suc=document.getElementById('fil-comp-suc')?.value;
+  const tipo=document.getElementById('fil-comp-tipo')?.value;
+  const esEditable=cu&&(cu.rol==='compras'||cu.rol==='admin');
+
+  const items=pedidos.filter(p=>{
+    if(desde&&p.fecha_pedido<desde)return false;
+    if(hasta&&p.fecha_pedido>hasta)return false;
+    if(suc&&p.sucursal!==suc)return false;
+    if(tipo&&p.tipo_orden!==tipo)return false;
+    return true;
+  });
+
+  const cont=document.getElementById('tabla-compras');
+  if(!cont)return;
+  if(!items.length){
+    cont.innerHTML='<div class="empty"><i class="ti ti-shopping-cart-off"></i>Sin pedidos para los filtros seleccionados</div>';
+    return;
+  }
+
+  cont.innerHTML=`<table><thead><tr>
+    <th style="width:8%">Fecha</th>
+    <th style="width:10%">N° Orden</th>
+    <th style="width:8%">Sucursal</th>
+    <th style="width:9%">Tipo</th>
+    <th style="width:10%">Valor</th>
+    <th style="width:6%">Cant.</th>
+    <th style="width:12%">Cargado por</th>
+    <th style="width:20%">Observaciones</th>
+    ${esEditable?'<th style="width:10%">Acciones</th>':''}
+  </tr></thead><tbody>
+  ${items.map(p=>`<tr>
+    <td>${fmtD(p.fecha_pedido)}</td>
+    <td><strong>${p.nro_orden}</strong></td>
+    <td>${p.sucursal}</td>
+    <td>${tipoOrdenPill(p.tipo_orden)}</td>
+    <td>${fmtPesos(p.valor_pesos)}</td>
+    <td>${p.cantidades??'—'}</td>
+    <td style="font-size:12px;color:var(--color-text-secondary)">${p.creado_por}</td>
+    <td style="font-size:12px;color:var(--color-text-secondary)">${p.observaciones||'—'}</td>
+    ${esEditable?`<td><div style="display:flex;gap:4px">
+      <button class="btn-sm btn-rep-mark" onclick="openCompModal('${p.id}')"><i class="ti ti-edit" style="font-size:12px"></i> Editar</button>
+      <button class="btn-sm btn-del" onclick="eliminarPedido('${p.id}')"><i class="ti ti-trash" style="font-size:12px"></i></button>
+    </div></td>`:''}
+  </tr>`).join('')}
+  </tbody></table>`;
+}
+
+function limpiarFiltrosCompras(){
+  ['fil-comp-desde','fil-comp-hasta','fil-comp-suc','fil-comp-tipo'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  renderCompras();
+}
+
+function openCompModal(id){
+  editPedidoId=id||null;
+  document.getElementById('comp-err').style.display='none';
+  document.getElementById('comp-modal-title').innerHTML=`<i class="ti ti-shopping-cart" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>${id?'Editar pedido':'Nuevo pedido'}`;
+  if(id){
+    const p=pedidos.find(x=>x.id===id);
+    if(!p)return;
+    document.getElementById('f-comp-fecha').value=p.fecha_pedido;
+    document.getElementById('f-comp-orden').value=p.nro_orden;
+    document.getElementById('f-comp-suc').value=p.sucursal;
+    document.getElementById('f-comp-tipo').value=p.tipo_orden;
+    document.getElementById('f-comp-valor').value=p.valor_pesos||'';
+    document.getElementById('f-comp-cant').value=p.cantidades||'';
+    document.getElementById('f-comp-obs').value=p.observaciones||'';
+  }else{
+    ['f-comp-fecha','f-comp-orden','f-comp-valor','f-comp-cant','f-comp-obs'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('f-comp-suc').value='';
+    document.getElementById('f-comp-tipo').value='';
+  }
+  document.getElementById('compov').classList.add('open');
+}
+function closeCompModal(){document.getElementById('compov').classList.remove('open');}
+
+async function guardarPedido(){
+  const fecha_pedido=document.getElementById('f-comp-fecha').value;
+  const nro_orden=document.getElementById('f-comp-orden').value.trim();
+  const sucursal=document.getElementById('f-comp-suc').value;
+  const tipo_orden=document.getElementById('f-comp-tipo').value;
+  const valor_pesos=document.getElementById('f-comp-valor').value||null;
+  const cantidades=document.getElementById('f-comp-cant').value||null;
+  const observaciones=document.getElementById('f-comp-obs').value.trim();
+  const errEl=document.getElementById('comp-err');
+  errEl.style.display='none';
+
+  if(!fecha_pedido||!nro_orden||!sucursal||!tipo_orden){
+    errEl.textContent='Completá fecha, N° de orden, sucursal y tipo de orden.';
+    errEl.style.display='block';return;
+  }
+  try{
+    if(editPedidoId){
+      const {error}=await sb.from('pedidos_compras').update({fecha_pedido,nro_orden,sucursal,tipo_orden,valor_pesos,cantidades,observaciones}).eq('id',editPedidoId);
+      if(error)throw error;
+    }else{
+      const {error}=await sb.from('pedidos_compras').insert([{fecha_pedido,nro_orden,sucursal,tipo_orden,valor_pesos,cantidades,observaciones,creado_por:cu.nombre}]);
+      if(error)throw error;
+    }
+    closeCompModal();
+    await cargarPedidos();
+  }catch(err){
+    errEl.textContent='Error al guardar: '+err.message;
+    errEl.style.display='block';
+  }
+}
+
+async function eliminarPedido(id){
+  if(!confirm('¿Eliminar este pedido? Esta acción no se puede deshacer.'))return;
+  const {error}=await sb.from('pedidos_compras').delete().eq('id',id);
+  if(error){alert('Error al eliminar: '+error.message);return;}
+  await cargarPedidos();
+}
+
 function renderFeriados(){
   const arr=getFeriados().slice().sort((a,b)=>a.fecha.localeCompare(b.fecha));
   const cont=document.getElementById('lista-feriados');
@@ -1202,6 +1386,7 @@ document.getElementById('obsov').addEventListener('click',function(e){if(e.targe
 document.getElementById('adjov').addEventListener('click',function(e){if(e.target===this)closeAdjModal();});
 document.getElementById('usrov').addEventListener('click',function(e){if(e.target===this)closeUserModal();});
 document.getElementById('repov').addEventListener('click',function(e){if(e.target===this)closeRepModalReporte();});
+document.getElementById('compov').addEventListener('click',function(e){if(e.target===this)closeCompModal();});
 document.getElementById('delov').addEventListener('click',function(e){if(e.target===this)closeDeleteModal();});
 </script>
 </body>
