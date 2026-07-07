@@ -268,6 +268,12 @@ tbody td{padding:14px 14px;vertical-align:middle}
       </div>
 
       <div class="tc" id="tc-turnos">
+        <!-- Sub-tabs estáticos -->
+        <div class="sub-tabs" style="margin-bottom:1.25rem">
+          <button class="sub-tab act" id="subtab-lista" onclick="swSubTab('lista',this)"><i class="ti ti-calendar" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>Turnos</button>
+          <button class="sub-tab" id="subtab-noshow" onclick="swSubTab('noshow',this)"><i class="ti ti-user-x" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>No Shows</button>
+          <button class="sub-tab" id="subtab-historico" onclick="swSubTab('historico',this)"><i class="ti ti-history" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>Histórico</button>
+        </div>
         <div class="sub-tc act" id="subtc-lista">
           <div class="sec-eyebrow">Vista Pre Pull · Por horizonte de días</div>
           <div class="sec-hdr">
@@ -338,23 +344,6 @@ tbody td{padding:14px 14px;vertical-align:middle}
       </div>
     </div>
 
-    <aside class="leyenda">
-      <h4>Tipo de turno</h4>
-      <div class="ley-item"><div class="ley-dot" style="background:#E91E8C"></div><span class="ley-lbl">Campaña</span></div>
-      <div class="ley-item"><div class="ley-dot" style="background:#7C3AED"></div><span class="ley-lbl">Pedido especial</span></div>
-      <div class="ley-item"><div class="ley-dot" style="background:#16A34A"></div><span class="ley-lbl">Reparación</span></div>
-      <div class="ley-item"><div class="ley-dot" style="background:#DC2626"></div><span class="ley-lbl">Servicio</span></div>
-      <div class="ley-item"><div class="ley-dot" style="background:#0EA5E9"></div><span class="ley-lbl">Cristales</span></div>
-      <div class="ley-item"><div class="ley-dot" style="background:#C19A1B"></div><span class="ley-lbl">Siniestros</span></div>
-      <div class="ley-sep">
-        <h4>Horizonte</h4>
-        <div class="ley-item"><div class="ley-sq" style="background:#D3D1C7"></div><span class="ley-lbl">Hoy</span></div>
-        <div class="ley-item"><div class="ley-sq" style="background:#C4C2B8"></div><span class="ley-lbl">N-1</span></div>
-        <div class="ley-item"><div class="ley-sq" style="background:#B4B2A9"></div><span class="ley-lbl">N-2</span></div>
-        <div class="ley-item"><div class="ley-sq" style="background:#ABAAA1"></div><span class="ley-lbl">N-3</span></div>
-        <div class="ley-item"><div class="ley-sq" style="background:#888780"></div><span class="ley-lbl">N-X</span></div>
-      </div>
-    </aside>
   </div>
 </div>
 </div>
@@ -695,23 +684,7 @@ function swTab(t,el){
 function swSubTab(t,el){document.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('act'));document.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));el.classList.add('act');document.getElementById('subtc-'+t).classList.add('act');if(t==='noshow')renderNoShow();if(t==='historico')renderHistorico();}
 
 function buildFilters(){
-  // Sub-tabs de Turnos (se renderizan dentro del tc-turnos, antes del contenido)
-  const stWrap=document.getElementById('subtc-lista');
-  if(stWrap){
-    const subTabsHtml=`<div class="sub-tabs" style="margin-bottom:1.25rem">
-      <button class="sub-tab act" id="subtab-lista" onclick="swSubTab('lista',this)"><i class="ti ti-calendar" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>Turnos</button>
-      <button class="sub-tab" id="subtab-noshow" onclick="swSubTab('noshow',this)"><i class="ti ti-user-x" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>No Shows</button>
-      <button class="sub-tab" id="subtab-historico" onclick="swSubTab('historico',this)"><i class="ti ti-history" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>Histórico</button>
-    </div>`;
-    if(!document.getElementById('sub-tabs-inserted')){
-      const subtabDiv=document.createElement('div');
-      subtabDiv.id='sub-tabs-inserted';
-      subtabDiv.innerHTML=subTabsHtml;
-      document.getElementById('tc-turnos').insertBefore(subtabDiv, stWrap.parentElement || stWrap);
-    }
-  }
-
-  // Sidebar filtros — solo visibles en secciones de turnos
+  // Sidebar filtros — visibles en la pestaña Turnos
   const sf=document.getElementById('sidebar-filters');
   if(sf){
     const TIPOS_DEF=[
@@ -795,7 +768,18 @@ function estPill(e){const m={pendiente:['p-pend','Pendiente'],arribo:['p-arr','A
 function valePill(v){return v?'<span class="pill vale-yes"><i class="ti ti-check" style="font-size:11px"></i> Con vale</span>':'<span class="pill vale-no"><i class="ti ti-x" style="font-size:11px"></i> Sin vale</span>';}
 function rolPill(r){const m={admin:['rol-admin','Admin'],citas:['rol-citas','Citas'],repuestos:['rol-rep','Repuestos']};const[c,l]=m[r];return`<span class="pill ${c}">${l}</span>`;}
 
-function renderGroups(cid,items,fn){let html='';DAY_GROUPS.forEach(g=>{const gi=items.filter(x=>getGroup(x.fecha).key===g.key);if(!gi.length)return;html+=`<div class="day-group"><div class="day-header ${g.cls}"><span class="day-lbl">${g.lbl}</span><span class="day-count">${gi.length}</span></div><div class="table-wrap">${fn(gi)}</div></div>`;});document.getElementById(cid).innerHTML=html||'<div class="empty"><i class="ti ti-calendar-off"></i>Sin turnos para este filtro</div>';}
+function renderGroups(cid,items,fn){
+  // Cachear el grupo de cada item una sola vez (diffHabil puede ser lento con muchos turnos)
+  const grouped=new Map();
+  items.forEach(x=>{const k=getGroup(x.fecha).key;if(!grouped.has(k))grouped.set(k,[]);grouped.get(k).push(x);});
+  let html='';
+  DAY_GROUPS.forEach(g=>{
+    const gi=grouped.get(g.key)||[];
+    if(!gi.length)return;
+    html+=`<div class="day-group"><div class="day-header ${g.cls}"><span class="day-lbl">${g.lbl}</span><span class="day-count">${gi.length}</span></div><div class="table-wrap">${fn(gi)}</div></div>`;
+  });
+  document.getElementById(cid).innerHTML=html||'<div class="empty"><i class="ti ti-calendar-off"></i>Sin turnos para este filtro</div>';
+}
 
 function renderTurnos(){
   const sel=document.getElementById('fil-suc-t');
