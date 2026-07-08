@@ -517,9 +517,20 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // Las contraseñas ahora viven en la columna "password" de la tabla "usuarios" en Supabase.
 // El admin puede crear usuarios y definir su contraseña desde la pestaña Usuarios.
 
-const TODAY=new Date();TODAY.setHours(0,0,0,0);
-function toStr(d){return d.toISOString().slice(0,10)}
-function parseD(s){const d=new Date(s+'T12:00:00');d.setHours(0,0,0,0);return d}
+// TODAY se construye con la fecha LOCAL del browser (evita bug de zona horaria UTC-3 Argentina)
+const _n=new Date();
+const TODAY=new Date(_n.getFullYear(),_n.getMonth(),_n.getDate());
+function toStr(d){
+  // Formatear sin pasar por UTC para evitar el offset de zona horaria
+  const dd=String(d.getDate()).padStart(2,'0');
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  return`${d.getFullYear()}-${mm}-${dd}`;
+}
+function parseD(s){
+  // Parsear la fecha como local (no UTC) para evitar saltos de día
+  const [y,m,d]=s.split('-').map(Number);
+  return new Date(y,m-1,d);
+}
 function diff(s){return Math.round((parseD(s)-TODAY)/86400000)}
 function fmtD(s){const d=parseD(s);const dd=String(d.getDate()).padStart(2,'0');const mm=String(d.getMonth()+1).padStart(2,'0');return`${dd}/${mm}/${d.getFullYear()}`;}
 function fmtFechaHora(d){const dd=String(d.getDate()).padStart(2,'0');const mm=String(d.getMonth()+1).padStart(2,'0');const hh=String(d.getHours()).padStart(2,'0');const mi=String(d.getMinutes()).padStart(2,'0');return`${dd}/${mm}/${d.getFullYear()} ${hh}:${mi}`;}
@@ -793,12 +804,35 @@ function renderGroups(cid,items,fn){
   const grouped=new Map();
   items.forEach(x=>{const k=getGroup(x.fecha).key;if(!grouped.has(k))grouped.set(k,[]);grouped.get(k).push(x);});
   let html='';
-  DAY_GROUPS.forEach(g=>{
+  // Grupos activos (sin Pasados) — se muestran normalmente
+  DAY_GROUPS.filter(g=>g.key!=='pas').forEach(g=>{
     const gi=grouped.get(g.key)||[];
     if(!gi.length)return;
     html+=`<div class="day-group"><div class="day-header ${g.cls}"><span class="day-lbl">${g.lbl}</span><span class="day-count">${gi.length}</span></div><div class="table-wrap">${fn(gi)}</div></div>`;
   });
+  // Pasados — colapsados al final como acordeón
+  const pasados=grouped.get('pas')||[];
+  if(pasados.length){
+    const pid=cid+'-pas-body';
+    html+=`<div class="day-group pas-collapsible" style="margin-top:.5rem">
+      <div class="day-header dh-nx" style="cursor:pointer;user-select:none" onclick="togglePasados('${pid}',this)">
+        <span class="day-lbl" style="color:var(--color-text-muted)">Pasados sin acción</span>
+        <span class="day-count">${pasados.length}</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--color-text-muted)" id="${pid}-chevron"><i class="ti ti-chevron-down" style="font-size:13px;vertical-align:-2px"></i> Ver</span>
+      </div>
+      <div id="${pid}" style="display:none;margin-top:.5rem"><div class="table-wrap">${fn(pasados)}</div></div>
+    </div>`;
+  }
   document.getElementById(cid).innerHTML=html||'<div class="empty"><i class="ti ti-calendar-off"></i>Sin turnos para este filtro</div>';
+}
+
+function togglePasados(pid,header){
+  const body=document.getElementById(pid);
+  const chev=document.getElementById(pid+'-chevron');
+  if(!body)return;
+  const isOpen=body.style.display!=='none';
+  body.style.display=isOpen?'none':'block';
+  if(chev) chev.innerHTML=isOpen?'<i class="ti ti-chevron-down" style="font-size:13px;vertical-align:-2px"></i> Ver':'<i class="ti ti-chevron-up" style="font-size:13px;vertical-align:-2px"></i> Ocultar';
 }
 
 function renderTurnos(){
