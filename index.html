@@ -108,7 +108,7 @@ a{color:#c62a27;text-decoration:none}
 
 /* ── APP BODY ────────────────────────────────────────── */
 .app-body{display:flex;flex:1;min-height:0;height:calc(100vh - 60px)}
-.screen#s-app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.screen#s-app{flex-direction:column;height:100vh;overflow:hidden}
 .screen#s-app.active{display:flex}
 
 /* ── SIDEBAR ─────────────────────────────────────────── */
@@ -385,15 +385,15 @@ tbody td{padding:11px 12px;vertical-align:middle}
       <div class="brand-sub">Sistema Pre Pull</div>
       <div class="fg">
         <label>Usuario</label>
-        <input type="text" id="l-user" placeholder="nombre.apellido" autocomplete="username">
+        <input type="text" id="lu" placeholder="nombre.apellido" autocomplete="username">
       </div>
       <div class="fg">
         <label>Contraseña</label>
-        <input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password">
+        <input type="password" id="lp" placeholder="••••••••" autocomplete="current-password">
       </div>
       <div class="fg">
         <label>Sector</label>
-        <select id="l-sector">
+        <select id="lr">
           <option value="">Seleccioná tu sector</option>
           <option value="admin">Administración</option>
           <option value="citas">Citas</option>
