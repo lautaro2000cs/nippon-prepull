@@ -1652,6 +1652,7 @@ function getMesesOpciones(){const y=new Date().getFullYear();return MESES_ANIO.f
 let compSeccionActual=null;
 let compRegistros=[];
 let compEditId=null;
+let compOrdenAsc=true; // true = más antiguo primero, false = más nuevo primero
 let compTargetEq=null, compTargetCub=null;
 
 async function cargarPedidos(){
@@ -1664,11 +1665,11 @@ async function cargarRegistrosSec(){
   const sec=COMP_SECCIONES.find(s=>s.key===compSeccionActual);
   if(!sec)return;
   if(sec.tabla==='compras_general'){
-    const {data,error}=await sb.from(sec.tabla).select('*').eq('seccion',sec.lbl).order('creado_en',{ascending:false});
+    const {data,error}=await sb.from(sec.tabla).select('*').eq('seccion',sec.lbl).order('fecha',{ascending:true});
     if(error){console.error(error);compRegistros=[];return;}
     compRegistros=data;
   }else{
-    const {data,error}=await sb.from(sec.tabla).select('*').order('creado_en',{ascending:false});
+    const {data,error}=await sb.from(sec.tabla).select('*').order('fecha',{ascending:true});
     if(error){console.error(error);compRegistros=[];return;}
     compRegistros=data;
   }
@@ -1753,7 +1754,18 @@ function renderFiltrosCompras(){
            <input type="date" id="fil-c-hasta" onchange="renderSeccionTabla()" style="${styleInp}">`;
   }
   html+=`<button class="btn-sm" onclick="limpiarFiltrosCompras()" style="font-size:12px">Limpiar filtros</button>`;
+  html+=`<button class="btn-sm" id="btn-orden-comp" onclick="toggleOrdenCompras()" style="font-size:12px;margin-left:auto" title="Cambiar orden">
+    <i class="ti ti-arrows-sort" style="font-size:13px;vertical-align:-2px"></i>
+    <span id="orden-comp-lbl">${compOrdenAsc?'Más antiguo primero':'Más nuevo primero'}</span>
+  </button>`;
   cont.innerHTML=html;
+}
+
+function toggleOrdenCompras(){
+  compOrdenAsc=!compOrdenAsc;
+  const lbl=document.getElementById('orden-comp-lbl');
+  if(lbl) lbl.textContent=compOrdenAsc?'Más antiguo primero':'Más nuevo primero';
+  renderSeccionTabla();
 }
 
 function limpiarFiltrosCompras(){
@@ -1773,7 +1785,7 @@ function renderSeccionTabla(){
   const esEdit=cu&&(cu.rol==='compras'||cu.rol==='admin');
   const puedeRecibir=cu&&(cu.rol==='repuestos'||cu.rol==='admin'||cu.rol==='compras');
 
-  const items=compRegistros.filter(r=>{
+  let items=compRegistros.filter(r=>{
     if(desde&&r.fecha&&r.fecha<desde)return false;
     if(hasta&&r.fecha&&r.fecha>hasta)return false;
     if(tipo&&r.tipo_orden!==tipo)return false;
@@ -1782,7 +1794,21 @@ function renderSeccionTabla(){
     return true;
   });
 
+  // Aplicar orden
+  items=items.slice().sort((a,b)=>{
+    const fa=a.fecha||'', fb=b.fecha||'';
+    return compOrdenAsc?(fa<fb?-1:fa>fb?1:0):(fa>fb?-1:fa<fb?1:0);
+  });
+
   if(!items.length){cont.innerHTML='<div class="empty"><i class="ti ti-inbox"></i>Sin registros para los filtros seleccionados</div>';return;}
+
+  // Función para obtener etiqueta de mes a partir de una fecha YYYY-MM-DD
+  const MESES_NOM=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  function mesLabel(fecha){
+    if(!fecha) return '';
+    const [y,m]=fecha.split('-');
+    return `${MESES_NOM[parseInt(m)-1]} ${y}`;
+  }
 
   let ths='',rowFn;
   if(['añelo','casacentral','flotas'].includes(k)){
@@ -1806,8 +1832,10 @@ function renderSeccionTabla(){
     cont.innerHTML='<div class="empty">Sección no reconocida</div>';return;
   }
 
+  const colCount=(ths.match(/<th>/g)||[]).length;
   const mostrarAcc=esEdit||(k==='cubiertas'&&puedeRecibir);
   const accTh=mostrarAcc?'<th>Acciones</th>':'';
+  const totalCols=colCount+(mostrarAcc?1:0);
   const accTd=r=>{
     if(!mostrarAcc)return'';
     const btnRec=(k==='cubiertas'&&puedeRecibir&&!r.fecha_recepcion)?`<button class="btn-sm" onclick="marcarRecepcionCubierta('${r.id}')" title="Marcar recepción"><i class="ti ti-package-import" style="font-size:12px"></i></button>`:'';
@@ -1816,7 +1844,26 @@ function renderSeccionTabla(){
     return`<td><div style="display:flex;gap:4px">${btnRec}${btnEdit}${btnDel}</div></td>`;
   };
 
-  cont.innerHTML=`<table><thead><tr>${ths}${accTh}</tr></thead><tbody>${items.map(r=>`<tr>${rowFn(r)}${accTd(r)}</tr>`).join('')}</tbody></table>`;
+  // Construir filas con separadores de mes
+  let tbody='';
+  let mesActual='';
+  for(const r of items){
+    const mesEstaFila=mesLabel(r.fecha);
+    if(mesEstaFila && mesEstaFila!==mesActual){
+      mesActual=mesEstaFila;
+      tbody+=`<tr>
+        <td colspan="${totalCols}" style="padding:0;border:none">
+          <div style="display:flex;align-items:center;gap:10px;padding:14px 12px 8px;margin-top:4px">
+            <span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-4,#8a8680)">${mesActual}</span>
+            <div style="flex:1;height:1px;background:rgba(0,0,0,.07)"></div>
+          </div>
+        </td>
+      </tr>`;
+    }
+    tbody+=`<tr>${rowFn(r)}${accTd(r)}</tr>`;
+  }
+
+  cont.innerHTML=`<table><thead><tr>${ths}${accTh}</tr></thead><tbody>${tbody}</tbody></table>`;
 }
 
 function renderTargetBanner(){
