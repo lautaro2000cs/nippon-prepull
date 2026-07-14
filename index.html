@@ -1232,7 +1232,7 @@ function renderTurnoCard(t){
       <div class="t-exp-item"><div class="t-exp-item-label">Prioridad</div><div class="t-exp-item-val">${priPill(t.prioridad)}</div></div>
     </div>
     <div class="t-exp-actions">
-      ${cC?`<button class="t-exp-btn t-exp-btn-arribo" onclick="marcarArribo('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Marcar arribó</button>`:''}
+      ${(cu&&(cu.rol==='repuestos'||cu.rol==='admin'))?`<button class="t-exp-btn t-exp-btn-arribo" onclick="marcarArribo('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Marcar arribó</button>`:''}
       ${cC?`<button class="t-exp-btn t-exp-btn-noshow" onclick="openNsModal('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="23" y2="14"/><line x1="23" y1="8" x2="17" y2="14"/></svg> No show</button>`:''}
       ${cC?`<button class="t-exp-btn t-exp-btn-outline" onclick="openRepr('${t.id}')">Reprogramar</button>`:''}
       ${cC?`<button class="t-exp-btn t-exp-btn-outline" onclick="openModal('${t.id}')">Editar</button>`:''}
