@@ -2144,6 +2144,16 @@ function refrescarHorizontes(){
 }
 
 // --- Adjuntos de turnos (Supabase Storage, bucket "turnos-adjuntos") ---
+// Sanitizar nombre de archivo para Supabase Storage (elimina caracteres inválidos)
+function sanitizarPath(nombre){
+  return nombre
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // quitar tildes
+    .replace(/[°ºª]/g,'')                             // quitar símbolos especiales
+    .replace(/[^a-zA-Z0-9._\-]/g,'_')                // reemplazar todo lo demás por _
+    .replace(/__+/g,'_')                              // colapsar guiones bajos múltiples
+    .replace(/^_|_$/g,'');                            // limpiar bordes
+}
+
 async function subirAdjuntos(){
   const input=document.getElementById('f-adj-input');
   const files=Array.from(input.files||[]);
@@ -2151,7 +2161,8 @@ async function subirAdjuntos(){
   document.getElementById('f-adj-subiendo').style.display='block';
   for(const file of files){
     try{
-      const path=`${Date.now()}_${Math.random().toString(36).slice(2,8)}_${file.name}`;
+      const nombreSanitizado=sanitizarPath(file.name);
+      const path=`${Date.now()}_${Math.random().toString(36).slice(2,8)}_${nombreSanitizado}`;
       const {error:upErr}=await sb.storage.from('turnos-adjuntos').upload(path,file);
       if(upErr) throw upErr;
       const {data:urlData}=sb.storage.from('turnos-adjuntos').getPublicUrl(path);
@@ -2333,7 +2344,8 @@ async function subirAdjuntosDrawer(){
   document.getElementById("dr-adj-subiendo").style.display="block";
   for(const file of files){
     try{
-      const path=Date.now()+"_"+Math.random().toString(36).slice(2,8)+"_"+file.name;
+      const nombreSanitizado=sanitizarPath(file.name);
+      const path=Date.now()+"_"+Math.random().toString(36).slice(2,8)+"_"+nombreSanitizado;
       const{error}=await sb.storage.from("turnos-adjuntos").upload(path,file);
       if(error)throw error;
       const{data}=sb.storage.from("turnos-adjuntos").getPublicUrl(path);
