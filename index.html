@@ -2333,7 +2333,12 @@ function openDrawer(){
   setDrawerPri("Mediana",document.querySelector(".drawer-seg-btn[data-val=\"Mediana\"]"));
 }
 function closeDrawer(){document.getElementById("drawer-ov").classList.remove("open");document.getElementById("drawer").style.display="none";drawerAdjuntos=[];document.getElementById("dr-adj-lista").innerHTML="";}
-function setDrawerPri(val,btn){document.querySelectorAll(".drawer-seg-btn").forEach(b=>{b.className="drawer-seg-btn";});if(btn)btn.className="drawer-seg-btn act-"+val.toLowerCase();document.getElementById("dr-pri-seg").dataset.val=val;}
+function setDrawerPri(val,btn){
+  const clsMap={Alta:'act-alta',Mediana:'act-media',Baja:'act-baja'};
+  document.querySelectorAll(".drawer-seg-btn").forEach(b=>{b.className="drawer-seg-btn";});
+  if(btn) btn.className="drawer-seg-btn "+(clsMap[val]||'act-media');
+  document.getElementById("dr-pri-seg").dataset.val=val;
+}
 
 async function crearTurnoDrawer(){const errEl=document.getElementById("drawer-err");errEl.style.display="none";const preor=document.getElementById("dr-preor").value.trim();const fecha=document.getElementById("dr-fecha").value;const cliente=document.getElementById("dr-cliente").value.trim();const dominio=document.getElementById("dr-dominio").value.trim();const modelo=document.getElementById("dr-modelo").value;const suc=document.getElementById("dr-suc").value;const tipo=document.getElementById("dr-tipo").value;const prioridad=document.getElementById("dr-pri-seg").dataset.val||"Mediana";const quien=document.getElementById("dr-quien").value;const obs=document.getElementById("dr-obs").value.trim();if(!cliente||!dominio){errEl.textContent="Completá al menos Cliente y Dominio.";errEl.style.display="block";return;}try{const{error}=await sb.from("turnos").insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad,quien,obs,estado:"pendiente",reprogramado:false,motivo_repr:"",no_show:false,vale:false,obs_rep:"",adjuntos:drawerAdjuntos}]);if(error)throw error;closeDrawer();showToast("Turno creado correctamente");}catch(err){errEl.textContent="Error: "+err.message;errEl.style.display="block";}}
 
