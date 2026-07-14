@@ -651,7 +651,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
       <label class="drawer-label">Prioridad</label>
       <div class="drawer-segment" id="dr-pri-seg">
         <button class="drawer-seg-btn" data-val="Alta" onclick="setDrawerPri('Alta',this)">Alta</button>
-        <button class="drawer-seg-btn act-media" data-val="Media" onclick="setDrawerPri('Media',this)">Media</button>
+        <button class="drawer-seg-btn act-media" data-val="Mediana" onclick="setDrawerPri('Mediana',this)">Mediana</button>
         <button class="drawer-seg-btn" data-val="Baja" onclick="setDrawerPri('Baja',this)">Baja</button>
       </div>
     </div>
@@ -2308,14 +2308,44 @@ let drawerAdjuntos=[];
 let metricaActiva=null;
 let searchVal="";
 
-function openDrawer(){document.getElementById("drawer-ov").classList.add("open");document.getElementById("drawer").style.display="flex";setDrawerPri("Media",document.querySelector(".drawer-seg-btn[data-val=\"Media\"]"));}
+function openDrawer(){
+  drawerAdjuntos=[];
+  document.getElementById("dr-adj-lista").innerHTML="";
+  const inp=document.getElementById("dr-adj-input");
+  if(inp)inp.value="";
+  // Limpiar campos del formulario
+  ["dr-preor","dr-fecha","dr-cliente","dr-dominio","dr-obs"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+  ["dr-modelo","dr-suc","dr-tipo","dr-quien"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+  document.getElementById("drawer-err").style.display="none";
+  document.getElementById("drawer-ov").classList.add("open");
+  document.getElementById("drawer").style.display="flex";
+  setDrawerPri("Mediana",document.querySelector(".drawer-seg-btn[data-val=\"Mediana\"]"));
+}
 function closeDrawer(){document.getElementById("drawer-ov").classList.remove("open");document.getElementById("drawer").style.display="none";drawerAdjuntos=[];document.getElementById("dr-adj-lista").innerHTML="";}
 function setDrawerPri(val,btn){document.querySelectorAll(".drawer-seg-btn").forEach(b=>{b.className="drawer-seg-btn";});if(btn)btn.className="drawer-seg-btn act-"+val.toLowerCase();document.getElementById("dr-pri-seg").dataset.val=val;}
 
-async function crearTurnoDrawer(){const errEl=document.getElementById("drawer-err");errEl.style.display="none";const preor=document.getElementById("dr-preor").value.trim();const fecha=document.getElementById("dr-fecha").value;const cliente=document.getElementById("dr-cliente").value.trim();const dominio=document.getElementById("dr-dominio").value.trim();const modelo=document.getElementById("dr-modelo").value;const suc=document.getElementById("dr-suc").value;const tipo=document.getElementById("dr-tipo").value;const prioridad=document.getElementById("dr-pri-seg").dataset.val||"Media";const quien=document.getElementById("dr-quien").value;const obs=document.getElementById("dr-obs").value.trim();if(!cliente||!dominio){errEl.textContent="Completá al menos Cliente y Dominio.";errEl.style.display="block";return;}try{const{error}=await sb.from("turnos").insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad,quien,obs,estado:"pendiente",reprogramado:false,motivo_repr:"",no_show:false,vale:false,obs_rep:"",adjuntos:drawerAdjuntos}]);if(error)throw error;closeDrawer();showToast("Turno creado correctamente");}catch(err){errEl.textContent="Error: "+err.message;errEl.style.display="block";}}
+async function crearTurnoDrawer(){const errEl=document.getElementById("drawer-err");errEl.style.display="none";const preor=document.getElementById("dr-preor").value.trim();const fecha=document.getElementById("dr-fecha").value;const cliente=document.getElementById("dr-cliente").value.trim();const dominio=document.getElementById("dr-dominio").value.trim();const modelo=document.getElementById("dr-modelo").value;const suc=document.getElementById("dr-suc").value;const tipo=document.getElementById("dr-tipo").value;const prioridad=document.getElementById("dr-pri-seg").dataset.val||"Mediana";const quien=document.getElementById("dr-quien").value;const obs=document.getElementById("dr-obs").value.trim();if(!cliente||!dominio){errEl.textContent="Completá al menos Cliente y Dominio.";errEl.style.display="block";return;}try{const{error}=await sb.from("turnos").insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad,quien,obs,estado:"pendiente",reprogramado:false,motivo_repr:"",no_show:false,vale:false,obs_rep:"",adjuntos:drawerAdjuntos}]);if(error)throw error;closeDrawer();showToast("Turno creado correctamente");}catch(err){errEl.textContent="Error: "+err.message;errEl.style.display="block";}}
 
-async function subirAdjuntosDrawer(){const input=document.getElementById("dr-adj-input");const files=Array.from(input.files||[]);if(!files.length)return;document.getElementById("dr-adj-subiendo").style.display="block";for(const file of files){try{const path=Date.now()+"_"+Math.random().toString(36).slice(2,8)+"_"+file.name;const{error}=await sb.storage.from("turnos-adjuntos").upload(path,file);if(error)throw error;const{data}=sb.storage.from("turnos-adjuntos").getPublicUrl(path);drawerAdjuntos.push({nombre:file.name,url:data.publicUrl,path,tipo:file.type});}catch(err){alert("No se pudo subir "+file.name+": "+err.message);}}
-document.getElementById("dr-adj-subiendo").style.display="none";input.value="";renderDrawerAdjuntos();}
+async function subirAdjuntosDrawer(){
+  const input=document.getElementById("dr-adj-input");
+  const files=Array.from(input.files||[]);
+  if(!files.length)return;
+  document.getElementById("dr-adj-subiendo").style.display="block";
+  for(const file of files){
+    try{
+      const path=Date.now()+"_"+Math.random().toString(36).slice(2,8)+"_"+file.name;
+      const{error}=await sb.storage.from("turnos-adjuntos").upload(path,file);
+      if(error)throw error;
+      const{data}=sb.storage.from("turnos-adjuntos").getPublicUrl(path);
+      drawerAdjuntos.push({nombre:file.name,url:data.publicUrl,path,tipo:file.type});
+    }catch(err){
+      alert("No se pudo subir "+file.name+": "+err.message);
+    }
+  }
+  document.getElementById("dr-adj-subiendo").style.display="none";
+  input.value="";
+  renderDrawerAdjuntos();
+}
 
 function renderDrawerAdjuntos(){const cont=document.getElementById("dr-adj-lista");if(!cont)return;cont.innerHTML=drawerAdjuntos.map((a,i)=>{const esImg=(a.tipo||"").startsWith("image/");return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface-sub);border-radius:8px;font-size:12px"><i class="ti ti-${esImg?"photo":"file"}" style="font-size:13px;flex-shrink:0"></i><a href="${a.url}" target="_blank" style="flex:1;color:#1f5fa8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.nombre}</a><button type="button" onclick="quitarAdjuntoDrawer(${i})" style="background:none;border:none;color:#c62a27;cursor:pointer"><i class="ti ti-x" style="font-size:12px"></i></button></div>`;}).join("");}
 
