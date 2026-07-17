@@ -643,7 +643,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
         <select class="drawer-input" id="dr-tipo">
           <option value="">Seleccionar...</option>
           <option>Campaña</option><option>Pedido especial</option><option>Reparación</option>
-          <option>Servicio</option><option>Cristales</option><option>Siniestros</option>
+          <option>Servicio</option><option>Cristales</option><option>Siniestros</option><option>Accesorios</option>
         </select>
       </div>
     </div>
@@ -695,7 +695,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
       </div>
       <div><label>Sucursal</label><select id="f-suc"><option value="">Seleccionar...</option><option>Roca</option><option>Perticone</option><option>Aguado</option></select></div>
       <div><label>Tipo de turno</label>
-        <select id="f-tipo"><option value="">Seleccionar...</option><option>Campaña</option><option>Pedido especial</option><option>Reparación</option><option>Servicio</option><option>Cristales</option><option>Siniestros</option></select>
+        <select id="f-tipo"><option value="">Seleccionar...</option><option>Campaña</option><option>Pedido especial</option><option>Reparación</option><option>Servicio</option><option>Cristales</option><option>Siniestros</option><option>Accesorios</option></select>
       </div>
       <div><label>Prioridad</label><select id="f-pri"><option value="">Seleccionar...</option><option>Alta</option><option>Mediana</option><option>Baja</option></select></div>
       <div><label>Cargado por</label><select id="f-quien"><option value="">Seleccionar...</option></select></div>
@@ -886,7 +886,7 @@ function diffHabil(s){
 function esTurnoFueraDeSemana(s){return esFinDeSemana(parseD(s));}
 
 const SUCURSALES=['Roca','Perticone','Aguado'];
-const TIPOS={'Campaña':'#E91E8C','Pedido especial':'#7C3AED','Reparación':'#16A34A','Servicio':'#DC2626','Cristales':'#0EA5E9','Siniestros':'#C19A1B'};
+const TIPOS={'Campaña':'#E91E8C','Pedido especial':'#7C3AED','Reparación':'#16A34A','Servicio':'#DC2626','Cristales':'#0EA5E9','Siniestros':'#C19A1B','Accesorios':'#059669'};
 function tipoDot(t){if(!t)return'<span style="font-size:11px;color:var(--color-text-secondary)">—</span>';return`<div class="tipo-cell"><div class="tipo-dot" style="background:${TIPOS[t]||'#888'}"></div><span style="font-size:11px;color:var(--color-text-secondary)">${t}</span></div>`;}
 const DAY_GROUPS=[{key:'finde',lbl:'⚠ Fin de semana / feriado — revisar',cls:'dh-nx',test:(d,s)=>esTurnoFueraDeSemana(s)||esFeriado(parseD(s))},{key:'hoy',lbl:'Hoy',cls:'dh-today',test:d=>d===0},{key:'n1',lbl:'N-1 — Próximo día hábil',cls:'dh-n1',test:d=>d===1},{key:'n2',lbl:'N-2 — En 2 días hábiles',cls:'dh-n2',test:d=>d===2},{key:'n3',lbl:'N-3 — En 3 días hábiles',cls:'dh-n3',test:d=>d===3},{key:'nx',lbl:'N-X — Más de 3 días hábiles',cls:'dh-nx',test:d=>d>3},{key:'pas',lbl:'Pasados',cls:'dh-nx',test:d=>d<0}];
 function getGroup(s){
@@ -1051,6 +1051,7 @@ function buildFilters(){
       {lbl:'Servicio',color:'#e0322f'},
       {lbl:'Cristales',color:'#2f7de0'},
       {lbl:'Siniestros',color:'#e0a72f'},
+      {lbl:'Accesorios',color:'#059669'},
     ];
     const HORIZONTES=[
       {key:'hoy',lbl:'Hoy'},{key:'n1',lbl:'N-1'},{key:'n2',lbl:'N-2'},
@@ -1179,7 +1180,7 @@ function togglePasados(pid,header){
   if(chev) chev.innerHTML=isOpen?'<i class="ti ti-chevron-down" style="font-size:13px;vertical-align:-2px"></i> Ver':'<i class="ti ti-chevron-up" style="font-size:13px;vertical-align:-2px"></i> Ocultar';
 }
 
-const TIPO_COLORS={'Campaña':'#7c5cff','Pedido especial':'#c05cff','Reparación':'#22a45d','Servicio':'#e0322f','Cristales':'#2f7de0','Siniestros':'#e0a72f'};
+const TIPO_COLORS={'Campaña':'#7c5cff','Pedido especial':'#c05cff','Reparación':'#22a45d','Servicio':'#e0322f','Cristales':'#2f7de0','Siniestros':'#e0a72f','Accesorios':'#059669'};
 function getTipoColor(t){return TIPO_COLORS[t]||'#8a8680';}
 
 function renderTurnoCard(t){
