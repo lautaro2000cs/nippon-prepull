@@ -737,6 +737,17 @@ tbody td{padding:11px 12px;vertical-align:middle}
     <div style="margin-bottom:.85rem"><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Estado del repuesto</label>
       <select id="rep-estado"><option value="arribo">Arribó</option><option value="faltante">Faltante</option><option value="bo">B/O</option></select>
     </div>
+    <div style="margin-bottom:.85rem">
+      <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:8px">Vale</label>
+      <div style="display:flex;gap:10px">
+        <button id="rep-vale-si" onclick="setRepVale(true)" style="flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--border-2);background:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s">
+          <i class="ti ti-check" style="font-size:13px;vertical-align:-2px;margin-right:4px"></i>Con vale
+        </button>
+        <button id="rep-vale-no" onclick="setRepVale(false)" style="flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--border-2);background:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s">
+          <i class="ti ti-x" style="font-size:13px;vertical-align:-2px;margin-right:4px"></i>Sin vale
+        </button>
+      </div>
+    </div>
     <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Observación <span>(opcional)</span></label>
       <textarea id="rep-obs" placeholder="Ej: separado en estantería A3..."></textarea>
     </div>
@@ -1342,7 +1353,6 @@ function renderRepuestos(){
     const obsCitaTag=t.obs?`<span class="obs-badge" style="background:#E6F1FB;color:#0C447C" onclick="verObs('${t.id}','cita')"><i class="ti ti-notes" style="font-size:11px"></i> Ver</span>`:'—';
     const acc=cR?`<div class="act-group">
       <button class="btn-sm btn-rep-mark" onclick="openRepModal('${t.id}')"><i class="ti ti-edit" style="font-size:12px"></i> ${t.estado==='pendiente'?'Marcar':'Editar'}</button>
-      <button class="btn-sm ${t.vale?'btn-vale-on':'btn-vale-off'}" onclick="openVModal('${t.id}')"><i class="ti ti-receipt" style="font-size:12px"></i> Vale</button>
     </div>`:`<div class="act-group">${estPill(t.estado)}</div>`;
     return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${valePill(t.vale)}</td><td>${nsBadge}</td><td>${obsCitaTag}</td><td>${obsTag}</td><td>${estPill(t.estado)}</td><td>${acc}</td></tr>`;
   }).join('')}</tbody></table>`);
@@ -1395,12 +1405,20 @@ async function guardarVale(){
   closeVModal();await cargarTurnos();renderRepuestos();
 }
 
-function openRepModal(id){repId=id;const t=findTurno(id);document.getElementById('rep-subtitle').textContent=`${t.preor} · ${t.cliente} · ${t.sucursal}`;document.getElementById('rep-estado').value=t.estado==='pendiente'?'arribo':t.estado;document.getElementById('rep-obs').value=t.obs_rep||'';document.getElementById('repmov').classList.add('open');}
+let repValeActual=false;
+function setRepVale(v){
+  repValeActual=v;
+  const si=document.getElementById('rep-vale-si');
+  const no=document.getElementById('rep-vale-no');
+  if(si) si.style.cssText=`flex:1;padding:9px;border-radius:9px;border:1.5px solid ${v?'#1f7a48':'var(--border-2)'};background:${v?'#e6f4ec':'none'};color:${v?'#1f7a48':'inherit'};font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s`;
+  if(no) no.style.cssText=`flex:1;padding:9px;border-radius:9px;border:1.5px solid ${!v?'var(--accent-h)':'var(--border-2)'};background:${!v?'var(--accent-tint)':'none'};color:${!v?'var(--accent-h)':'inherit'};font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s`;
+}
+function openRepModal(id){repId=id;const t=findTurno(id);document.getElementById('rep-subtitle').textContent=`${t.preor} · ${t.cliente} · ${t.sucursal}`;document.getElementById('rep-estado').value=t.estado==='pendiente'?'arribo':t.estado;document.getElementById('rep-obs').value=t.obs_rep||'';repValeActual=!!t.vale;setRepVale(repValeActual);document.getElementById('repmov').classList.add('open');}
 function closeRepModal(){document.getElementById('repmov').classList.remove('open');}
 async function guardarRep(){
   const estado=document.getElementById('rep-estado').value;
   const obs_rep=document.getElementById('rep-obs').value.trim();
-  const {error}=await sb.from('turnos').update({estado,obs_rep}).eq('id',repId);
+  const {error}=await sb.from('turnos').update({estado,obs_rep,vale:repValeActual}).eq('id',repId);
   if(error){alert('Error al guardar: '+error.message);return;}
   closeRepModal();await cargarTurnos();renderTurnos();renderRepuestos();renderDash();
 }
