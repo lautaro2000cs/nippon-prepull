@@ -1166,29 +1166,7 @@ function renderGroups(cid,items,fn){
     if(!gi.length)return;
     html+=`<div class="day-group"><div class="day-header ${g.cls}"><span class="day-lbl">${g.lbl}</span><span class="day-count">${gi.length}</span></div><div class="table-wrap">${fn(gi)}</div></div>`;
   });
-  // Pasados — colapsados al final como acordeón
-  const pasados=grouped.get('pas')||[];
-  if(pasados.length){
-    const pid=cid+'-pas-body';
-    html+=`<div class="day-group pas-collapsible" style="margin-top:.5rem">
-      <div class="day-header dh-nx" style="cursor:pointer;user-select:none" onclick="togglePasados('${pid}',this)">
-        <span class="day-lbl" style="color:var(--color-text-muted)">Pasados sin acción</span>
-        <span class="day-count">${pasados.length}</span>
-        <span style="margin-left:auto;font-size:11px;color:var(--color-text-muted)" id="${pid}-chevron"><i class="ti ti-chevron-down" style="font-size:13px;vertical-align:-2px"></i> Ver</span>
-      </div>
-      <div id="${pid}" style="display:none;margin-top:.5rem"><div class="table-wrap">${fn(pasados)}</div></div>
-    </div>`;
-  }
   document.getElementById(cid).innerHTML=html||'<div class="empty"><i class="ti ti-calendar-off"></i>Sin turnos para este filtro</div>';
-}
-
-function togglePasados(pid,header){
-  const body=document.getElementById(pid);
-  const chev=document.getElementById(pid+'-chevron');
-  if(!body)return;
-  const isOpen=body.style.display!=='none';
-  body.style.display=isOpen?'none':'block';
-  if(chev) chev.innerHTML=isOpen?'<i class="ti ti-chevron-down" style="font-size:13px;vertical-align:-2px"></i> Ver':'<i class="ti ti-chevron-up" style="font-size:13px;vertical-align:-2px"></i> Ocultar';
 }
 
 const TIPO_COLORS={'Campaña':'#7c5cff','Pedido especial':'#c05cff','Reparación':'#22a45d','Servicio':'#e0322f','Cristales':'#2f7de0','Siniestros':'#e0a72f','Accesorios':'#059669'};
