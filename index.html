@@ -1092,10 +1092,14 @@ function buildFilters(){
 
   const fr=document.getElementById('fil-rep-wrap');
   if(fr){
+    const buscadorRep=`<div class="search-wrap">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" class="search-input" id="search-rep" placeholder="Buscar por dominio o patente..." value="${searchRepVal||''}" oninput="searchRepVal=this.value;renderRepuestos()">
+    </div>`;
     if(cu.sucursalFija){
-      fr.innerHTML=`<div class="filter-locked"><i class="ti ti-lock" style="font-size:13px"></i> ${cu.sucursalFija} (fijo)</div>`;
+      fr.innerHTML=`${buscadorRep}<div class="filter-locked"><i class="ti ti-lock" style="font-size:13px"></i> ${cu.sucursalFija} (fijo)</div>`;
     } else {
-      fr.innerHTML=`<select class="filter-sel" id="fil-suc-r" onchange="renderRepuestos()"><option value="">Todas las sucursales</option>${SUCURSALES.map(s=>`<option>${s}</option>`).join('')}</select>`;
+      fr.innerHTML=`${buscadorRep}<select class="filter-sel" id="fil-suc-r" onchange="renderRepuestos()"><option value="">Todas las sucursales</option>${SUCURSALES.map(s=>`<option>${s}</option>`).join('')}</select>`;
     }
   }
 
@@ -1318,7 +1322,12 @@ function togglePasados(pid,header){
 
 function renderRepuestos(){
   const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-r')?document.getElementById('fil-suc-r').value:'');
-  const items=turnos.filter(t=>!f||t.sucursal===f);
+  const qr=(searchRepVal||'').toLowerCase().trim();
+  const items=turnos.filter(t=>{
+    if(f&&t.sucursal!==f) return false;
+    if(qr&&!(t.dominio||'').toLowerCase().includes(qr)) return false;
+    return true;
+  });
   renderGroups('grupos-repuestos',items,gi=>`<table><thead><tr>
     <th style="width:7%">Pre-Or</th><th style="width:11%">Cliente</th><th style="width:6%">Dominio</th><th style="width:7%">Modelo</th>
     <th style="width:7%">Sucursal</th><th style="width:8%">Fecha del turno</th><th style="width:8%">Tipo</th><th style="width:5%">Prior.</th>
@@ -2315,6 +2324,7 @@ document.getElementById('delov').addEventListener('click',function(e){if(e.targe
 let drawerAdjuntos=[];
 let metricaActiva=null;
 let searchVal="";
+let searchRepVal="";
 
 function openDrawer(){
   drawerAdjuntos=[];
