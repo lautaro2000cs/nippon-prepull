@@ -755,6 +755,18 @@ tbody td{padding:11px 12px;vertical-align:middle}
   </div>
 </div>
 
+<div class="modal-ov" id="recmov">
+  <div class="modal sm">
+    <h3><i class="ti ti-package-import" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Marcar recepción</h3>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem" id="rec-subtitle"></div>
+    <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Remito interno</label>
+      <input type="text" id="rec-remito" placeholder="Número de remito interno"/>
+    </div>
+    <p class="login-err" id="rec-err" style="display:none"></p>
+    <div class="mfooter"><button class="btn-cancel" onclick="closeRecepcionModal()">Cancelar</button><button class="btn-save" onclick="confirmarRecepcionCubierta()">Confirmar recepción</button></div>
+  </div>
+</div>
+
 <div class="alert-ov" id="aov">
   <div class="alert-modal">
     <div class="alert-icon-wrap"><i class="ti ti-alert-triangle"></i></div>
@@ -1976,7 +1988,7 @@ const COMP_SCHEMA={
     {id:'f-c-tipo',  label:'Tipo',type:'select',req:true,opts:['Reposición','Vendedor directo','Firm Order']},
     {id:'f-c-lineas',label:'Líneas',type:'text',req:true,ph:''},
     {id:'f-c-valor', label:'Valor ($)',type:'number',req:false,ph:'0.00',step:'0.01'},
-    {id:'f-c-codigo',label:'Código',type:'text',req:true,ph:''},
+    {id:'f-c-codigo',label:'Código',type:'text',req:false,ph:''},
     {id:'f-c-cant',  label:'Cantidad',type:'number',req:false,ph:'0',step:'1'},
   ],
   lubricantes:[
@@ -2002,7 +2014,6 @@ const COMP_SCHEMA={
     {id:'f-c-orden', label:'N° Orden',type:'text',req:true,ph:''},
     {id:'f-c-fecha', label:'Fecha',type:'date',req:true},
     {id:'f-c-cant',  label:'Cantidad',type:'number',req:true,ph:'0',step:'1'},
-    {id:'f-c-remito',label:'Remito interno',type:'text',req:true,ph:''},
     {id:'f-c-obs',   label:'Observaciones',type:'textarea',req:false,ph:'',full:true},
   ],
 };
@@ -2064,7 +2075,8 @@ async function guardarPedido(){
   else if(k==='especial')
     data={fecha:v('f-c-fecha'),nro_orden:v('f-c-orden'),lineas:v('f-c-lineas'),costo:vn('f-c-costo'),item:v('f-c-item')};
   else if(k==='cubiertas')
-    data={mes:v('f-c-mes'),marca:v('f-c-marca'),item:v('f-c-item'),descripcion:v('f-c-desc'),nro_orden:v('f-c-orden'),fecha:v('f-c-fecha'),cantidad:vn('f-c-cant'),remito_interno:v('f-c-remito'),observaciones:v('f-c-obs')||''};
+    data={mes:v('f-c-mes'),marca:v('f-c-marca'),item:v('f-c-item'),descripcion:v('f-c-desc'),nro_orden:v('f-c-orden'),fecha:v('f-c-fecha'),cantidad:vn('f-c-cant'),observaciones:v('f-c-obs')||''};
+  if(k==='cubiertas'&&!compEditId) data.remito_interno='';
   try{
     if(compEditId){
       const {error}=await sb.from(secInfo.tabla).update(data).eq('id',compEditId);
@@ -2088,9 +2100,25 @@ async function eliminarPedido(id){
   await cargarRegistrosSec();
 }
 
-async function marcarRecepcionCubierta(id){
-  const {error}=await sb.from('compras_cubiertas').update({fecha_recepcion:toStr(new Date()),recibido_por:cu.nombre}).eq('id',id);
-  if(error){alert('Error: '+error.message);return;}
+let recepcionId=null;
+function marcarRecepcionCubierta(id){
+  const r=compRegistros.find(x=>x.id===id);
+  if(!r)return;
+  recepcionId=id;
+  document.getElementById('rec-subtitle').innerHTML=`<strong>${r.marca}</strong> · ${r.item} · N° Orden ${r.nro_orden}`;
+  document.getElementById('rec-remito').value='';
+  document.getElementById('rec-err').style.display='none';
+  document.getElementById('recmov').classList.add('open');
+}
+function closeRecepcionModal(){recepcionId=null;document.getElementById('recmov').classList.remove('open');}
+async function confirmarRecepcionCubierta(){
+  if(!recepcionId)return;
+  const errEl=document.getElementById('rec-err');
+  const remito=document.getElementById('rec-remito').value.trim();
+  if(!remito){errEl.textContent='Ingresá el número de remito interno.';errEl.style.display='block';return;}
+  const {error}=await sb.from('compras_cubiertas').update({fecha_recepcion:toStr(new Date()),recibido_por:cu.nombre,remito_interno:remito}).eq('id',recepcionId);
+  if(error){errEl.textContent='Error: '+error.message;errEl.style.display='block';return;}
+  closeRecepcionModal();
   await cargarRegistrosSec();
 }
 
@@ -2318,6 +2346,7 @@ document.getElementById('usrov').addEventListener('click',function(e){if(e.targe
 document.getElementById('repov').addEventListener('click',function(e){if(e.target===this)closeRepModalReporte();});
 document.getElementById('compov').addEventListener('click',function(e){if(e.target===this)closeCompModal();});
 document.getElementById('delov').addEventListener('click',function(e){if(e.target===this)closeDeleteModal();});
+document.getElementById('recmov').addEventListener('click',function(e){if(e.target===this)closeRecepcionModal();});
 
 
 // ── FUNCIONES NUEVAS: DRAWER, MÉTRICAS, CARDS ─────────────────────────────────
