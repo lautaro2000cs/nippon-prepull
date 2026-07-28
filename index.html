@@ -403,6 +403,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
           <option value="citas">Citas</option>
           <option value="repuestos">Repuestos</option>
           <option value="compras">Compras</option>
+          <option value="supervisor">Supervisor</option>
         </select>
       </div>
       <button class="btn-in" id="btn-login" onclick="doLogin()">Ingresar</button>
@@ -529,6 +530,14 @@ tbody td{padding:11px 12px;vertical-align:middle}
               <h2>Repuestos</h2>
             </div>
             <div class="hdr-actions" id="fil-rep-wrap"></div>
+          </div>
+          <!-- Métricas -->
+          <div class="metrics-row" id="metricas-row-rep"></div>
+          <!-- Hint filtro activo -->
+          <div id="filter-hint-rep" style="display:none" class="filter-hint">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            <span id="filter-hint-txt-rep"></span>
+            <button class="filter-hint-btn" onclick="limpiarFiltroMetricaRep()">Limpiar filtros</button>
           </div>
           <div id="grupos-repuestos"><div class="loading-spinner"><i class="ti ti-loader-2"></i></div></div>
         </div>
@@ -804,7 +813,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
       <div><label>Nombre completo</label><input type="text" id="f-usr-nombre" placeholder="Apellido, Nombre"/></div>
       <div><label>Usuario (para ingresar)</label><input type="text" id="f-usr-username" placeholder="nombre.apellido"/></div>
       <div><label>Contraseña</label><input type="text" id="f-usr-pass" placeholder="Mínimo 4 caracteres"/></div>
-      <div><label>Sector</label><select id="f-usr-rol" onchange="toggleSucUsr()"><option value="">Seleccionar...</option><option value="admin">Admin</option><option value="citas">Citas</option><option value="repuestos">Repuestos</option></select></div>
+      <div><label>Sector</label><select id="f-usr-rol" onchange="toggleSucUsr()"><option value="">Seleccionar...</option><option value="admin">Admin</option><option value="citas">Citas</option><option value="repuestos">Repuestos</option><option value="supervisor">Supervisor</option></select></div>
       <div id="f-usr-suc-wrap"><label>Sucursal fija (opcional)</label><select id="f-usr-suc"><option value="">Sin sucursal fija — ve todas</option><option>Roca</option><option>Perticone</option><option>Aguado</option></select></div>
     </div>
     <p class="login-err" id="usr-err" style="display:none"></p>
@@ -939,11 +948,23 @@ async function verificarConexion(){
     if(error) throw error;
     el.className='conn-status conn-ok';
     el.innerHTML='<i class="ti ti-check" style="font-size:13px;vertical-align:-2px"></i> Conectado a la base de datos';
+    asegurarSupervisorAguado();
   }catch(err){
     el.className='conn-status conn-err';
     el.innerHTML='<i class="ti ti-alert-triangle" style="font-size:13px;vertical-align:-2px"></i> No se pudo conectar. Revisá la configuración.';
     console.error('Error de conexión a Supabase:',err);
   }
+}
+
+// Crea el usuario supervisor de Aguado si todavía no existe (idempotente, silencioso)
+async function asegurarSupervisorAguado(){
+  try{
+    const {data,error}=await sb.from('usuarios').select('id').eq('username','supervisor.aguado').maybeSingle();
+    if(error) return;
+    if(!data){
+      await sb.from('usuarios').insert([{nombre:'Supervisor Aguado',username:'supervisor.aguado',password:'NICaguado++',rol:'supervisor',sucursal_fija:'Aguado'}]);
+    }
+  }catch(e){/* silencioso: si no se puede crear, se puede dar de alta desde el panel de Usuarios */}
 }
 verificarConexion();
 
@@ -982,19 +1003,21 @@ async function showApp(){
   document.getElementById('s-login').classList.remove('active');
   document.getElementById('s-app').classList.add('active');
   document.getElementById('tb-user').textContent=cu.nombre;
-  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras'}[cu.rol]||cu.rol;
+  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor'}[cu.rol]||cu.rol;
   const sucEl=document.getElementById('tb-suc');
   if(cu.sucursalFija){sucEl.style.display='inline-flex';sucEl.innerHTML=`<i class="ti ti-map-pin" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${cu.sucursalFija}`;}
   else sucEl.style.display='none';
 
-  document.getElementById('tab-turnos').style.display=(cu.rol==='citas'||cu.rol==='admin'||cu.rol==='compras')?'':'none';
-  document.getElementById('tab-rep').style.display=(cu.rol==='repuestos'||cu.rol==='admin'||cu.rol==='compras')?'':'none';
+  document.getElementById('tab-dash').style.display=(cu.rol==='supervisor')?'none':'';
+  document.getElementById('tab-turnos').style.display=(cu.rol==='citas'||cu.rol==='admin'||cu.rol==='compras'||cu.rol==='supervisor')?'':'none';
+  document.getElementById('tab-rep').style.display=(cu.rol==='repuestos'||cu.rol==='admin'||cu.rol==='compras'||cu.rol==='supervisor')?'':'none';
   document.getElementById('tab-usr').style.display=cu.rol==='admin'?'':'none';
   document.getElementById('tab-compras').style.display=(cu.rol==='compras'||cu.rol==='admin')?'':'none';
 
   let startTab='dash';
   if(cu.rol==='repuestos') startTab='repuestos';
   if(cu.rol==='compras') startTab='compras';
+  if(cu.rol==='supervisor') startTab='turnos';
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('act'));
   document.querySelectorAll('.tc').forEach(c=>c.classList.remove('act'));
   document.getElementById('tab-'+(startTab==='repuestos'?'rep':startTab)).classList.add('act');
@@ -1103,8 +1126,8 @@ function buildFilters(){
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input type="text" class="search-input" id="search-turnos" placeholder="Buscar cliente, dominio..." oninput="searchVal=this.value;renderTurnos()">
     </div>
-    <select class="filter-sel" id="fil-suc-t" onchange="renderTurnos()"><option value="">Todas las sucursales</option>${SUCURSALES.map(s=>`<option>${s}</option>`).join('')}</select>
-    ${cu.rol!=='repuestos'?`<button class="btn-add" onclick="openDrawer()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Nuevo turno</button>`:''}`;
+    ${cu.sucursalFija?`<div class="filter-locked"><i class="ti ti-lock" style="font-size:13px"></i> ${cu.sucursalFija} (fijo)</div>`:`<select class="filter-sel" id="fil-suc-t" onchange="renderTurnos()"><option value="">Todas las sucursales</option>${SUCURSALES.map(s=>`<option>${s}</option>`).join('')}</select>`}
+    ${(cu.rol==='citas'||cu.rol==='admin')?`<button class="btn-add" onclick="openDrawer()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Nuevo turno</button>`:''}`;
 
   const fr=document.getElementById('fil-rep-wrap');
   if(fr){
@@ -1173,7 +1196,7 @@ function valePill(v){return v?'<span class="pill p-vale"><i class="ti ti-check" 
 function priPill(p){const m={Alta:'pri-alta',Mediana:'pri-med',Baja:'pri-baja'};return`<span class="pill ${m[p]||'pri-baja'}">${p||'-'}</span>`;}
 function estPill(e){const m={pendiente:['p-pend','Pendiente'],arribo:['p-arr','Arribó'],faltante:['p-falt','Faltante'],bo:['p-bo','<i class="ti ti-alert-triangle" style="font-size:12px;vertical-align:-1px"></i> B/O']};const[c,l]=m[e]||['p-pend','Pendiente'];return`<span class="pill ${c}">${l}</span>`;}
 function valePill(v){return v?'<span class="pill vale-yes"><i class="ti ti-check" style="font-size:11px"></i> Con vale</span>':'<span class="pill vale-no"><i class="ti ti-x" style="font-size:11px"></i> Sin vale</span>';}
-function rolPill(r){const m={admin:'<span class="pill" style="background:#fbeceb;color:#c62a27">Admin</span>',citas:'<span class="pill" style="background:#e6f4ec;color:#1f7a48">Citas</span>',repuestos:'<span class="pill" style="background:#eef0ff;color:#4f46e5">Repuestos</span>',compras:'<span class="pill" style="background:#fbf1de;color:#9a6a08">Compras</span>'};return m[r]||`<span style="font-size:11px">${r}</span>`;}
+function rolPill(r){const m={admin:'<span class="pill" style="background:#fbeceb;color:#c62a27">Admin</span>',citas:'<span class="pill" style="background:#e6f4ec;color:#1f7a48">Citas</span>',repuestos:'<span class="pill" style="background:#eef0ff;color:#4f46e5">Repuestos</span>',compras:'<span class="pill" style="background:#fbf1de;color:#9a6a08">Compras</span>',supervisor:'<span class="pill" style="background:#e6f1fb;color:#0c447c">Supervisor</span>'};return m[r]||`<span style="font-size:11px">${r}</span>`;}
 
 function renderGroups(cid,items,fn){
   // Cachear el grupo de cada item una sola vez (diffHabil puede ser lento con muchos turnos)
@@ -1269,7 +1292,7 @@ async function marcarArribo(id){
 
 function renderTurnos(){
   const sel=document.getElementById('fil-suc-t');
-  const f=sel?sel.value:'';
+  const f=cu.sucursalFija?cu.sucursalFija:(sel?sel.value:'');
   const tiposFilt=getTiposFiltrados();
   const horizFilt=getHorizontesFiltrados();
   const q=(searchVal||'').toLowerCase().trim();
@@ -1342,21 +1365,32 @@ function renderRepuestos(){
   const items=turnos.filter(t=>{
     if(f&&t.sucursal!==f) return false;
     if(qr&&!(t.dominio||'').toLowerCase().includes(qr)) return false;
+    if(metricaActivaRep==='today'&&diff(t.fecha)!==0) return false;
+    if(metricaActivaRep==='noshow'&&!t.no_show) return false;
+    if(metricaActivaRep==='repuesto'&&t.estado!=='pendiente') return false;
+    if(metricaActivaRep==='vale'&&!t.vale) return false;
     return true;
   });
+  if(typeof renderMetricasRep==='function') renderMetricasRep();
   renderGroups('grupos-repuestos',items,gi=>`<table><thead><tr>
     <th style="width:7%">Pre-Or</th><th style="width:11%">Cliente</th><th style="width:6%">Dominio</th><th style="width:7%">Modelo</th>
     <th style="width:7%">Sucursal</th><th style="width:8%">Fecha del turno</th><th style="width:8%">Tipo</th><th style="width:5%">Prior.</th>
     <th style="width:6%">Vale</th><th style="width:6%">No Show</th><th style="width:9%">Comentario Citas</th><th style="width:9%">Comentario Repuestos</th><th style="width:6%">Estado</th><th style="width:16%">Acciones</th>
   </tr></thead><tbody>${gi.map(t=>{
     const cR=cu&&(cu.rol==='repuestos'||cu.rol==='admin');
+    const cSup=cu&&cu.rol==='supervisor';
     const adjTag=(Array.isArray(t.adjuntos)&&t.adjuntos.length)?`<span class="obs-badge" style="margin-left:4px" onclick='verAdjuntos(${JSON.stringify(t.id)})' title="Ver archivos adjuntos"><i class="ti ti-paperclip" style="font-size:11px"></i> ${t.adjuntos.length}</span>`:'';
     const nsBadge=t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i></span>':'—';
-    const obsTag=t.obs_rep?`<span class="obs-badge" onclick="openRepModal('${t.id}')" title="${t.obs_rep}"><i class="ti ti-message" style="font-size:11px"></i></span>`:'—';
+    const obsTag=t.obs_rep?`<span class="obs-badge" onclick="${cR?`openRepModal('${t.id}')`:`verObs('${t.id}','rep')`}" title="${t.obs_rep}"><i class="ti ti-message" style="font-size:11px"></i></span>`:'—';
     const obsCitaTag=t.obs?`<span class="obs-badge" style="background:#E6F1FB;color:#0C447C" onclick="verObs('${t.id}','cita')"><i class="ti ti-notes" style="font-size:11px"></i> Ver</span>`:'—';
-    const acc=cR?`<div class="act-group">
-      <button class="btn-sm btn-rep-mark" onclick="openRepModal('${t.id}')"><i class="ti ti-edit" style="font-size:12px"></i> ${t.estado==='pendiente'?'Marcar':'Editar'}</button>
-    </div>`:`<div class="act-group">${estPill(t.estado)}</div>`;
+    let acc;
+    if(cR){
+      acc=`<div class="act-group"><button class="btn-sm btn-rep-mark" onclick="openRepModal('${t.id}')"><i class="ti ti-edit" style="font-size:12px"></i> ${t.estado==='pendiente'?'Marcar':'Editar'}</button></div>`;
+    }else if(cSup){
+      acc=`<div class="act-group"><button class="btn-sm btn-noshow" onclick="openNsModal('${t.id}')"><i class="ti ti-user-x" style="font-size:12px"></i> ${t.no_show?'Quitar No Show':'No Show'}</button></div>`;
+    }else{
+      acc=`<div class="act-group">${estPill(t.estado)}</div>`;
+    }
     return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${valePill(t.vale)}</td><td>${nsBadge}</td><td>${obsCitaTag}</td><td>${obsTag}</td><td>${estPill(t.estado)}</td><td>${acc}</td></tr>`;
   }).join('')}</tbody></table>`);
 }
@@ -2373,6 +2407,7 @@ document.getElementById('recmov').addEventListener('click',function(e){if(e.targ
 // ── FUNCIONES NUEVAS: DRAWER, MÉTRICAS, CARDS ─────────────────────────────────
 let drawerAdjuntos=[];
 let metricaActiva=null;
+let metricaActivaRep=null;
 let searchVal="";
 let searchRepVal="";
 
@@ -2431,7 +2466,13 @@ function setMetrica(key){metricaActiva=metricaActiva===key?null:key;document.que
 
 function limpiarFiltroMetrica(){metricaActiva=null;document.querySelectorAll(".metric-card").forEach(c=>c.classList.remove("act"));const hint=document.getElementById("filter-hint");if(hint)hint.style.display="none";renderTurnos();}
 
-function renderMetricas(){const cont=document.getElementById("metricas-row");if(!cont)return;const hoy=turnos.filter(t=>diff(t.fecha)===0);const noshow=turnos.filter(t=>t.no_show);const rep=turnos.filter(t=>t.estado==="pendiente");const vale=turnos.filter(t=>t.vale);const cards=[{key:"today",cls:"metric-today",lbl:"Turnos hoy",val:hoy.length,tag:hoy.length===1?"turno":"turnos"},{key:"noshow",cls:"metric-noshow",lbl:"No-shows",val:noshow.length,tag:"sin presentarse"},{key:"repuesto",cls:"metric-rep",lbl:"Repuestos pend.",val:rep.length,tag:"pendientes"},{key:"vale",cls:"metric-vale",lbl:"Vale listo",val:vale.length,tag:"con vale"}];cont.innerHTML=cards.map(c=>`<div class="metric-card ${c.cls}${metricaActiva===c.key?" act":""}" data-key="${c.key}" onclick="setMetrica('${c.key}')"><div class="metric-lbl">${c.lbl}</div><div class="metric-val">${c.val}</div><div class="metric-tag">${c.tag}</div></div>`).join("");}
+function renderMetricas(){const cont=document.getElementById("metricas-row");if(!cont)return;const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-t')?document.getElementById('fil-suc-t').value:'');const base=turnos.filter(t=>!f||t.sucursal===f);const hoy=base.filter(t=>diff(t.fecha)===0);const noshow=base.filter(t=>t.no_show);const rep=base.filter(t=>t.estado==="pendiente");const vale=base.filter(t=>t.vale);const cards=[{key:"today",cls:"metric-today",lbl:"Turnos hoy",val:hoy.length,tag:hoy.length===1?"turno":"turnos"},{key:"noshow",cls:"metric-noshow",lbl:"No-shows",val:noshow.length,tag:"sin presentarse"},{key:"repuesto",cls:"metric-rep",lbl:"Repuestos pend.",val:rep.length,tag:"pendientes"},{key:"vale",cls:"metric-vale",lbl:"Vale listo",val:vale.length,tag:"con vale"}];cont.innerHTML=cards.map(c=>`<div class="metric-card ${c.cls}${metricaActiva===c.key?" act":""}" data-key="${c.key}" onclick="setMetrica('${c.key}')"><div class="metric-lbl">${c.lbl}</div><div class="metric-val">${c.val}</div><div class="metric-tag">${c.tag}</div></div>`).join("");}
+
+function setMetricaRep(key){metricaActivaRep=metricaActivaRep===key?null:key;document.querySelectorAll("#metricas-row-rep .metric-card").forEach(c=>c.classList.toggle("act",c.dataset.key===metricaActivaRep));const hint=document.getElementById("filter-hint-rep");const hintTxt=document.getElementById("filter-hint-txt-rep");if(metricaActivaRep&&hint){hint.style.display="flex";const labels={today:"Filtrando: Turnos de hoy",noshow:"Filtrando: No shows",repuesto:"Filtrando: Repuestos pendientes",vale:"Filtrando: Vale listo"};if(hintTxt)hintTxt.textContent=labels[metricaActivaRep]||"";}else if(hint)hint.style.display="none";renderRepuestos();}
+
+function limpiarFiltroMetricaRep(){metricaActivaRep=null;document.querySelectorAll("#metricas-row-rep .metric-card").forEach(c=>c.classList.remove("act"));const hint=document.getElementById("filter-hint-rep");if(hint)hint.style.display="none";renderRepuestos();}
+
+function renderMetricasRep(){const cont=document.getElementById("metricas-row-rep");if(!cont)return;const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-r')?document.getElementById('fil-suc-r').value:'');const base=turnos.filter(t=>!f||t.sucursal===f);const hoy=base.filter(t=>diff(t.fecha)===0);const noshow=base.filter(t=>t.no_show);const rep=base.filter(t=>t.estado==="pendiente");const vale=base.filter(t=>t.vale);const cards=[{key:"today",cls:"metric-today",lbl:"Turnos hoy",val:hoy.length,tag:hoy.length===1?"turno":"turnos"},{key:"noshow",cls:"metric-noshow",lbl:"No-shows",val:noshow.length,tag:"sin presentarse"},{key:"repuesto",cls:"metric-rep",lbl:"Repuestos pend.",val:rep.length,tag:"pendientes"},{key:"vale",cls:"metric-vale",lbl:"Vale listo",val:vale.length,tag:"con vale"}];cont.innerHTML=cards.map(c=>`<div class="metric-card ${c.cls}${metricaActivaRep===c.key?" act":""}" data-key="${c.key}" onclick="setMetricaRep('${c.key}')"><div class="metric-lbl">${c.lbl}</div><div class="metric-val">${c.val}</div><div class="metric-tag">${c.tag}</div></div>`).join("");}
 
 function actualizarContadoresSubTabs(){const activos=turnos.filter(t=>!esHistorico(t)&&!t.no_show);const ns=turnos.filter(t=>t.no_show);const hist=turnos.filter(esHistorico);const el1=document.getElementById("cnt-lista");const el2=document.getElementById("cnt-noshow");const el3=document.getElementById("cnt-hist");if(el1)el1.textContent=activos.length;if(el2)el2.textContent=ns.length;if(el3)el3.textContent=hist.length;}
 
