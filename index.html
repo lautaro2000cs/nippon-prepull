@@ -757,13 +757,17 @@ tbody td{padding:11px 12px;vertical-align:middle}
 
 <div class="modal-ov" id="recmov">
   <div class="modal sm">
-    <h3><i class="ti ti-package-import" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Marcar recepción</h3>
+    <h3 id="rec-modal-title"><i class="ti ti-package-import" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Marcar recepción</h3>
     <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem" id="rec-subtitle"></div>
     <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Remito interno</label>
       <input type="text" id="rec-remito" placeholder="Número de remito interno"/>
     </div>
     <p class="login-err" id="rec-err" style="display:none"></p>
-    <div class="mfooter"><button class="btn-cancel" onclick="closeRecepcionModal()">Cancelar</button><button class="btn-save" onclick="confirmarRecepcionCubierta()">Confirmar recepción</button></div>
+    <div class="mfooter">
+      <button class="btn-sm btn-del" id="rec-quitar-btn" onclick="quitarRecepcionCubierta()" style="display:none;margin-right:auto"><i class="ti ti-x" style="font-size:12px;vertical-align:-2px"></i> Quitar recepción</button>
+      <button class="btn-cancel" onclick="closeRecepcionModal()">Cancelar</button>
+      <button class="btn-save" id="rec-confirm-btn" onclick="confirmarRecepcionCubierta()">Confirmar recepción</button>
+    </div>
   </div>
 </div>
 
@@ -1856,7 +1860,9 @@ function renderSeccionTabla(){
   const totalCols=colCount+(mostrarAcc?1:0);
   const accTd=r=>{
     if(!mostrarAcc)return'';
-    const btnRec=(k==='cubiertas'&&puedeRecibir&&!r.fecha_recepcion)?`<button class="btn-sm" onclick="marcarRecepcionCubierta('${r.id}')" title="Marcar recepción"><i class="ti ti-package-import" style="font-size:12px"></i></button>`:'';
+    const btnRec=(k==='cubiertas'&&puedeRecibir)?(r.fecha_recepcion
+      ?`<button class="btn-sm" onclick="marcarRecepcionCubierta('${r.id}')" title="Editar recepción"><i class="ti ti-edit" style="font-size:12px"></i> Recepción</button>`
+      :`<button class="btn-sm" onclick="marcarRecepcionCubierta('${r.id}')" title="Marcar recepción"><i class="ti ti-package-import" style="font-size:12px"></i></button>`):'';
     const btnEdit=esEdit?`<button class="btn-sm btn-rep-mark" onclick="openCompModal('${r.id}')"><i class="ti ti-edit" style="font-size:12px"></i></button>`:'';
     const btnDel=esEdit?`<button class="btn-sm btn-del" onclick="eliminarPedido('${r.id}')"><i class="ti ti-trash" style="font-size:12px"></i></button>`:'';
     return`<td><div style="display:flex;gap:4px">${btnRec}${btnEdit}${btnDel}</div></td>`;
@@ -2105,8 +2111,12 @@ function marcarRecepcionCubierta(id){
   const r=compRegistros.find(x=>x.id===id);
   if(!r)return;
   recepcionId=id;
+  const esEdicion=!!r.fecha_recepcion;
+  document.getElementById('rec-modal-title').innerHTML=`<i class="ti ti-package-import" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>${esEdicion?'Editar recepción':'Marcar recepción'}`;
   document.getElementById('rec-subtitle').innerHTML=`<strong>${r.marca}</strong> · ${r.item} · N° Orden ${r.nro_orden}`;
-  document.getElementById('rec-remito').value='';
+  document.getElementById('rec-remito').value=esEdicion?(r.remito_interno||''):'';
+  document.getElementById('rec-confirm-btn').textContent=esEdicion?'Guardar cambios':'Confirmar recepción';
+  document.getElementById('rec-quitar-btn').style.display=esEdicion?'':'none';
   document.getElementById('rec-err').style.display='none';
   document.getElementById('recmov').classList.add('open');
 }
@@ -2116,8 +2126,19 @@ async function confirmarRecepcionCubierta(){
   const errEl=document.getElementById('rec-err');
   const remito=document.getElementById('rec-remito').value.trim();
   if(!remito){errEl.textContent='Ingresá el número de remito interno.';errEl.style.display='block';return;}
-  const {error}=await sb.from('compras_cubiertas').update({fecha_recepcion:toStr(new Date()),recibido_por:cu.nombre,remito_interno:remito}).eq('id',recepcionId);
+  const r=compRegistros.find(x=>x.id===recepcionId);
+  const upd={remito_interno:remito};
+  if(!r||!r.fecha_recepcion){upd.fecha_recepcion=toStr(new Date());upd.recibido_por=cu.nombre;}
+  const {error}=await sb.from('compras_cubiertas').update(upd).eq('id',recepcionId);
   if(error){errEl.textContent='Error: '+error.message;errEl.style.display='block';return;}
+  closeRecepcionModal();
+  await cargarRegistrosSec();
+}
+async function quitarRecepcionCubierta(){
+  if(!recepcionId)return;
+  if(!confirm('¿Quitar la recepción de esta cubierta? Volverá a quedar pendiente.'))return;
+  const {error}=await sb.from('compras_cubiertas').update({fecha_recepcion:null,recibido_por:null,remito_interno:''}).eq('id',recepcionId);
+  if(error){document.getElementById('rec-err').textContent='Error: '+error.message;document.getElementById('rec-err').style.display='block';return;}
   closeRecepcionModal();
   await cargarRegistrosSec();
 }
