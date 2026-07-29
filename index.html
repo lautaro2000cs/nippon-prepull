@@ -1162,7 +1162,7 @@ function buildFilters(){
   if(fc) fc.innerHTML=`<button class="btn-add" onclick="openCompModal(null)"><i class="ti ti-plus"></i> Nuevo pedido</button>`;
 }
 
-function aplicarFiltrosSidebar(){renderTurnos();}
+function aplicarFiltrosSidebar(){renderTurnos();if(typeof renderRepuestos==='function')renderRepuestos();}
 
 function toggleTipo(tipo,el){
   const activo=el.dataset.active==='1';
@@ -1175,6 +1175,7 @@ function setHorizonteChip(key,el){
   horizonteActivoChip=key;
   document.querySelectorAll('.hz-chip').forEach(b=>b.classList.toggle('act',b.dataset.horizonte===key));
   renderTurnos();
+  if(typeof renderRepuestos==='function')renderRepuestos();
 }
 
 // toggleHorizonte ya no se usa pero lo dejamos por compatibilidad
@@ -1198,13 +1199,14 @@ function estPill(e){const m={pendiente:['p-pend','Pendiente'],arribo:['p-arr','A
 function valePill(v){return v?'<span class="pill vale-yes"><i class="ti ti-check" style="font-size:11px"></i> Con vale</span>':'<span class="pill vale-no"><i class="ti ti-x" style="font-size:11px"></i> Sin vale</span>';}
 function rolPill(r){const m={admin:'<span class="pill" style="background:#fbeceb;color:#c62a27">Admin</span>',citas:'<span class="pill" style="background:#e6f4ec;color:#1f7a48">Citas</span>',repuestos:'<span class="pill" style="background:#eef0ff;color:#4f46e5">Repuestos</span>',compras:'<span class="pill" style="background:#fbf1de;color:#9a6a08">Compras</span>',supervisor:'<span class="pill" style="background:#e6f1fb;color:#0c447c">Supervisor</span>'};return m[r]||`<span style="font-size:11px">${r}</span>`;}
 
-function renderGroups(cid,items,fn){
+function renderGroups(cid,items,fn,horizFilt){
   // Cachear el grupo de cada item una sola vez (diffHabil puede ser lento con muchos turnos)
   const grouped=new Map();
   items.forEach(x=>{const k=getGroup(x.fecha).key;if(!grouped.has(k))grouped.set(k,[]);grouped.get(k).push(x);});
   let html='';
   // Grupos activos (sin Pasados) — se muestran normalmente
   DAY_GROUPS.filter(g=>g.key!=='pas').forEach(g=>{
+    if(horizFilt&&!horizFilt.includes(g.key))return;
     const gi=grouped.get(g.key)||[];
     if(!gi.length)return;
     html+=`<div class="day-group"><div class="day-header ${g.cls}"><span class="day-lbl">${g.lbl}</span><span class="day-count">${gi.length}</span></div><div class="table-wrap">${fn(gi)}</div></div>`;
@@ -1362,8 +1364,11 @@ function togglePasados(pid,header){
 function renderRepuestos(){
   const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-r')?document.getElementById('fil-suc-r').value:'');
   const qr=(searchRepVal||'').toLowerCase().trim();
+  const tiposFilt=getTiposFiltrados();
+  const horizFilt=getHorizontesFiltrados();
   const items=turnos.filter(t=>{
     if(f&&t.sucursal!==f) return false;
+    if(tiposFilt&&!tiposFilt.includes(t.tipo)) return false;
     if(qr&&!(t.dominio||'').toLowerCase().includes(qr)) return false;
     if(metricaActivaRep==='today'&&diff(t.fecha)!==0) return false;
     if(metricaActivaRep==='noshow'&&!t.no_show) return false;
@@ -1392,7 +1397,7 @@ function renderRepuestos(){
       acc=`<div class="act-group">${estPill(t.estado)}</div>`;
     }
     return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${valePill(t.vale)}</td><td>${nsBadge}</td><td>${obsCitaTag}</td><td>${obsTag}</td><td>${estPill(t.estado)}</td><td>${acc}</td></tr>`;
-  }).join('')}</tbody></table>`);
+  }).join('')}</tbody></table>`,horizFilt);
 }
 
 
@@ -2109,7 +2114,7 @@ async function guardarPedido(){
   if(['añelo','casacentral','flotas'].includes(k))
     data={seccion:secInfo.lbl,fecha:v('f-c-fecha'),nro_orden:v('f-c-orden'),tipo_orden:v('f-c-tipo'),costo:vn('f-c-costo'),linea:v('f-c-linea'),item:v('f-c-item'),cantidad:vn('f-c-cant'),observaciones:v('f-c-obs')||''};
   else if(k==='equipamiento')
-    data={fecha:v('f-c-fecha'),nro_orden:v('f-c-orden'),tipo_orden:v('f-c-tipo'),lineas:v('f-c-lineas'),valor:vn('f-c-valor'),codigo:v('f-c-codigo'),cantidad:vn('f-c-cant')};
+    data={fecha:v('f-c-fecha'),nro_orden:v('f-c-orden'),tipo_orden:v('f-c-tipo'),lineas:v('f-c-lineas'),valor:vn('f-c-valor'),codigo:v('f-c-codigo')||null,cantidad:vn('f-c-cant')};
   else if(k==='lubricantes')
     data={fecha:v('f-c-fecha'),nro_orden:v('f-c-orden'),lineas:v('f-c-lineas'),valor:vn('f-c-valor'),cantidad:vn('f-c-cant'),item:v('f-c-item')};
   else if(k==='especial')
