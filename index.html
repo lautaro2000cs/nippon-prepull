@@ -125,6 +125,7 @@ a{color:#c62a27;text-decoration:none}
 .filter-check-item{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:8px;font-size:13.5px;font-weight:500;color:var(--text-2);cursor:pointer;transition:background .15s;user-select:none}
 .filter-check-item:hover{background:var(--bg)}
 .filter-check-item[data-active="0"]{opacity:.35}
+.filter-check-item.sel{background:var(--accent-tint);color:var(--text-1);font-weight:700}
 .filter-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .filter-sq{width:9px;height:9px;border-radius:2px;flex-shrink:0;background:var(--text-6)}
 .hz-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 4px}
@@ -1164,9 +1165,14 @@ function buildFilters(){
 
 function aplicarFiltrosSidebar(){renderTurnos();if(typeof renderRepuestos==='function')renderRepuestos();}
 
+let tipoActivo=null;
 function toggleTipo(tipo,el){
-  const activo=el.dataset.active==='1';
-  el.dataset.active=activo?'0':'1';
+  // Selección única: al clickear se muestra solo ese tipo; al volver a clickearlo se muestran todos
+  tipoActivo=(tipoActivo===tipo)?null:tipo;
+  document.querySelectorAll('#filtro-tipo-lista [data-tipo]').forEach(it=>{
+    it.dataset.active=(!tipoActivo||it.dataset.tipo===tipoActivo)?'1':'0';
+    it.classList.toggle('sel',!!tipoActivo&&it.dataset.tipo===tipoActivo);
+  });
   aplicarFiltrosSidebar();
 }
 
@@ -1182,10 +1188,7 @@ function setHorizonteChip(key,el){
 function toggleHorizonte(key,el){setHorizonteChip(key,el);}
 
 function getTiposFiltrados(){
-  const items=document.querySelectorAll('#filtro-tipo-lista [data-tipo]');
-  if(!items.length) return null;
-  const activos=[...items].filter(el=>el.dataset.active==='1').map(el=>el.dataset.tipo);
-  return activos.length===items.length?null:activos;
+  return tipoActivo?[tipoActivo]:null;
 }
 
 function getHorizontesFiltrados(){
