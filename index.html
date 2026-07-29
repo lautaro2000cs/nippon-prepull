@@ -525,22 +525,45 @@ tbody td{padding:11px 12px;vertical-align:middle}
 
         <!-- REPUESTOS -->
         <div class="tc" id="tc-repuestos">
-          <div class="sec-hdr-plain">
-            <div>
-              <div class="sec-eyebrow">Control de repuestos</div>
-              <h2>Repuestos</h2>
+          <div class="sub-tabs">
+            <button class="sub-tab act" id="subtab-rep-activos" onclick="swSubTabRep('activos',this)">
+              Repuestos <span class="sub-tab-count" id="cnt-rep-activos">0</span>
+            </button>
+            <button class="sub-tab" id="subtab-rep-hist" onclick="swSubTabRep('hist',this)">
+              Histórico <span class="sub-tab-count" id="cnt-rep-hist">0</span>
+            </button>
+          </div>
+
+          <div class="sub-tc act" id="subtc-rep-activos">
+            <div class="sec-hdr-plain">
+              <div>
+                <div class="sec-eyebrow">Control de repuestos</div>
+                <h2>Repuestos</h2>
+              </div>
+              <div class="hdr-actions" id="fil-rep-wrap"></div>
             </div>
-            <div class="hdr-actions" id="fil-rep-wrap"></div>
+            <!-- Métricas -->
+            <div class="metrics-row" id="metricas-row-rep"></div>
+            <!-- Hint filtro activo -->
+            <div id="filter-hint-rep" style="display:none" class="filter-hint">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              <span id="filter-hint-txt-rep"></span>
+              <button class="filter-hint-btn" onclick="limpiarFiltroMetricaRep()">Limpiar filtros</button>
+            </div>
+            <div id="grupos-repuestos"><div class="loading-spinner"><i class="ti ti-loader-2"></i></div></div>
           </div>
-          <!-- Métricas -->
-          <div class="metrics-row" id="metricas-row-rep"></div>
-          <!-- Hint filtro activo -->
-          <div id="filter-hint-rep" style="display:none" class="filter-hint">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-            <span id="filter-hint-txt-rep"></span>
-            <button class="filter-hint-btn" onclick="limpiarFiltroMetricaRep()">Limpiar filtros</button>
+
+          <div class="sub-tc" id="subtc-rep-hist">
+            <div class="sec-hdr-plain">
+              <div>
+                <div class="sec-eyebrow">Turnos ya transcurridos · última semana</div>
+                <h2>Histórico de repuestos</h2>
+              </div>
+              <div class="hdr-actions" id="fil-rephist-wrap"></div>
+            </div>
+            <div class="access-note"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0"></i><div>Se muestran los turnos cuya fecha ya pasó, de los últimos 7 días. Los más antiguos se ocultan automáticamente.</div></div>
+            <div id="grupos-rep-hist"></div>
           </div>
-          <div id="grupos-repuestos"><div class="loading-spinner"><i class="ti ti-loader-2"></i></div></div>
         </div>
 
         <!-- USUARIOS -->
@@ -1042,6 +1065,7 @@ function iniciarRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'turnos'},async(payload)=>{
       await cargarTurnos();
       renderTurnos();renderRepuestos();renderNoShow();renderHistorico();renderDash();
+      if(typeof renderRepHistorico==='function') renderRepHistorico();
       if(typeof renderMetricas==='function') renderMetricas();
       if(typeof actualizarContadoresSubTabs==='function') actualizarContadoresSubTabs();
     })
@@ -1058,6 +1082,7 @@ function doLogout(){detenerRealtime();cu=null;document.getElementById('s-app').c
 async function cargarTodo(){
   await Promise.all([cargarTurnos(), cargarUsuariosParaSelect()]);
   renderDash();renderTurnos();renderRepuestos();renderNoShow();renderHistorico();
+  if(typeof renderRepHistorico==='function') renderRepHistorico();
   if(typeof renderMetricas==='function') renderMetricas();
   if(typeof actualizarContadoresSubTabs==='function') actualizarContadoresSubTabs();
   // Poblar select del drawer con usuarios de Citas
@@ -1089,7 +1114,16 @@ function swTab(t,el){
   if(t==='dash') renderDash();
   if(t==='compras') renderCompras();
 }
-function swSubTab(t,el){document.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('act'));document.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));el.classList.add('act');document.getElementById('subtc-'+t).classList.add('act');if(t==='noshow')renderNoShow();if(t==='historico')renderHistorico();}
+function swSubTab(t,el){const cont=document.getElementById('tc-turnos');cont.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('act'));cont.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));el.classList.add('act');document.getElementById('subtc-'+t).classList.add('act');if(t==='noshow')renderNoShow();if(t==='historico')renderHistorico();}
+function swSubTabRep(t,el){
+  const cont=document.getElementById('tc-repuestos');
+  cont.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('act'));
+  cont.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));
+  el.classList.add('act');
+  document.getElementById('subtc-rep-'+t).classList.add('act');
+  if(t==='hist')renderRepHistorico();
+  else renderRepuestos();
+}
 
 function buildFilters(){
   // Sidebar filtros
@@ -1143,6 +1177,19 @@ function buildFilters(){
     }
   }
 
+  const frh=document.getElementById('fil-rephist-wrap');
+  if(frh){
+    const buscadorHist=`<div class="search-wrap">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" class="search-input" id="search-rephist" placeholder="Buscar por dominio o patente..." value="${searchRepHistVal||''}" oninput="searchRepHistVal=this.value;renderRepHistorico()">
+    </div>`;
+    if(cu.sucursalFija){
+      frh.innerHTML=`${buscadorHist}<div class="filter-locked"><i class="ti ti-lock" style="font-size:13px"></i> ${cu.sucursalFija} (fijo)</div>`;
+    } else {
+      frh.innerHTML=`${buscadorHist}<select class="filter-sel" id="fil-suc-rh" onchange="renderRepHistorico()"><option value="">Todas las sucursales</option>${SUCURSALES.map(s=>`<option>${s}</option>`).join('')}</select>`;
+    }
+  }
+
   const fn=document.getElementById('fil-noshow-wrap');
   if(fn){
     fn.innerHTML=cu.sucursalFija?`<div class="filter-locked"><i class="ti ti-lock" style="font-size:13px"></i> ${cu.sucursalFija} (fijo)</div>`
@@ -1163,7 +1210,7 @@ function buildFilters(){
   if(fc) fc.innerHTML=`<button class="btn-add" onclick="openCompModal(null)"><i class="ti ti-plus"></i> Nuevo pedido</button>`;
 }
 
-function aplicarFiltrosSidebar(){renderTurnos();if(typeof renderRepuestos==='function')renderRepuestos();}
+function aplicarFiltrosSidebar(){renderTurnos();if(typeof renderRepuestos==='function')renderRepuestos();if(typeof renderRepHistorico==='function'&&document.getElementById('subtc-rep-hist')&&document.getElementById('subtc-rep-hist').classList.contains('act'))renderRepHistorico();}
 
 let tipoActivo=null;
 function toggleTipo(tipo,el){
@@ -1401,6 +1448,46 @@ function renderRepuestos(){
     }
     return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${valePill(t.vale)}</td><td>${nsBadge}</td><td>${obsCitaTag}</td><td>${obsTag}</td><td>${estPill(t.estado)}</td><td>${acc}</td></tr>`;
   }).join('')}</tbody></table>`,horizFilt);
+  actualizarContadoresRep();
+}
+
+// Un turno entra al histórico de repuestos si su fecha ya pasó y no tiene más de 7 días de antigüedad
+const REP_HIST_DIAS=7;
+function esRepHistorico(t){const d=diff(t.fecha);return d<0 && d>=-REP_HIST_DIAS;}
+
+function actualizarContadoresRep(){
+  const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-r')?document.getElementById('fil-suc-r').value:'');
+  const activos=turnos.filter(t=>(!f||t.sucursal===f)&&diff(t.fecha)>=0).length;
+  const fh=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-rh')?document.getElementById('fil-suc-rh').value:'');
+  const hist=turnos.filter(t=>esRepHistorico(t)&&(!fh||t.sucursal===fh)).length;
+  const cA=document.getElementById('cnt-rep-activos'); if(cA) cA.textContent=activos;
+  const cH=document.getElementById('cnt-rep-hist'); if(cH) cH.textContent=hist;
+}
+
+function renderRepHistorico(){
+  const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-rh')?document.getElementById('fil-suc-rh').value:'');
+  const qr=(searchRepHistVal||'').toLowerCase().trim();
+  const tiposFilt=getTiposFiltrados();
+  const items=turnos.filter(t=>{
+    if(!esRepHistorico(t)) return false;
+    if(f&&t.sucursal!==f) return false;
+    if(tiposFilt&&!tiposFilt.includes(t.tipo)) return false;
+    if(qr&&!(t.dominio||'').toLowerCase().includes(qr)) return false;
+    return true;
+  }).sort((a,b)=>parseD(b.fecha)-parseD(a.fecha)); // más recientes primero
+  actualizarContadoresRep();
+  const cont=document.getElementById('grupos-rep-hist');
+  if(!cont) return;
+  if(!items.length){cont.innerHTML='<div class="empty"><i class="ti ti-history"></i>Sin turnos transcurridos en los últimos 7 días</div>';return;}
+  cont.innerHTML=`<div class="table-wrap"><table><thead><tr>
+    <th style="width:8%">Pre-Or</th><th style="width:13%">Cliente</th><th style="width:8%">Dominio</th><th style="width:9%">Modelo</th>
+    <th style="width:9%">Sucursal</th><th style="width:10%">Fecha del turno</th><th style="width:10%">Tipo</th>
+    <th style="width:7%">Vale</th><th style="width:7%">No Show</th><th style="width:11%">Comentario Repuestos</th><th style="width:8%">Estado</th>
+  </tr></thead><tbody>${items.map(t=>{
+    const nsBadge=t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i></span>':'—';
+    const obsTag=t.obs_rep?`<span class="obs-badge" onclick="verObs('${t.id}','rep')" title="${t.obs_rep}"><i class="ti ti-message" style="font-size:11px"></i></span>`:'—';
+    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${valePill(t.vale)}</td><td>${nsBadge}</td><td>${obsTag}</td><td>${estPill(t.estado)}</td></tr>`;
+  }).join('')}</tbody></table></div>`;
 }
 
 
@@ -2418,6 +2505,7 @@ let metricaActiva=null;
 let metricaActivaRep=null;
 let searchVal="";
 let searchRepVal="";
+let searchRepHistVal="";
 
 function openDrawer(){
   drawerAdjuntos=[];
