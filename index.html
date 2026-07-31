@@ -1799,15 +1799,17 @@ const COMP_SECCIONES=[
 ];
 const MESES_ANIO=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 function getMesesOpciones(){const y=new Date().getFullYear();return MESES_ANIO.flatMap(m=>[`${m} ${y-1}`,`${m} ${y}`,`${m} ${y+1}`]);}
-// Devuelve solo los meses que realmente aparecen en los registros cargados, ordenados cronológicamente
+// Etiqueta "Mes Año" a partir de una fecha YYYY-MM-DD (fuente única y confiable)
+function mesLabelFecha(fecha){
+  if(!fecha) return '';
+  const [y,m]=String(fecha).split('-');
+  return `${MESES_ANIO[parseInt(m,10)-1]} ${y}`;
+}
+// Devuelve solo los meses que realmente aparecen en los registros (según su fecha), ordenados cronológicamente
 function getMesesEnRegistros(){
-  const set=new Set();
-  compRegistros.forEach(r=>{if(r.mes)set.add(r.mes);});
-  return [...set].sort((a,b)=>{
-    const [ma,ya]=a.split(' '), [mb,yb]=b.split(' ');
-    const dy=Number(ya)-Number(yb);
-    return dy!==0?dy:MESES_ANIO.indexOf(ma)-MESES_ANIO.indexOf(mb);
-  });
+  const map=new Map(); // "YYYY-MM" -> etiqueta
+  compRegistros.forEach(r=>{if(r.fecha){const [y,m]=String(r.fecha).split('-');const key=`${y}-${m}`;if(!map.has(key))map.set(key,mesLabelFecha(r.fecha));}});
+  return [...map.entries()].sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0).map(e=>e[1]);
 }
 
 let compSeccionActual=null;
@@ -1955,7 +1957,7 @@ function renderSeccionTabla(){
     if(desde&&r.fecha&&r.fecha<desde)return false;
     if(hasta&&r.fecha&&r.fecha>hasta)return false;
     if(tipo&&r.tipo_orden!==tipo)return false;
-    if(mes&&r.mes!==mes)return false;
+    if(mes&&mesLabelFecha(r.fecha)!==mes)return false;
     if(marca&&!(r.marca||'').toLowerCase().includes(marca))return false;
     return true;
   });
@@ -1991,7 +1993,7 @@ function renderSeccionTabla(){
     rowFn=r=>`<td>${fmtD(r.fecha)}</td><td><strong>${r.nro_orden}</strong></td><td>${r.lineas}</td><td>${fmtPesos(r.costo)}</td><td>${r.item||'—'}</td>`;
   }else if(k==='cubiertas'){
     ths='<th>Mes</th><th>Marca</th><th>Item</th><th>Descripción</th><th>N° Orden</th><th>Fecha</th><th>Cant.</th><th>Remito</th><th>Recepción</th><th>Obs.</th>';
-    rowFn=r=>`<td>${r.mes}</td><td>${r.marca}</td><td>${r.item}</td><td style="font-size:12px">${r.descripcion}</td><td><strong>${r.nro_orden}</strong></td><td>${fmtD(r.fecha)}</td><td>${r.cantidad}</td><td>${r.remito_interno}</td>
+    rowFn=r=>`<td>${mesLabelFecha(r.fecha)}</td><td>${r.marca}</td><td>${r.item}</td><td style="font-size:12px">${r.descripcion}</td><td><strong>${r.nro_orden}</strong></td><td>${fmtD(r.fecha)}</td><td>${r.cantidad}</td><td>${r.remito_interno}</td>
       <td>${r.fecha_recepcion?`<span class="pill p-arr" style="font-size:11px"><i class="ti ti-check" style="font-size:10px"></i> ${fmtD(r.fecha_recepcion)}</span>`:'<span style="font-size:12px;color:var(--color-text-secondary)">Pendiente</span>'}</td>
       <td style="font-size:12px">${r.observaciones||'—'}</td>`;
   }else{
