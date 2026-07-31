@@ -1799,6 +1799,16 @@ const COMP_SECCIONES=[
 ];
 const MESES_ANIO=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 function getMesesOpciones(){const y=new Date().getFullYear();return MESES_ANIO.flatMap(m=>[`${m} ${y-1}`,`${m} ${y}`,`${m} ${y+1}`]);}
+// Devuelve solo los meses que realmente aparecen en los registros cargados, ordenados cronológicamente
+function getMesesEnRegistros(){
+  const set=new Set();
+  compRegistros.forEach(r=>{if(r.mes)set.add(r.mes);});
+  return [...set].sort((a,b)=>{
+    const [ma,ya]=a.split(' '), [mb,yb]=b.split(' ');
+    const dy=Number(ya)-Number(yb);
+    return dy!==0?dy:MESES_ANIO.indexOf(ma)-MESES_ANIO.indexOf(mb);
+  });
+}
 
 let compSeccionActual=null;
 let compRegistros=[];
@@ -1824,6 +1834,7 @@ async function cargarRegistrosSec(){
     if(error){console.error(error);compRegistros=[];return;}
     compRegistros=data;
   }
+  renderFiltrosCompras();
   renderSeccionTabla();
   renderTargetBanner();
 }
@@ -1897,7 +1908,7 @@ function renderFiltrosCompras(){
            <input type="date" id="fil-c-hasta" onchange="renderSeccionTabla()" style="${styleInp}">
            <select id="fil-c-tipo" class="filter-sel" onchange="renderSeccionTabla()"><option value="">Todos los tipos</option><option>Reposición</option><option>Vendedor directo</option><option>Firm Order</option></select>`;
   }else if(k==='cubiertas'){
-    html+=`<select id="fil-c-mes" class="filter-sel" onchange="renderSeccionTabla()"><option value="">Todos los meses</option>${getMesesOpciones().map(m=>`<option>${m}</option>`).join('')}</select>
+    html+=`<select id="fil-c-mes" class="filter-sel" onchange="renderSeccionTabla()"><option value="">Todos los meses</option>${getMesesEnRegistros().map(m=>`<option>${m}</option>`).join('')}</select>
            <input type="text" id="fil-c-marca" placeholder="Filtrar por marca..." oninput="renderSeccionTabla()" style="${styleInp}">`;
   }else{
     html+=`<input type="date" id="fil-c-desde" onchange="renderSeccionTabla()" style="${styleInp}">
@@ -1909,7 +1920,11 @@ function renderFiltrosCompras(){
     <i class="ti ti-arrows-sort" style="font-size:13px;vertical-align:-2px"></i>
     <span id="orden-comp-lbl">${compOrdenAsc?'Más antiguo primero':'Más nuevo primero'}</span>
   </button>`;
+  // Preservar los valores de los filtros que el usuario ya tenía seleccionados
+  const prev={};
+  ['fil-c-desde','fil-c-hasta','fil-c-tipo','fil-c-mes','fil-c-marca'].forEach(id=>{const el=document.getElementById(id);if(el)prev[id]=el.value;});
   cont.innerHTML=html;
+  Object.keys(prev).forEach(id=>{const el=document.getElementById(id);if(el&&prev[id])el.value=prev[id];});
 }
 
 function toggleOrdenCompras(){
