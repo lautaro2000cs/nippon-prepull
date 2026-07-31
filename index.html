@@ -1911,6 +1911,7 @@ function renderFiltrosCompras(){
            <select id="fil-c-tipo" class="filter-sel" onchange="renderSeccionTabla()"><option value="">Todos los tipos</option><option>Reposición</option><option>Vendedor directo</option><option>Firm Order</option></select>`;
   }else if(k==='cubiertas'){
     html+=`<select id="fil-c-mes" class="filter-sel" onchange="renderSeccionTabla()"><option value="">Todos los meses</option>${getMesesEnRegistros().map(m=>`<option>${m}</option>`).join('')}</select>
+           <input type="text" id="fil-c-item" placeholder="Buscar por ítem (código)..." oninput="renderSeccionTabla()" style="${styleInp}">
            <input type="text" id="fil-c-marca" placeholder="Filtrar por marca..." oninput="renderSeccionTabla()" style="${styleInp}">`;
   }else{
     html+=`<input type="date" id="fil-c-desde" onchange="renderSeccionTabla()" style="${styleInp}">
@@ -1924,7 +1925,7 @@ function renderFiltrosCompras(){
   </button>`;
   // Preservar los valores de los filtros que el usuario ya tenía seleccionados
   const prev={};
-  ['fil-c-desde','fil-c-hasta','fil-c-tipo','fil-c-mes','fil-c-marca'].forEach(id=>{const el=document.getElementById(id);if(el)prev[id]=el.value;});
+  ['fil-c-desde','fil-c-hasta','fil-c-tipo','fil-c-mes','fil-c-item','fil-c-marca'].forEach(id=>{const el=document.getElementById(id);if(el)prev[id]=el.value;});
   cont.innerHTML=html;
   Object.keys(prev).forEach(id=>{const el=document.getElementById(id);if(el&&prev[id])el.value=prev[id];});
 }
@@ -1937,7 +1938,7 @@ function toggleOrdenCompras(){
 }
 
 function limpiarFiltrosCompras(){
-  ['fil-c-desde','fil-c-hasta','fil-c-tipo','fil-c-mes','fil-c-marca'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['fil-c-desde','fil-c-hasta','fil-c-tipo','fil-c-mes','fil-c-item','fil-c-marca'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   renderSeccionTabla();
 }
 
@@ -1949,6 +1950,7 @@ function renderSeccionTabla(){
   const hasta=document.getElementById('fil-c-hasta')?.value||'';
   const tipo=document.getElementById('fil-c-tipo')?.value||'';
   const mes=document.getElementById('fil-c-mes')?.value||'';
+  const item=(document.getElementById('fil-c-item')?.value||'').toLowerCase().trim();
   const marca=(document.getElementById('fil-c-marca')?.value||'').toLowerCase();
   const esEdit=cu&&(cu.rol==='compras'||cu.rol==='admin');
   const puedeRecibir=cu&&(cu.rol==='repuestos'||cu.rol==='admin'||cu.rol==='compras');
@@ -1958,6 +1960,7 @@ function renderSeccionTabla(){
     if(hasta&&r.fecha&&r.fecha>hasta)return false;
     if(tipo&&r.tipo_orden!==tipo)return false;
     if(mes&&mesLabelFecha(r.fecha)!==mes)return false;
+    if(item&&!(r.item||'').toLowerCase().includes(item))return false;
     if(marca&&!(r.marca||'').toLowerCase().includes(marca))return false;
     return true;
   });
