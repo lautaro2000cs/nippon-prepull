@@ -599,6 +599,19 @@ tbody td{padding:11px 12px;vertical-align:middle}
             <div class="sec-eyebrow">Módulo de compras</div>
             <div class="sec-hdr-plain" style="margin-bottom:1.5rem"><h2>Compras</h2></div>
             <div id="comp-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px"></div>
+            <div style="display:flex;align-items:center;gap:12px;margin:2rem 0 1rem"><span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-4,#8a8680)">Gestión anual</span><div style="flex:1;height:1px;background:rgba(0,0,0,.08)"></div></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px">
+              <div onclick="abrirISD()" style="background:#fff;border:1px solid var(--color-border-tertiary);border-radius:13px;padding:20px 20px 20px 22px;cursor:pointer;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;transition:box-shadow .12s,border-color .12s" onmouseover="this.style.boxShadow='0 6px 18px -12px rgba(16,24,40,.26)';this.style.borderColor='#e0e3e7'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--color-border-tertiary)'">
+                <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#4B5563"></div>
+                <div style="display:flex;align-items:center;gap:10px"><i class="ti ti-file-invoice" style="font-size:19px;color:#4B5563"></i><span style="font-size:16px;font-weight:700;color:var(--color-text-primary)">ISD</span></div>
+                <span style="font-size:18px;color:#c2c8cf">→</span>
+              </div>
+              <div onclick="abrirTransporte()" style="background:#fff;border:1px solid var(--color-border-tertiary);border-radius:13px;padding:20px 20px 20px 22px;cursor:pointer;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;transition:box-shadow .12s,border-color .12s" onmouseover="this.style.boxShadow='0 6px 18px -12px rgba(16,24,40,.26)';this.style.borderColor='#e0e3e7'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--color-border-tertiary)'">
+                <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#0d9488"></div>
+                <div style="display:flex;align-items:center;gap:10px"><i class="ti ti-truck-delivery" style="font-size:19px;color:#0d9488"></i><span style="font-size:16px;font-weight:700;color:var(--color-text-primary)">Calendario Transporte</span></div>
+                <span style="font-size:18px;color:#c2c8cf">→</span>
+              </div>
+            </div>
           </div>
           <div id="comp-seccion" style="display:none">
             <div class="sec-hdr">
@@ -617,6 +630,38 @@ tbody td{padding:11px 12px;vertical-align:middle}
             <div id="target-banner" style="display:none;background:#fff;border:1px solid var(--border-1);border-radius:var(--r-metric);padding:1.25rem 1.5rem;margin-bottom:1.25rem;box-shadow:0 1px 2px rgba(0,0,0,.04)"></div>
             <div id="comp-filtros" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem"></div>
             <div id="tabla-compras"></div>
+          </div>
+
+          <!-- ISD -->
+          <div id="comp-isd" style="display:none">
+            <div class="sec-hdr">
+              <div class="sec-hdr-left" style="display:flex;align-items:center;gap:10px">
+                <button class="btn-sm" onclick="volverComprasHome()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg> Volver</button>
+                <div><div class="sec-eyebrow">Compras</div><h2>ISD</h2></div>
+              </div>
+              <div class="hdr-actions" id="isd-actions"></div>
+            </div>
+            <div id="isd-filtros" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem"></div>
+            <div id="tabla-isd"></div>
+          </div>
+
+          <!-- CALENDARIO TRANSPORTE -->
+          <div id="comp-transporte" style="display:none">
+            <div class="sec-hdr">
+              <div class="sec-hdr-left" style="display:flex;align-items:center;gap:10px">
+                <button class="btn-sm" onclick="volverComprasHome()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg> Volver</button>
+                <div><div class="sec-eyebrow">Compras</div><h2>Calendario Transporte</h2></div>
+              </div>
+              <div class="hdr-actions" id="transporte-actions"></div>
+            </div>
+            <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:1.1rem">
+              <select id="tr-anio" class="filter-sel" onchange="renderTransporte()"></select>
+              <div style="display:flex;gap:14px;align-items:center;font-size:12px;color:var(--color-text-secondary);flex-wrap:wrap">
+                <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:#DCF3E3;border:1px solid #16A34A"></span>Llegada cargada</span>
+                <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:#FBE3E3;border:1px solid #DC2626"></span>Fin de semana / feriado</span>
+              </div>
+            </div>
+            <div id="tabla-transporte"></div>
           </div>
         </div>
 
@@ -881,6 +926,29 @@ tbody td{padding:11px 12px;vertical-align:middle}
     <div class="mgrid" id="comp-modal-fields"></div>
     <p class="login-err" id="comp-err" style="display:none"></p>
     <div class="mfooter"><button class="btn-cancel" onclick="closeCompModal()">Cancelar</button><button class="btn-save" onclick="guardarPedido()">Guardar pedido</button></div>
+  </div>
+</div>
+
+<div class="modal-ov" id="isdov">
+  <div class="modal">
+    <h3 id="isd-modal-title"><i class="ti ti-file-invoice" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Nuevo registro ISD</h3>
+    <div class="mgrid" id="isd-modal-fields"></div>
+    <p class="login-err" id="isd-err" style="display:none"></p>
+    <div class="mfooter"><button class="btn-cancel" onclick="closeIsdModal()">Cancelar</button><button class="btn-save" onclick="guardarISD()">Guardar</button></div>
+  </div>
+</div>
+
+<div class="modal-ov" id="trov">
+  <div class="modal sm">
+    <h3 id="tr-modal-title"><i class="ti ti-truck-delivery" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Llegada de camión</h3>
+    <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:.85rem" id="tr-fecha-lbl"></div>
+    <div class="mgrid"><div class="full"><label>Código de llegada</label><input type="text" id="f-tr-codigo" placeholder="Ej: R-20/02"></div></div>
+    <p class="login-err" id="tr-err" style="display:none"></p>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="closeTrModal()">Cancelar</button>
+      <button class="btn-sm btn-del" id="tr-quitar" onclick="quitarLlegada()" style="display:none;align-items:center;gap:4px"><i class="ti ti-trash" style="font-size:12px"></i> Quitar</button>
+      <button class="btn-save" onclick="guardarLlegada()">Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -1887,6 +1955,8 @@ function renderCompras(){
   const home=document.getElementById('comp-home');
   const sec=document.getElementById('comp-seccion');
   if(!home||!sec)return;
+  const _isdV=document.getElementById('comp-isd'); if(_isdV)_isdV.style.display='none';
+  const _trV=document.getElementById('comp-transporte'); if(_trV)_trV.style.display='none';
   if(!compSeccionActual){
     home.style.display='block'; sec.style.display='none';
     renderCompCards();
@@ -2290,6 +2360,201 @@ async function eliminarPedido(id){
   if(error){alert('Error: '+error.message);return;}
   await cargarRegistrosSec();
 }
+
+/* ===================== ISD & CALENDARIO TRANSPORTE ===================== */
+const MESES_UP=MESES_ANIO.map(m=>m.toUpperCase());
+function _puedeEditarComp(){return cu&&(cu.rol==='compras'||cu.rol==='admin');}
+function _ocultarVistasCompras(){['comp-home','comp-seccion','comp-isd','comp-transporte'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});}
+
+/* ---------- ISD ---------- */
+let isdRegistros=[]; let isdEditId=null;
+const ISD_SCHEMA=[
+  {id:'f-isd-anio', label:'Año', type:'number', req:true, ph:'2026', step:'1'},
+  {id:'f-isd-nrodealer', label:'Nro Dealer', type:'text', req:true},
+  {id:'f-isd-dealer', label:'Dealer', type:'text', req:true},
+  {id:'f-isd-sucursal', label:'Sucursal', type:'text', req:true},
+  {id:'f-isd-mes', label:'Mes', type:'select', req:true, opts:MESES_UP},
+  {id:'f-isd-isd', label:'ISD', type:'text', req:true},
+  {id:'f-isd-remito', label:'Remito', type:'text', req:true},
+  {id:'f-isd-nparte', label:'N° parte', type:'text', req:true},
+  {id:'f-isd-cant', label:'Cant', type:'number', req:true, step:'1'},
+  {id:'f-isd-tipo', label:'Tipo', type:'text', req:true},
+  {id:'f-isd-sdr', label:'SDR', type:'text', req:false},
+];
+const ISD_MAP={'f-isd-anio':'anio','f-isd-nrodealer':'nro_dealer','f-isd-dealer':'dealer','f-isd-sucursal':'sucursal','f-isd-mes':'mes','f-isd-isd':'isd','f-isd-remito':'remito','f-isd-nparte':'n_parte','f-isd-cant':'cant','f-isd-tipo':'tipo','f-isd-sdr':'sdr'};
+
+function abrirISD(){
+  _ocultarVistasCompras();
+  const v=document.getElementById('comp-isd'); if(v)v.style.display='block';
+  document.getElementById('isd-actions').innerHTML=_puedeEditarComp()?`<button class="btn-add" onclick="openIsdModal(null)"><i class="ti ti-plus"></i> Nuevo registro</button>`:'';
+  cargarISD();
+}
+async function cargarISD(){
+  const {data,error}=await sb.from('isd').select('*').order('created_at',{ascending:true});
+  if(error){console.error(error);isdRegistros=[];}else{isdRegistros=data||[];}
+  renderIsdFiltros();
+  renderISD();
+}
+function renderIsdFiltros(){
+  const cont=document.getElementById('isd-filtros'); if(!cont)return;
+  const styleInp='padding:8px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:13px';
+  const anios=[...new Set(isdRegistros.map(r=>r.anio).filter(x=>x!=null))].sort((a,b)=>b-a);
+  const y=new Date().getFullYear(); if(!anios.includes(y))anios.unshift(y);
+  const prevA=document.getElementById('fil-isd-anio')?.value||'';
+  const prevM=document.getElementById('fil-isd-mes')?.value||'';
+  const prevB=document.getElementById('fil-isd-buscar')?.value||'';
+  cont.innerHTML=`
+    <select id="fil-isd-anio" class="filter-sel" onchange="renderISD()"><option value="">Todos los años</option>${anios.map(a=>`<option ${String(a)===prevA?'selected':''}>${a}</option>`).join('')}</select>
+    <select id="fil-isd-mes" class="filter-sel" onchange="renderISD()"><option value="">Todos los meses</option>${MESES_UP.map(m=>`<option ${m===prevM?'selected':''}>${m}</option>`).join('')}</select>
+    <input type="text" id="fil-isd-buscar" placeholder="Buscar (n° parte, ISD, remito...)" oninput="renderISD()" style="${styleInp};min-width:220px" value="${prevB.replace(/"/g,'&quot;')}">`;
+}
+function renderISD(){
+  const cont=document.getElementById('tabla-isd'); if(!cont)return;
+  const fa=document.getElementById('fil-isd-anio')?.value||'';
+  const fm=document.getElementById('fil-isd-mes')?.value||'';
+  const fb=(document.getElementById('fil-isd-buscar')?.value||'').toLowerCase().trim();
+  const esEdit=_puedeEditarComp();
+  let items=isdRegistros.filter(r=>{
+    if(fa&&String(r.anio)!==fa)return false;
+    if(fm&&(r.mes||'')!==fm)return false;
+    if(fb){const hay=[r.n_parte,r.isd,r.remito,r.tipo,r.dealer,r.sucursal].map(x=>String(x||'').toLowerCase()).join(' ');if(!hay.includes(fb))return false;}
+    return true;
+  });
+  if(!items.length){cont.innerHTML='<div class="empty"><i class="ti ti-inbox"></i>Sin registros ISD</div>';return;}
+  const ths='<th>Año</th><th>Nro Dealer</th><th>Dealer</th><th>Sucursal</th><th>Mes</th><th>ISD</th><th>Remito</th><th>N° parte</th><th>Cant</th><th>Tipo</th><th>SDR</th>'+(esEdit?'<th>Acciones</th>':'');
+  const rows=items.map(r=>{
+    const acc=esEdit?`<td><div style="display:flex;gap:4px"><button class="btn-sm btn-rep-mark" onclick="openIsdModal('${r.id}')"><i class="ti ti-edit" style="font-size:12px"></i></button><button class="btn-sm btn-del" onclick="eliminarISD('${r.id}')"><i class="ti ti-trash" style="font-size:12px"></i></button></div></td>`:'';
+    return `<tr><td>${r.anio??'—'}</td><td>${r.nro_dealer??'—'}</td><td>${r.dealer??'—'}</td><td>${r.sucursal??'—'}</td><td>${r.mes??'—'}</td><td>${r.isd??'—'}</td><td>${r.remito??'—'}</td><td>${r.n_parte??'—'}</td><td>${r.cant??'—'}</td><td>${r.tipo??'—'}</td><td>${r.sdr||'—'}</td>${acc}</tr>`;
+  }).join('');
+  cont.innerHTML=`<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+function openIsdModal(id){
+  if(!_puedeEditarComp())return;
+  isdEditId=id||null;
+  document.getElementById('isd-modal-title').innerHTML=`<i class="ti ti-file-invoice" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>${id?'Editar registro ISD':'Nuevo registro ISD'}`;
+  document.getElementById('isd-err').style.display='none';
+  const cont=document.getElementById('isd-modal-fields');
+  cont.innerHTML=ISD_SCHEMA.map(f=>{
+    const opt=f.req?'':'<span style="color:var(--color-text-secondary);font-weight:400"> (opcional)</span>';
+    let input;
+    if(f.type==='select'){input=`<select id="${f.id}"><option value="">Seleccionar...</option>${f.opts.map(o=>`<option>${o}</option>`).join('')}</select>`;}
+    else{input=`<input type="${f.type}" id="${f.id}" placeholder="${f.ph||''}" ${f.step?`step="${f.step}"`:''}/>`;}
+    return `<div><label>${f.label}${opt}</label>${input}</div>`;
+  }).join('');
+  const anioEl=document.getElementById('f-isd-anio'); if(anioEl&&!id)anioEl.value=new Date().getFullYear();
+  if(id){const r=isdRegistros.find(x=>x.id===id);if(r){ISD_SCHEMA.forEach(f=>{const el=document.getElementById(f.id);const col=ISD_MAP[f.id];if(el&&r[col]!=null)el.value=r[col];});}}
+  document.getElementById('isdov').classList.add('open');
+}
+function closeIsdModal(){document.getElementById('isdov').classList.remove('open');}
+async function guardarISD(){
+  if(!_puedeEditarComp())return;
+  const err=document.getElementById('isd-err'); err.style.display='none';
+  for(const f of ISD_SCHEMA){if(f.req){const el=document.getElementById(f.id);if(!el||!el.value.trim()){err.textContent=`Completá: ${f.label}`;err.style.display='block';return;}}}
+  const v=id=>{const x=document.getElementById(id)?.value;return x&&x.trim()?x.trim():null;};
+  const data={anio:Number(v('f-isd-anio')),nro_dealer:v('f-isd-nrodealer'),dealer:v('f-isd-dealer'),sucursal:v('f-isd-sucursal'),mes:v('f-isd-mes'),isd:v('f-isd-isd'),remito:v('f-isd-remito'),n_parte:v('f-isd-nparte'),cant:Number(v('f-isd-cant')),tipo:v('f-isd-tipo'),sdr:v('f-isd-sdr')};
+  try{
+    if(isdEditId){const {error}=await sb.from('isd').update(data).eq('id',isdEditId);if(error)throw error;}
+    else{data.creado_por=cu.nombre;const {error}=await sb.from('isd').insert([data]);if(error)throw error;}
+    closeIsdModal(); await cargarISD();
+  }catch(e){err.textContent='Error al guardar: '+e.message;err.style.display='block';}
+}
+async function eliminarISD(id){
+  if(!_puedeEditarComp())return;
+  if(!confirm('¿Eliminar este registro ISD? No se puede deshacer.'))return;
+  const {error}=await sb.from('isd').delete().eq('id',id);
+  if(error){alert('Error: '+error.message);return;}
+  await cargarISD();
+}
+
+/* ---------- CALENDARIO TRANSPORTE ---------- */
+let trLlegadas={}; let trFechaSel=null;
+function abrirTransporte(){
+  _ocultarVistasCompras();
+  const v=document.getElementById('comp-transporte'); if(v)v.style.display='block';
+  document.getElementById('transporte-actions').innerHTML=_puedeEditarComp()?`<span style="font-size:12px;color:var(--color-text-secondary)"><i class="ti ti-click" style="font-size:14px;vertical-align:-2px"></i> Tocá un día para cargar la llegada</span>`:'';
+  const sel=document.getElementById('tr-anio');
+  if(sel&&!sel.dataset.ready){
+    const y=new Date().getFullYear();
+    sel.innerHTML=[y-2,y-1,y,y+1].map(a=>`<option ${a===y?'selected':''}>${a}</option>`).join('');
+    sel.dataset.ready='1';
+  }
+  cargarTransporte();
+}
+async function cargarTransporte(){
+  const {data,error}=await sb.from('transporte_llegadas').select('*');
+  trLlegadas={};
+  if(!error&&data){data.forEach(r=>{trLlegadas[r.fecha]={id:r.id,codigo:r.codigo};});}
+  else if(error){console.error(error);}
+  renderTransporte();
+}
+function renderTransporte(){
+  const cont=document.getElementById('tabla-transporte'); if(!cont)return;
+  const anio=Number(document.getElementById('tr-anio')?.value||new Date().getFullYear());
+  const esEdit=_puedeEditarComp();
+  const DOW=['Lu','Ma','Mi','Ju','Vi','Sá','Do'];
+  let html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">';
+  for(let m=0;m<12;m++){
+    const first=new Date(anio,m,1);
+    const diasEnMes=new Date(anio,m+1,0).getDate();
+    const offset=(first.getDay()+6)%7;
+    html+=`<div style="background:#fff;border:1px solid var(--color-border-tertiary);border-radius:12px;padding:12px 14px">
+      <div style="font-size:13px;font-weight:700;color:var(--color-text-primary);margin-bottom:8px">${MESES_ANIO[m]} ${anio}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
+        ${DOW.map(d=>`<div style="text-align:center;font-size:10px;font-weight:600;color:var(--color-text-secondary);padding:2px 0">${d}</div>`).join('')}`;
+    for(let i=0;i<offset;i++)html+='<div></div>';
+    for(let d=1;d<=diasEnMes;d++){
+      const dateObj=new Date(anio,m,d);
+      const fstr=toStr(dateObj);
+      const lle=trLlegadas[fstr];
+      const finde=esFinDeSemana(dateObj);
+      const fer=esFeriado(dateObj);
+      let bg='#fff',bd='var(--color-border-tertiary)',col='var(--color-text-primary)';
+      if(lle){bg='#DCF3E3';bd='#16A34A';col='#0f5132';}
+      else if(finde||fer){bg='#FBE3E3';bd='#DC2626';col='#7f1d1d';}
+      const clickable=esEdit?`onclick="openTrModal('${fstr}')" `:'';
+      const cursor=esEdit?'cursor:pointer;':'';
+      const codigoHTML=lle?`<div style="font-size:9px;line-height:1.15;margin-top:1px;word-break:break-word;max-height:24px;overflow:hidden">${lle.codigo}</div>`:'';
+      const tip=fer?'Feriado':(finde?'Fin de semana':'');
+      html+=`<div ${clickable}title="${tip}" style="${cursor}min-height:44px;border:1px solid ${bd};border-radius:6px;background:${bg};color:${col};padding:3px 4px;display:flex;flex-direction:column">
+        <div style="font-size:11px;font-weight:700">${d}</div>${codigoHTML}
+      </div>`;
+    }
+    html+='</div></div>';
+  }
+  html+='</div>';
+  cont.innerHTML=html;
+}
+function openTrModal(fstr){
+  if(!_puedeEditarComp())return;
+  trFechaSel=fstr;
+  const lle=trLlegadas[fstr];
+  document.getElementById('tr-modal-title').innerHTML=`<i class="ti ti-truck-delivery" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>${lle?'Editar llegada':'Cargar llegada'}`;
+  document.getElementById('tr-fecha-lbl').textContent='Fecha: '+fmtD(fstr);
+  document.getElementById('f-tr-codigo').value=lle?lle.codigo:'';
+  document.getElementById('tr-err').style.display='none';
+  document.getElementById('tr-quitar').style.display=lle?'inline-flex':'none';
+  document.getElementById('trov').classList.add('open');
+}
+function closeTrModal(){document.getElementById('trov').classList.remove('open');}
+async function guardarLlegada(){
+  if(!_puedeEditarComp()||!trFechaSel)return;
+  const err=document.getElementById('tr-err'); err.style.display='none';
+  const codigo=document.getElementById('f-tr-codigo').value.trim();
+  if(!codigo){err.textContent='Ingresá el código de la llegada.';err.style.display='block';return;}
+  try{
+    const {error}=await sb.from('transporte_llegadas').upsert({fecha:trFechaSel,codigo,creado_por:cu.nombre},{onConflict:'fecha'});
+    if(error)throw error;
+    closeTrModal(); await cargarTransporte();
+  }catch(e){err.textContent='Error al guardar: '+e.message;err.style.display='block';}
+}
+async function quitarLlegada(){
+  if(!_puedeEditarComp()||!trFechaSel)return;
+  if(!confirm('¿Quitar la llegada de este día?'))return;
+  const {error}=await sb.from('transporte_llegadas').delete().eq('fecha',trFechaSel);
+  if(error){alert('Error: '+error.message);return;}
+  closeTrModal(); await cargarTransporte();
+}
+
 
 let recepcionId=null;
 function marcarRecepcionCubierta(id){
