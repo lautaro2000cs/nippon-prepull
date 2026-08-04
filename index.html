@@ -659,6 +659,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
               <div style="display:flex;gap:14px;align-items:center;font-size:12px;color:var(--color-text-secondary);flex-wrap:wrap">
                 <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:#DCF3E3;border:1px solid #16A34A"></span>Llegada de camión</span>
                 <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:#FBE3E3;border:1px solid #DC2626"></span>Feriado / fin de semana</span>
+                <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:#FEF3C7;border:1px solid #D97706"></span>No llegó</span>
               </div>
             </div>
             <div id="tabla-transporte"></div>
@@ -942,8 +943,9 @@ tbody td{padding:11px 12px;vertical-align:middle}
   <div class="modal sm">
     <h3 id="tr-modal-title"><i class="ti ti-calendar-event" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Marcar día</h3>
     <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:.85rem" id="tr-fecha-lbl"></div>
-    <div style="display:flex;gap:8px;margin-bottom:.9rem">
+    <div style="display:flex;gap:8px;margin-bottom:.9rem;flex-wrap:wrap">
       <button type="button" id="tr-btn-llegada" onclick="setTrTipo('llegada')"><i class="ti ti-truck-delivery"></i> Arribó el camión</button>
+      <button type="button" id="tr-btn-novino" onclick="setTrTipo('novino')"><i class="ti ti-truck-off"></i> No llegó</button>
       <button type="button" id="tr-btn-feriado" onclick="setTrTipo('feriado')"><i class="ti ti-calendar-off"></i> Feriado</button>
     </div>
     <div class="mgrid"><div class="full"><label id="tr-input-label">Código de llegada</label><input type="text" id="f-tr-codigo" placeholder="Ej: R-20/02"></div></div>
@@ -2514,11 +2516,12 @@ function renderTransporte(){
       let bg='#fff',bd='var(--color-border-tertiary)',col='var(--color-text-primary)';
       if(rec&&rec.tipo==='llegada'){bg='#DCF3E3';bd='#16A34A';col='#0f5132';}
       else if(rec&&rec.tipo==='feriado'){bg='#FBE3E3';bd='#DC2626';col='#7f1d1d';}
+      else if(rec&&rec.tipo==='novino'){bg='#FEF3C7';bd='#D97706';col='#92400E';}
       else if(finde){bg='#FBE3E3';bd='#DC2626';col='#7f1d1d';}
       const clickable=esEdit?`onclick="openTrModal('${fstr}')" `:'';
       const cursor=esEdit?'cursor:pointer;':'';
       const textoHTML=rec?`<div style="font-size:9px;line-height:1.15;margin-top:1px;word-break:break-word;max-height:24px;overflow:hidden">${rec.codigo}</div>`:'';
-      const tip=rec?(rec.tipo==='feriado'?'Feriado: '+rec.codigo:'Llegada: '+rec.codigo):(finde?'Fin de semana':'');
+      const tip=rec?(rec.tipo==='feriado'?'Feriado: '+rec.codigo:(rec.tipo==='novino'?'No llegó'+(rec.codigo&&rec.codigo!=='No llegó'?': '+rec.codigo:''):'Llegada: '+rec.codigo)):(finde?'Fin de semana':'');
       html+=`<div ${clickable}title="${tip}" style="${cursor}min-height:44px;border:1px solid ${bd};border-radius:6px;background:${bg};color:${col};padding:3px 4px;display:flex;flex-direction:column">
         <div style="font-size:11px;font-weight:700">${d}</div>${textoHTML}
       </div>`;
@@ -2532,15 +2535,18 @@ function renderTransporte(){
 let trTipoSel='llegada';
 function setTrTipo(t){
   trTipoSel=t;
-  const base='flex:1;padding:9px 8px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:.12s';
+  const base='flex:1;min-width:92px;padding:9px 8px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:.12s';
   const off='border:1px solid var(--color-border-tertiary);background:#fff;color:var(--color-text-secondary)';
   const onLle='border:1px solid #16A34A;background:#DCF3E3;color:#0f5132';
   const onFer='border:1px solid #DC2626;background:#FBE3E3;color:#7f1d1d';
-  const bl=document.getElementById('tr-btn-llegada'), bf=document.getElementById('tr-btn-feriado');
+  const onNov='border:1px solid #D97706;background:#FEF3C7;color:#92400E';
+  const bl=document.getElementById('tr-btn-llegada'), bf=document.getElementById('tr-btn-feriado'), bn=document.getElementById('tr-btn-novino');
   if(bl)bl.style.cssText=base+';'+(t==='llegada'?onLle:off);
+  if(bn)bn.style.cssText=base+';'+(t==='novino'?onNov:off);
   if(bf)bf.style.cssText=base+';'+(t==='feriado'?onFer:off);
   const lbl=document.getElementById('tr-input-label'), inp=document.getElementById('f-tr-codigo');
   if(t==='feriado'){ if(lbl)lbl.textContent='Nombre del feriado'; if(inp)inp.placeholder='Ej: Día de la Independencia'; }
+  else if(t==='novino'){ if(lbl)lbl.textContent='Motivo / nota (opcional)'; if(inp)inp.placeholder='Ej: demora en fábrica'; }
   else { if(lbl)lbl.textContent='Código de llegada'; if(inp)inp.placeholder='Ej: R-20/02'; }
 }
 function openTrModal(fstr){
@@ -2560,8 +2566,9 @@ function closeTrModal(){document.getElementById('trov').classList.remove('open')
 async function guardarLlegada(){
   if(!_puedeEditarComp()||!trFechaSel)return;
   const err=document.getElementById('tr-err'); err.style.display='none';
-  const texto=document.getElementById('f-tr-codigo').value.trim();
-  if(!texto){err.textContent=trTipoSel==='feriado'?'Ingresá el nombre del feriado.':'Ingresá el código de la llegada.';err.style.display='block';return;}
+  let texto=document.getElementById('f-tr-codigo').value.trim();
+  if(trTipoSel==='novino'){ if(!texto)texto='No llegó'; }
+  else if(!texto){err.textContent=trTipoSel==='feriado'?'Ingresá el nombre del feriado.':'Ingresá el código de la llegada.';err.style.display='block';return;}
   try{
     const {error}=await sb.from('transporte_llegadas').upsert({fecha:trFechaSel,codigo:texto,tipo:trTipoSel,creado_por:cu.nombre},{onConflict:'fecha'});
     if(error)throw error;
