@@ -657,8 +657,8 @@ tbody td{padding:11px 12px;vertical-align:middle}
             <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:1.1rem">
               <select id="tr-anio" class="filter-sel" onchange="renderTransporte()"></select>
               <div style="display:flex;gap:14px;align-items:center;font-size:12px;color:var(--color-text-secondary);flex-wrap:wrap">
-                <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:#DCF3E3;border:1px solid #16A34A"></span>Llegada cargada</span>
-                <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:#FBE3E3;border:1px solid #DC2626"></span>Fin de semana / feriado</span>
+                <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:#DCF3E3;border:1px solid #16A34A"></span>Llegada de camión</span>
+                <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:#FBE3E3;border:1px solid #DC2626"></span>Feriado / fin de semana</span>
               </div>
             </div>
             <div id="tabla-transporte"></div>
@@ -940,9 +940,13 @@ tbody td{padding:11px 12px;vertical-align:middle}
 
 <div class="modal-ov" id="trov">
   <div class="modal sm">
-    <h3 id="tr-modal-title"><i class="ti ti-truck-delivery" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Llegada de camión</h3>
+    <h3 id="tr-modal-title"><i class="ti ti-calendar-event" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Marcar día</h3>
     <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:.85rem" id="tr-fecha-lbl"></div>
-    <div class="mgrid"><div class="full"><label>Código de llegada</label><input type="text" id="f-tr-codigo" placeholder="Ej: R-20/02"></div></div>
+    <div style="display:flex;gap:8px;margin-bottom:.9rem">
+      <button type="button" id="tr-btn-llegada" onclick="setTrTipo('llegada')"><i class="ti ti-truck-delivery"></i> Arribó el camión</button>
+      <button type="button" id="tr-btn-feriado" onclick="setTrTipo('feriado')"><i class="ti ti-calendar-off"></i> Feriado</button>
+    </div>
+    <div class="mgrid"><div class="full"><label id="tr-input-label">Código de llegada</label><input type="text" id="f-tr-codigo" placeholder="Ej: R-20/02"></div></div>
     <p class="login-err" id="tr-err" style="display:none"></p>
     <div class="mfooter">
       <button class="btn-cancel" onclick="closeTrModal()">Cancelar</button>
@@ -2483,7 +2487,7 @@ function abrirTransporte(){
 async function cargarTransporte(){
   const {data,error}=await sb.from('transporte_llegadas').select('*');
   trLlegadas={};
-  if(!error&&data){data.forEach(r=>{trLlegadas[r.fecha]={id:r.id,codigo:r.codigo};});}
+  if(!error&&data){data.forEach(r=>{trLlegadas[r.fecha]={id:r.id,codigo:r.codigo,tipo:r.tipo||'llegada'};});}
   else if(error){console.error(error);}
   renderTransporte();
 }
@@ -2505,18 +2509,18 @@ function renderTransporte(){
     for(let d=1;d<=diasEnMes;d++){
       const dateObj=new Date(anio,m,d);
       const fstr=toStr(dateObj);
-      const lle=trLlegadas[fstr];
+      const rec=trLlegadas[fstr];
       const finde=esFinDeSemana(dateObj);
-      const fer=esFeriado(dateObj);
       let bg='#fff',bd='var(--color-border-tertiary)',col='var(--color-text-primary)';
-      if(lle){bg='#DCF3E3';bd='#16A34A';col='#0f5132';}
-      else if(finde||fer){bg='#FBE3E3';bd='#DC2626';col='#7f1d1d';}
+      if(rec&&rec.tipo==='llegada'){bg='#DCF3E3';bd='#16A34A';col='#0f5132';}
+      else if(rec&&rec.tipo==='feriado'){bg='#FBE3E3';bd='#DC2626';col='#7f1d1d';}
+      else if(finde){bg='#FBE3E3';bd='#DC2626';col='#7f1d1d';}
       const clickable=esEdit?`onclick="openTrModal('${fstr}')" `:'';
       const cursor=esEdit?'cursor:pointer;':'';
-      const codigoHTML=lle?`<div style="font-size:9px;line-height:1.15;margin-top:1px;word-break:break-word;max-height:24px;overflow:hidden">${lle.codigo}</div>`:'';
-      const tip=fer?'Feriado':(finde?'Fin de semana':'');
+      const textoHTML=rec?`<div style="font-size:9px;line-height:1.15;margin-top:1px;word-break:break-word;max-height:24px;overflow:hidden">${rec.codigo}</div>`:'';
+      const tip=rec?(rec.tipo==='feriado'?'Feriado: '+rec.codigo:'Llegada: '+rec.codigo):(finde?'Fin de semana':'');
       html+=`<div ${clickable}title="${tip}" style="${cursor}min-height:44px;border:1px solid ${bd};border-radius:6px;background:${bg};color:${col};padding:3px 4px;display:flex;flex-direction:column">
-        <div style="font-size:11px;font-weight:700">${d}</div>${codigoHTML}
+        <div style="font-size:11px;font-weight:700">${d}</div>${textoHTML}
       </div>`;
     }
     html+='</div></div>';
@@ -2524,32 +2528,49 @@ function renderTransporte(){
   html+='</div>';
   cont.innerHTML=html;
 }
+// selección de tipo (llegada / feriado) en el modal
+let trTipoSel='llegada';
+function setTrTipo(t){
+  trTipoSel=t;
+  const base='flex:1;padding:9px 8px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:.12s';
+  const off='border:1px solid var(--color-border-tertiary);background:#fff;color:var(--color-text-secondary)';
+  const onLle='border:1px solid #16A34A;background:#DCF3E3;color:#0f5132';
+  const onFer='border:1px solid #DC2626;background:#FBE3E3;color:#7f1d1d';
+  const bl=document.getElementById('tr-btn-llegada'), bf=document.getElementById('tr-btn-feriado');
+  if(bl)bl.style.cssText=base+';'+(t==='llegada'?onLle:off);
+  if(bf)bf.style.cssText=base+';'+(t==='feriado'?onFer:off);
+  const lbl=document.getElementById('tr-input-label'), inp=document.getElementById('f-tr-codigo');
+  if(t==='feriado'){ if(lbl)lbl.textContent='Nombre del feriado'; if(inp)inp.placeholder='Ej: Día de la Independencia'; }
+  else { if(lbl)lbl.textContent='Código de llegada'; if(inp)inp.placeholder='Ej: R-20/02'; }
+}
 function openTrModal(fstr){
   if(!_puedeEditarComp())return;
   trFechaSel=fstr;
-  const lle=trLlegadas[fstr];
-  document.getElementById('tr-modal-title').innerHTML=`<i class="ti ti-truck-delivery" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>${lle?'Editar llegada':'Cargar llegada'}`;
+  const rec=trLlegadas[fstr];
+  document.getElementById('tr-modal-title').innerHTML=`<i class="ti ti-calendar-event" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>${rec?'Editar día':'Marcar día'}`;
   document.getElementById('tr-fecha-lbl').textContent='Fecha: '+fmtD(fstr);
-  document.getElementById('f-tr-codigo').value=lle?lle.codigo:'';
+  document.getElementById('f-tr-codigo').value=rec?rec.codigo:'';
   document.getElementById('tr-err').style.display='none';
-  document.getElementById('tr-quitar').style.display=lle?'inline-flex':'none';
+  document.getElementById('tr-quitar').style.display=rec?'inline-flex':'none';
+  setTrTipo(rec?rec.tipo:'llegada');
   document.getElementById('trov').classList.add('open');
+  setTimeout(()=>{const i=document.getElementById('f-tr-codigo');if(i)i.focus();},50);
 }
 function closeTrModal(){document.getElementById('trov').classList.remove('open');}
 async function guardarLlegada(){
   if(!_puedeEditarComp()||!trFechaSel)return;
   const err=document.getElementById('tr-err'); err.style.display='none';
-  const codigo=document.getElementById('f-tr-codigo').value.trim();
-  if(!codigo){err.textContent='Ingresá el código de la llegada.';err.style.display='block';return;}
+  const texto=document.getElementById('f-tr-codigo').value.trim();
+  if(!texto){err.textContent=trTipoSel==='feriado'?'Ingresá el nombre del feriado.':'Ingresá el código de la llegada.';err.style.display='block';return;}
   try{
-    const {error}=await sb.from('transporte_llegadas').upsert({fecha:trFechaSel,codigo,creado_por:cu.nombre},{onConflict:'fecha'});
+    const {error}=await sb.from('transporte_llegadas').upsert({fecha:trFechaSel,codigo:texto,tipo:trTipoSel,creado_por:cu.nombre},{onConflict:'fecha'});
     if(error)throw error;
     closeTrModal(); await cargarTransporte();
   }catch(e){err.textContent='Error al guardar: '+e.message;err.style.display='block';}
 }
 async function quitarLlegada(){
   if(!_puedeEditarComp()||!trFechaSel)return;
-  if(!confirm('¿Quitar la llegada de este día?'))return;
+  if(!confirm('¿Quitar la marca de este día?'))return;
   const {error}=await sb.from('transporte_llegadas').delete().eq('fecha',trFechaSel);
   if(error){alert('Error: '+error.message);return;}
   closeTrModal(); await cargarTransporte();
