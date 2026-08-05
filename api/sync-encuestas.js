@@ -32,18 +32,13 @@ function wiseHeaders(token) {
 }
 
 // 1) Autenticación -> devuelve el token JWT
+// Según la doc de Wise CX: GET /authenticate?user=USUARIO
+// con la cabecera x-api-key. NO lleva body.
 async function autenticar() {
-  const res = await fetch(`${WISE_BASE}/authenticate`, {
-    method: "POST",
+  const url = `${WISE_BASE}/authenticate?user=${encodeURIComponent(process.env.WISE_USER)}`;
+  const res = await fetch(url, {
+    method: "GET",
     headers: wiseHeaders(null),
-    body: JSON.stringify({
-      // Wise CX usa usuario + api key. Mandamos ambos campos con los
-      // nombres más habituales para cubrir variantes de su API.
-      username: process.env.WISE_USER,
-      user: process.env.WISE_USER,
-      api_key: process.env.WISE_API_KEY,
-      apikey: process.env.WISE_API_KEY,
-    }),
   });
 
   const txt = await res.text();
