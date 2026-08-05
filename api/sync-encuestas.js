@@ -248,18 +248,68 @@ function buscarClave(obj, terminos) {
   return null;
 }
 
-// detecta TODAS las columnas cuyo valor sea una nota 0..10 (puntuaciones)
-function columnasDePuntuacion(fila) {
-  const cols = [];
+// Convierte un valor de celda a número 0-10, o null si no aplica (ej "S/D")
+function aNota(v) {
+  if (v == null) return null;
+  const s = String(v).trim().replace(",", ".");
+  if (s === "" || /^s\/?d$/i.test(s)) return null; // "S/D" = sin dato
+  const n = Number(s);
+  return (!isNaN(n) && n >= 0 && n <= 10) ? n : null;
+}
+
+// Busca en la fila la columna cuyo NOMBRE contenga TODAS las palabras dadas
+// (sin distinguir mayúsculas ni tildes) y devuelve su valor como nota.
+function notaPorPalabras(fila, palabras) {
+  const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   for (const [k, v] of Object.entries(fila)) {
-    const n = Number(String(v).replace(",", "."));
-    if (!isNaN(n) && n >= 0 && n <= 10 && String(v).trim() !== "") {
-      // heurística: el nombre suele contener "calific", "punt", "nps",
-      // "nota", "score", o el signo "¿". Si no, igual lo tomamos si es 0-10.
-      cols.push(k);
+    const nk = norm(k);
+    if (palabras.every((p) => nk.includes(norm(p)))) {
+      return aNota(v);
     }
   }
-  return cols;
+  return null;
+}
+
+// Extrae las notas de cada pregunta identificándolas por palabras clave únicas
+// de su enunciado en el reporte de Wise.
+function extraerPreguntas(fila) {
+  return {
+    // --- las 5 del promedio del asesor ---
+    p_amabilidad:  notaPorPalabras(fila, ["amabilidad"]),
+    p_atencion:    notaPorPalabras(fila, ["atencion", "solicitudes"]),
+    p_puntualidad: notaPorPalabras(fila, ["puntualidad"]),
+    p_explicacion: notaPorPalabras(fila, ["explicacion"]),
+    p_limpieza:    notaPorPalabras(fila, ["limpieza"]),
+    // --- otras preguntas (se muestran pero no cuentan al promedio) ---
+    p_turnos:      notaPorPalabras(fila, ["facilidad", "turnos"]),
+    p_espera:      notaPorPalabras(fila, ["tiempo", "espera"]),
+    p_calidad:     notaPorPalabras(fila, ["calidad", "servicio", "prestado"]),
+    p_recomienda:  notaPorPalabras(fila, ["recomiende"]),
+  };
+}
+
+// Busca el comentario libre del cliente
+function extraerComentario(fila) {
+  const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  for (const [k, v] of Object.entries(fila)) {
+    const nk = norm(k);
+    if ((nk.includes("sugerencias") || nk.includes("comentario")) && String(v).trim() && String(v).trim() !== "S/D") {
+      return String(v).trim();
+    }
+  }
+  return null;
+}
+
+// Busca el campo "¿el vehículo quedó funcionando correctamente?" (SI/NO)
+function extraerFunciono(fila) {
+  const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  for (const [k, v] of Object.entries(fila)) {
+    if (norm(k).includes("funcionando correctamente")) {
+      const s = String(v).trim();
+      return s || null;
+    }
+  }
+  return null;
 }
 
 // convierte una fila cruda de Wise en el registro que guardamos en Supabase
@@ -273,14 +323,19 @@ function mapearFila(fila, idx) {
   const kEncuesta = buscarClave(fila, ["encuesta", "survey"]);
   const kId       = buscarClave(fila, ["id", "caso", "case", "#"]);
 
-  // puntuaciones
-  const colsPunt = columnasDePuntuacion(fila);
-  const nums = colsPunt
-    .map((c) => Number(String(fila[c]).replace(",", ".")))
-    .filter((n) => !isNaN(n));
-  const puntuacion = nums.length ? nums[0] : null;
-  const prom = nums.length
-    ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 100) / 100
+  // extraer cada pregunta a su columna
+  const preguntas = extraerPreguntas(fila);
+
+  // promedio del asesor = promedio de las 5 preguntas que le corresponden
+  const cincoDelAsesor = [
+    preguntas.p_amabilidad,
+    preguntas.p_atencion,
+    preguntas.p_puntualidad,
+    preguntas.p_explicacion,
+    preguntas.p_limpieza,
+  ].filter((n) => n != null);
+  const promedioAsesor = cincoDelAsesor.length
+    ? Math.round((cincoDelAsesor.reduce((a, b) => a + b, 0) / cincoDelAsesor.length) * 100) / 100
     : null;
 
   // id estable Y único: usamos el id de Wise si existe, pero SIEMPRE le
@@ -302,8 +357,15 @@ function mapearFila(fila, idx) {
     wise_id: wiseId,
     fecha,
     asesor:    kAsesor   ? fila[kAsesor]   : null,
-    puntuacion,
-    puntuacion_prom: prom,
+    // las 9 preguntas en columnas separadas
+    ...preguntas,
+    // el promedio del asesor (5 preguntas) y el comentario
+    promedio_asesor: promedioAsesor,
+    comentario: extraerComentario(fila),
+    funciono_ok: extraerFunciono(fila),
+    // compatibilidad: mantenemos puntuacion_prom apuntando al nuevo promedio
+    puntuacion_prom: promedioAsesor,
+    puntuacion: promedioAsesor,
     sucursal:  kSucursal ? fila[kSucursal] : null,
     servicio:  kServicio ? fila[kServicio] : null,
     dominio:   kDominio  ? fila[kDominio]  : null,
