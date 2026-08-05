@@ -283,11 +283,13 @@ function mapearFila(fila, idx) {
     ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 100) / 100
     : null;
 
-  // id estable: usa el id de Wise si existe; si no, combina campos
-  const wiseId = String(
-    (kId && fila[kId]) ||
-    `${kDominio ? fila[kDominio] : ""}_${kFecha ? fila[kFecha] : ""}_${idx}`
-  ).trim();
+  // id estable Y único: usamos el id de Wise si existe, pero SIEMPRE le
+  // anexamos el índice de fila para que nunca haya dos wise_id iguales en
+  // el mismo lote (Postgres rechaza upsert con claves duplicadas).
+  const base = (kId && fila[kId])
+    ? String(fila[kId]).trim()
+    : `${kDominio ? fila[kDominio] : ""}_${kFecha ? fila[kFecha] : ""}`.trim();
+  const wiseId = `${base}#${idx}`;
 
   // parseo de fecha tolerante
   let fecha = null;
@@ -333,6 +335,13 @@ function limpiarNulos(valor) {
 // 5) Upsert a Supabase vía REST (sin SDK, para mantener la función liviana)
 async function guardarEnSupabase(registros) {
   if (registros.length === 0) return { insertados: 0 };
+
+  // de-duplicar por wise_id (nos quedamos con la última ocurrencia).
+  // Postgres rechaza el upsert si el mismo lote trae dos filas con la
+  // misma clave, así que garantizamos unicidad acá también.
+  const porId = new Map();
+  for (const r of registros) porId.set(r.wise_id, r);
+  registros = Array.from(porId.values());
 
   // limpieza en el objeto (byte nulo real y otros de control)
   registros = registros.map(limpiarNulos);
