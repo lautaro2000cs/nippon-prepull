@@ -120,14 +120,28 @@ async function esperarReporte(token, exportId) {
   throw new Error("Timeout esperando la exportación de Wise.");
 }
 
-// 4) Descarga el archivo del reporte (CSV o JSON) y lo convierte a filas
+// 4) Descarga el archivo del reporte y lo convierte a filas.
+// Wise entrega un ZIP que contiene el CSV adentro, así que primero
+// detectamos el ZIP, extraemos el CSV y recién ahí parseamos.
 async function descargarFilas(reportUrl) {
   const res = await fetch(reportUrl);
-  const txt = await res.text();
   if (!res.ok) throw new Error(`descarga falló (${res.status})`);
 
+  // leemos como binario (puede ser ZIP)
+  const buf = Buffer.from(await res.arrayBuffer());
+
+  // firma de ZIP: los primeros 2 bytes son 'P' 'K' (0x50 0x4B)
+  const esZip = buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b;
+
+  let texto;
+  if (esZip) {
+    texto = extraerCSVdeZip(buf);
+  } else {
+    texto = buf.toString("utf8");
+  }
+
+  const t = texto.trim();
   // ¿es JSON?
-  const t = txt.trim();
   if (t.startsWith("[") || t.startsWith("{")) {
     const j = JSON.parse(t);
     if (Array.isArray(j)) return j;
@@ -135,9 +149,51 @@ async function descargarFilas(reportUrl) {
     if (Array.isArray(j.rows)) return j.rows;
     return [];
   }
-
-  // si no, asumimos CSV
+  // si no, es CSV
   return parseCSV(t);
+}
+
+// Extrae el primer archivo (el CSV) de un buffer ZIP, sin dependencias externas.
+// Lee la estructura del ZIP y descomprime con zlib.inflateRaw (método deflate)
+// o lo toma tal cual (método stored/sin compresión).
+function extraerCSVdeZip(buf) {
+  const zlib = require("zlib");
+  let offset = 0;
+
+  while (offset + 4 <= buf.length) {
+    const sig = buf.readUInt32LE(offset);
+    // 0x04034b50 = Local File Header (inicio de un archivo dentro del ZIP)
+    if (sig !== 0x04034b50) break;
+
+    const metodo = buf.readUInt16LE(offset + 8);       // 0=stored, 8=deflate
+    const compSize = buf.readUInt32LE(offset + 18);    // tamaño comprimido
+    const nameLen = buf.readUInt16LE(offset + 26);     // largo del nombre
+    const extraLen = buf.readUInt16LE(offset + 28);    // largo del campo extra
+
+    const nombre = buf.toString("utf8", offset + 30, offset + 30 + nameLen);
+    const dataStart = offset + 30 + nameLen + extraLen;
+    const dataEnd = dataStart + compSize;
+    const comprimido = buf.subarray(dataStart, dataEnd);
+
+    let contenido;
+    if (metodo === 0) {
+      contenido = comprimido;                          // sin compresión
+    } else if (metodo === 8) {
+      contenido = zlib.inflateRawSync(comprimido);     // deflate
+    } else {
+      // método desconocido: pasamos a la siguiente entrada
+      offset = dataEnd;
+      continue;
+    }
+
+    // nos quedamos con el primer archivo que parezca CSV (o el primero a secas)
+    if (nombre.toLowerCase().endsWith(".csv") || !nombre.includes("/")) {
+      return contenido.toString("utf8");
+    }
+    offset = dataEnd;
+  }
+
+  throw new Error("No se pudo extraer el CSV del ZIP de Wise.");
 }
 
 // parser CSV simple pero que respeta comillas y comas internas
