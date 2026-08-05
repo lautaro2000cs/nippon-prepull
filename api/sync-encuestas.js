@@ -71,13 +71,18 @@ async function iniciarExport(token) {
   const data = JSON.parse(txt);
   const exportId = data.export_id || data.id || data.exportId;
   if (!exportId) throw new Error("No se recibió export_id: " + txt);
-  return exportId;
+  // devolvemos también el crudo para diagnóstico
+  return { exportId, raw: txt };
 }
 
 // 3) Consulta el estado hasta que termine -> devuelve report_url
 async function esperarReporte(token, exportId) {
-  const MAX_INTENTOS = 30;   // 30 intentos
-  const ESPERA_MS = 4000;    // cada 4s  => hasta ~2 min de espera
+  const MAX_INTENTOS = 40;   // 40 intentos
+  const ESPERA_MS = 4000;    // cada 4s  => hasta ~2.5 min de espera
+
+  // espera inicial: Wise necesita unos segundos para registrar el export
+  // antes de que /status lo reconozca (si no, devuelve EXPORT_NOT_FOUND)
+  await sleep(5000);
 
   for (let i = 0; i < MAX_INTENTOS; i++) {
     const res = await fetch(
@@ -85,7 +90,16 @@ async function esperarReporte(token, exportId) {
       { method: "GET", headers: wiseHeaders(token) }
     );
     const txt = await res.text();
-    if (!res.ok) throw new Error(`status falló (${res.status}): ${txt}`);
+
+    // EXPORT_NOT_FOUND en los primeros intentos = todavía no se registró.
+    // Lo toleramos y reintentamos (hasta ~40s). Si persiste, ahí sí falla.
+    if (!res.ok) {
+      if (txt.includes("EXPORT_NOT_FOUND") && i < 10) {
+        await sleep(ESPERA_MS);
+        continue;
+      }
+      throw new Error(`status falló (${res.status}) [intento ${i}]: ${txt}`);
+    }
 
     const data = JSON.parse(txt);
     const estado = String(data.status || "").toLowerCase();
@@ -300,7 +314,19 @@ export default async function handler(req, res) {
 
   try {
     const token = await autenticar();
-    const exportId = await iniciarExport(token);
+    const { exportId, raw: exportRaw } = await iniciarExport(token);
+
+    // modo diagnóstico: /api/sync-encuestas?key=...&debug=1
+    // muestra qué devolvió Wise al iniciar el export, sin esperar el resto
+    if (req.query.debug === "1") {
+      return res.status(200).json({
+        ok: true,
+        modo: "debug",
+        export_id_detectado: exportId,
+        respuesta_cruda_del_export: exportRaw,
+      });
+    }
+
     const reportUrl = await esperarReporte(token, exportId);
     const filas = await descargarFilas(reportUrl);
     const registros = filas.map(mapearFila);
