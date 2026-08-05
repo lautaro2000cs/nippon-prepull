@@ -278,8 +278,16 @@ function limpiarNulos(valor) {
 async function guardarEnSupabase(registros) {
   if (registros.length === 0) return { insertados: 0 };
 
-  // limpiar caracteres nulos que Postgres rechaza
+  // limpieza en el objeto (byte nulo real y otros de control)
   registros = registros.map(limpiarNulos);
+
+  // Serializamos y limpiamos el TEXTO final, cubriendo dos casos que
+  // Postgres rechaza: el byte nulo real y la secuencia escapada "\u0000"
+  // (que JSON.stringify puede generar y Postgres no acepta como texto).
+  let payload = JSON.stringify(registros);
+  payload = payload
+    .replace(/\\u0000/g, "")   // literal escapado \u0000
+    .replace(/\u0000/g, "");    // byte nulo real por las dudas
 
   const url = `${process.env.SUPABASE_URL}/rest/v1/encuestas?on_conflict=wise_id`;
   const res = await fetch(url, {
@@ -291,7 +299,7 @@ async function guardarEnSupabase(registros) {
       // merge-duplicates = upsert: actualiza si ya existe ese wise_id
       Prefer: "resolution=merge-duplicates,return=minimal",
     },
-    body: JSON.stringify(registros),
+    body: payload,
   });
 
   if (!res.ok) {
