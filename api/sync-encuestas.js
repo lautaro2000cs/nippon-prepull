@@ -242,9 +242,30 @@ function mapearFila(fila, idx) {
   };
 }
 
+// Limpia recursivamente los caracteres nulos (\u0000) y otros de control
+// que Postgres/Supabase no acepta guardar. Vienen del CSV de Wise.
+function limpiarNulos(valor) {
+  if (typeof valor === "string") {
+    // elimina el carácter nulo y otros de control invisibles
+    return valor.replace(/\u0000/g, "").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+  }
+  if (Array.isArray(valor)) {
+    return valor.map(limpiarNulos);
+  }
+  if (valor && typeof valor === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(valor)) out[k] = limpiarNulos(v);
+    return out;
+  }
+  return valor;
+}
+
 // 5) Upsert a Supabase vía REST (sin SDK, para mantener la función liviana)
 async function guardarEnSupabase(registros) {
   if (registros.length === 0) return { insertados: 0 };
+
+  // limpiar caracteres nulos que Postgres rechaza
+  registros = registros.map(limpiarNulos);
 
   const url = `${process.env.SUPABASE_URL}/rest/v1/encuestas?on_conflict=wise_id`;
   const res = await fetch(url, {
