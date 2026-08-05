@@ -464,6 +464,10 @@ tbody td{padding:11px 12px;vertical-align:middle}
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 2h3l2.7 12.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>
           Compras
         </button>
+        <button class="nav-item" id="tab-encuestas" style="display:none" onclick="swTab('encuestas',this)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg>
+          Encuestas
+        </button>
       </nav>
 
       <div class="sidebar-divider"></div>
@@ -663,6 +667,57 @@ tbody td{padding:11px 12px;vertical-align:middle}
               </div>
             </div>
             <div id="tabla-transporte"></div>
+          </div>
+        </div>
+
+        <!-- ENCUESTAS -->
+        <div class="tc" id="tc-encuestas">
+          <div class="sub-tabs">
+            <button class="sub-tab act" id="subtab-enc-resumen" onclick="swSubTabEnc('resumen',this)">
+              Por asesor <span class="sub-tab-count" id="cnt-enc-asesores">0</span>
+            </button>
+            <button class="sub-tab" id="subtab-enc-detalle" onclick="swSubTabEnc('detalle',this)">
+              Detalle <span class="sub-tab-count" id="cnt-enc-detalle">0</span>
+            </button>
+          </div>
+
+          <!-- RESUMEN POR ASESOR (promedios) -->
+          <div class="sub-tc act" id="subtc-enc-resumen">
+            <div class="sec-hdr">
+              <div class="sec-hdr-left">
+                <div class="sec-eyebrow">Encuestas de satisfacción · Wise CX</div>
+                <h2>Promedio por asesor</h2>
+                <div class="tb-sub" id="enc-resumen-sub" style="margin-top:4px"></div>
+              </div>
+              <div class="hdr-actions">
+                <select id="enc-rango" class="filter-sel" onchange="renderEncuestas()">
+                  <option value="7">Últimos 7 días</option>
+                  <option value="30" selected>Últimos 30 días</option>
+                  <option value="90">Últimos 90 días</option>
+                  <option value="0">Todo</option>
+                </select>
+                <button class="btn-sm" id="enc-sync-btn" onclick="sincronizarEncuestas()" title="Traer encuestas nuevas desde Wise ahora">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+                  Sincronizar
+                </button>
+              </div>
+            </div>
+            <div class="metrics-row" id="enc-metricas-row"></div>
+            <div id="enc-tabla-asesores"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando encuestas...</div></div>
+          </div>
+
+          <!-- DETALLE (una fila por encuesta) -->
+          <div class="sub-tc" id="subtc-enc-detalle">
+            <div class="sec-hdr-plain">
+              <div>
+                <div class="sec-eyebrow">Una fila por encuesta respondida</div>
+                <h2>Detalle de respuestas</h2>
+              </div>
+              <div class="hdr-actions">
+                <input type="text" id="enc-buscar" placeholder="Buscar asesor, patente, sucursal..." oninput="renderEncuestas()" style="padding:9px 12px;border:1px solid var(--border-2);border-radius:10px;font-size:13px;min-width:240px">
+              </div>
+            </div>
+            <div id="enc-tabla-detalle"></div>
           </div>
         </div>
 
@@ -1144,6 +1199,7 @@ async function showApp(){
   document.getElementById('tab-rep').style.display=(cu.rol==='repuestos'||cu.rol==='admin'||cu.rol==='compras'||cu.rol==='supervisor')?'':'none';
   document.getElementById('tab-usr').style.display=cu.rol==='admin'?'':'none';
   document.getElementById('tab-compras').style.display=(cu.rol==='compras'||cu.rol==='admin'||cu.username==='repuestos.aguado')?'':'none';
+  document.getElementById('tab-encuestas').style.display=(cu.rol==='admin'||cu.rol==='compras'||cu.rol==='supervisor')?'':'none';
 
   let startTab='dash';
   if(cu.rol==='repuestos') startTab='repuestos';
@@ -1213,6 +1269,220 @@ async function cargarUsuariosParaSelect(){
   usuarios.filter(u=>u.rol==='citas').forEach(u=>{const o=document.createElement('option');o.textContent=u.nombre;sel.appendChild(o);});
 }
 
+// ============================================================
+//  MÓDULO ENCUESTAS (Wise CX -> Supabase -> aquí)
+// ============================================================
+let encuestas = [];            // filas crudas desde Supabase
+let encSubTab = 'resumen';
+let encCargadas = false;
+
+function swSubTabEnc(t, el){
+  encSubTab = t;
+  const cont = document.getElementById('tc-encuestas');
+  cont.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('act'));
+  cont.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));
+  el.classList.add('act');
+  document.getElementById('subtc-enc-'+t).classList.add('act');
+  renderEncuestas();
+}
+
+// Carga desde Supabase (la web solo LEE; el backend es quien escribe)
+async function cargarEncuestas(){
+  if(encCargadas){ renderEncuestas(); return; }
+  const cont = document.getElementById('enc-tabla-asesores');
+  const { data, error } = await sb
+    .from('encuestas')
+    .select('*')
+    .order('fecha', { ascending:false });
+  if(error){
+    console.error('Error al cargar encuestas:', error);
+    cont.innerHTML = '<div class="access-note" style="color:#b91c1c"><i class="ti ti-alert-triangle"></i> No se pudieron cargar las encuestas. ¿Creaste la tabla en Supabase?</div>';
+    return;
+  }
+  encuestas = data || [];
+  encCargadas = true;
+  renderEncuestas();
+}
+
+// Filtra por rango de días + texto de búsqueda
+function encuestasFiltradas(){
+  const dias = parseInt(document.getElementById('enc-rango')?.value || '30', 10);
+  let arr = encuestas.slice();
+  if(dias > 0){
+    const limite = new Date();
+    limite.setDate(limite.getDate() - dias);
+    arr = arr.filter(e => e.fecha && new Date(e.fecha) >= limite);
+  }
+  const q = (document.getElementById('enc-buscar')?.value || '').toLowerCase().trim();
+  if(q){
+    arr = arr.filter(e =>
+      [e.asesor, e.dominio, e.sucursal, e.servicio, e.empresa]
+        .some(v => (v||'').toLowerCase().includes(q))
+    );
+  }
+  return arr;
+}
+
+function renderEncuestas(){
+  if(encSubTab === 'resumen') renderEncResumen();
+  else renderEncDetalle();
+  // contadores de las sub-tabs
+  const total = encuestas.length;
+  const asesores = new Set(encuestas.map(e=>e.asesor).filter(Boolean)).size;
+  const cAses = document.getElementById('cnt-enc-asesores');
+  const cDet  = document.getElementById('cnt-enc-detalle');
+  if(cAses) cAses.textContent = asesores;
+  if(cDet)  cDet.textContent  = total;
+}
+
+// --- Vista: promedio por asesor ---
+function renderEncResumen(){
+  const arr = encuestasFiltradas();
+  const cont = document.getElementById('enc-tabla-asesores');
+  const sub  = document.getElementById('enc-resumen-sub');
+  const mrow = document.getElementById('enc-metricas-row');
+
+  if(arr.length === 0){
+    cont.innerHTML = '<div class="access-note"><i class="ti ti-info-circle"></i> No hay encuestas en este período. Probá "Sincronizar" o ampliá el rango.</div>';
+    if(mrow) mrow.innerHTML = '';
+    if(sub) sub.textContent = '';
+    return;
+  }
+
+  // agrupar por asesor
+  const grupos = {};
+  arr.forEach(e => {
+    const a = e.asesor || '(sin asesor)';
+    if(!grupos[a]) grupos[a] = { asesor:a, notas:[], total:0 };
+    const n = (e.puntuacion_prom != null) ? Number(e.puntuacion_prom)
+            : (e.puntuacion != null ? Number(e.puntuacion) : null);
+    if(n != null && !isNaN(n)) grupos[a].notas.push(n);
+    grupos[a].total++;
+  });
+
+  const filas = Object.values(grupos).map(g => {
+    const prom = g.notas.length ? g.notas.reduce((a,b)=>a+b,0)/g.notas.length : null;
+    return { ...g, prom };
+  }).sort((a,b)=> (b.prom??-1) - (a.prom??-1));
+
+  // métricas generales
+  const todasNotas = arr.map(e => e.puntuacion_prom!=null?Number(e.puntuacion_prom):(e.puntuacion!=null?Number(e.puntuacion):null)).filter(n=>n!=null&&!isNaN(n));
+  const promGeneral = todasNotas.length ? (todasNotas.reduce((a,b)=>a+b,0)/todasNotas.length) : null;
+  const mejor = filas.filter(f=>f.prom!=null)[0];
+
+  if(sub) sub.textContent = `${arr.length} encuestas · ${filas.length} asesores`;
+  if(mrow){
+    mrow.innerHTML = `
+      ${metricCard('Promedio general', promGeneral!=null?promGeneral.toFixed(2):'—', '#4f46e5')}
+      ${metricCard('Encuestas', arr.length, '#0d9488')}
+      ${metricCard('Mejor asesor', mejor?mejor.asesor:'—', '#16a34a', mejor?mejor.prom.toFixed(2):'')}
+    `;
+  }
+
+  let html = `<div class="enc-table-wrap" style="overflow-x:auto;background:#fff;border:1px solid var(--border-1);border-radius:14px">
+    <table class="enc-table" style="width:100%;border-collapse:collapse;font-size:13.5px">
+      <thead><tr style="text-align:left;border-bottom:1px solid var(--border-1)">
+        <th style="padding:12px 16px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-4)">Asesor</th>
+        <th style="padding:12px 16px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-4);text-align:center">Encuestas</th>
+        <th style="padding:12px 16px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-4);text-align:center">Promedio</th>
+        <th style="padding:12px 16px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-4);width:180px">Nivel</th>
+      </tr></thead><tbody>`;
+  filas.forEach(f => {
+    const color = notaColor(f.prom);
+    const pct = f.prom!=null ? (f.prom/10*100) : 0;
+    html += `<tr style="border-bottom:1px solid var(--border-1)">
+      <td style="padding:11px 16px;font-weight:600;color:var(--text-1)">${escapeHtml(f.asesor)}</td>
+      <td style="padding:11px 16px;text-align:center;color:var(--text-3);font-family:var(--mono)">${f.total}</td>
+      <td style="padding:11px 16px;text-align:center;font-family:var(--mono);font-weight:700;font-size:15px;color:${color}">${f.prom!=null?f.prom.toFixed(2):'—'}</td>
+      <td style="padding:11px 16px"><div style="background:var(--border-1);border-radius:6px;height:8px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${color};border-radius:6px"></div></div></td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>`;
+  cont.innerHTML = html;
+}
+
+// --- Vista: detalle ---
+function renderEncDetalle(){
+  const arr = encuestasFiltradas();
+  const cont = document.getElementById('enc-tabla-detalle');
+  if(arr.length === 0){
+    cont.innerHTML = '<div class="access-note"><i class="ti ti-info-circle"></i> Sin resultados.</div>';
+    return;
+  }
+  let html = `<div style="overflow-x:auto;background:#fff;border:1px solid var(--border-1);border-radius:14px">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="text-align:left;border-bottom:1px solid var(--border-1)">
+        ${['Fecha','Asesor','Nota','Sucursal','Servicio','Patente','Cliente'].map(h=>`<th style="padding:11px 14px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-4);white-space:nowrap">${h}</th>`).join('')}
+      </tr></thead><tbody>`;
+  arr.slice(0, 500).forEach(e => {
+    const nota = e.puntuacion_prom!=null?Number(e.puntuacion_prom):(e.puntuacion!=null?Number(e.puntuacion):null);
+    const f = e.fecha ? new Date(e.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—';
+    html += `<tr style="border-bottom:1px solid var(--border-1)">
+      <td style="padding:10px 14px;color:var(--text-3);white-space:nowrap;font-family:var(--mono)">${f}</td>
+      <td style="padding:10px 14px;font-weight:600;color:var(--text-1);white-space:nowrap">${escapeHtml(e.asesor||'—')}</td>
+      <td style="padding:10px 14px;text-align:center;font-family:var(--mono);font-weight:700;color:${notaColor(nota)}">${nota!=null?nota.toFixed(nota%1?1:0):'—'}</td>
+      <td style="padding:10px 14px;color:var(--text-3)">${escapeHtml(e.sucursal||'—')}</td>
+      <td style="padding:10px 14px;color:var(--text-3)">${escapeHtml(e.servicio||'—')}</td>
+      <td style="padding:10px 14px;color:var(--text-3);font-family:var(--mono)">${escapeHtml(e.dominio||'—')}</td>
+      <td style="padding:10px 14px;color:var(--text-3)">${escapeHtml(e.empresa||'—')}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>`;
+  if(arr.length > 500) html += `<div class="tb-sub" style="margin-top:10px;text-align:center">Mostrando 500 de ${arr.length}. Afiná con la búsqueda o el rango.</div>`;
+  cont.innerHTML = html;
+}
+
+// Botón "Sincronizar ahora" -> llama al backend y recarga
+async function sincronizarEncuestas(){
+  const btn = document.getElementById('enc-sync-btn');
+  if(!btn) return;
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Sincronizando...';
+  try{
+    // el secreto lo definís en Vercel (SYNC_SECRET). Se pide por prompt la 1a vez
+    // y queda en memoria de sesión para no exponerlo en el código.
+    let key = sessionStorage.getItem('sync_key');
+    if(!key){
+      key = prompt('Clave de sincronización (SYNC_SECRET de Vercel):') || '';
+      if(key) sessionStorage.setItem('sync_key', key);
+    }
+    const r = await fetch('/api/sync-encuestas?key=' + encodeURIComponent(key));
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || ('HTTP '+r.status));
+    // recargar datos frescos
+    encCargadas = false;
+    await cargarEncuestas();
+    btn.innerHTML = '<i class="ti ti-check"></i> ' + (j.registros_guardados ?? 0) + ' actualizadas';
+    setTimeout(()=>{ btn.innerHTML = orig; btn.disabled=false; }, 2500);
+  }catch(err){
+    console.error(err);
+    sessionStorage.removeItem('sync_key'); // por si la clave estaba mal
+    btn.innerHTML = '<i class="ti ti-alert-triangle"></i> Error';
+    alert('No se pudo sincronizar: ' + err.message);
+    setTimeout(()=>{ btn.innerHTML = orig; btn.disabled=false; }, 2500);
+  }
+}
+
+// helpers de estilo
+function metricCard(lbl, val, color, sub){
+  return `<div class="metric-card" style="--m-color:${color};cursor:default">
+    <div class="metric-lbl">${lbl}</div>
+    <div class="metric-val" style="color:${color};font-size:${String(val).length>6?'22px':''}">${escapeHtml(String(val))}</div>
+    ${sub?`<div class="tb-sub" style="margin-top:4px">Prom. ${sub}</div>`:''}
+  </div>`;
+}
+function notaColor(n){
+  if(n==null||isNaN(n)) return 'var(--text-4)';
+  if(n>=9) return '#16a34a';
+  if(n>=7) return '#65a30d';
+  if(n>=5) return '#d97706';
+  return '#dc2626';
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 function swTab(t,el){
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('act'));
   document.querySelectorAll('.tc').forEach(c=>c.classList.remove('act'));
@@ -1220,6 +1490,7 @@ function swTab(t,el){
   if(t==='usuarios') renderUsers();
   if(t==='dash') renderDash();
   if(t==='compras') renderCompras();
+  if(t==='encuestas') cargarEncuestas();
 }
 function swSubTab(t,el){const cont=document.getElementById('tc-turnos');cont.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('act'));cont.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));el.classList.add('act');document.getElementById('subtc-'+t).classList.add('act');if(t==='noshow')renderNoShow();if(t==='historico')renderHistorico();}
 function swSubTabRep(t,el){
