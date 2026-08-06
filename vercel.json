@@ -1,13 +1,7 @@
 {
-     "crons": [
-       {
-         "path": "/api/sync-encuestas",
-         "schedule": "0 9 * * *"
-       }
-     ],
-     "functions": {
-       "api/sync-encuestas.js": {
-         "maxDuration": 60
-       }
-     }
-   }
+  "functions": {
+    "api/sync-encuestas.js": {
+      "maxDuration": 60
+    }
+  }
+}
