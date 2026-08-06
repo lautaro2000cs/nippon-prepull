@@ -1523,6 +1523,44 @@ function normAsesor(s){
   return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
 }
 
+// Las 5 preguntas del asesor (clave interna + etiqueta)
+const PREGUNTAS_ASESOR = [
+  ['p_amabilidad',  'Amabilidad'],
+  ['p_atencion',    'Atención a solicitudes'],
+  ['p_puntualidad', 'Puntualidad en entrega'],
+  ['p_explicacion', 'Explicación trabajos/costos'],
+  ['p_limpieza',    'Limpieza del vehículo'],
+];
+
+// ¿la encuesta está anulada por el admin?
+function estaAnulada(e){
+  return e.anulada === true;
+}
+
+// preguntas desestimadas de una encuesta (array de claves tipo "p_limpieza")
+function preguntasDesestimadas(e){
+  try{
+    if(Array.isArray(e.preguntas_desestimadas)) return e.preguntas_desestimadas;
+    if(typeof e.preguntas_desestimadas === 'string') return JSON.parse(e.preguntas_desestimadas);
+  }catch(err){}
+  return [];
+}
+
+// Promedio del asesor para una encuesta, RESPETANDO desestimaciones.
+// Si está anulada -> null (no cuenta). Si tiene preguntas desestimadas,
+// se promedian solo las que quedan.
+function promedioEncuesta(e){
+  if(estaAnulada(e)) return null;
+  const desest = preguntasDesestimadas(e);
+  const notas = PREGUNTAS_ASESOR
+    .filter(([clave]) => !desest.includes(clave))
+    .map(([clave]) => e[clave])
+    .filter(v => v != null && !isNaN(Number(v)))
+    .map(Number);
+  if(notas.length === 0) return null;
+  return Math.round((notas.reduce((a,b)=>a+b,0)/notas.length)*100)/100;
+}
+
 // filtra encuestas por rango de fechas (fecha_respuesta) + búsqueda.
 // soloMias=true además limita a las del asesor logueado (para el Detalle).
 function encuestasFiltradas(soloMias){
@@ -1618,13 +1656,12 @@ function renderEncResumen(){
     return;
   }
 
-  // agrupar por asesor
+  // agrupar por asesor (excluye encuestas anuladas por el admin)
   const grupos = {};
-  arr.forEach(e => {
+  arr.filter(e => !estaAnulada(e)).forEach(e => {
     const a = e.asesor || '(sin asesor)';
     if(!grupos[a]) grupos[a] = { asesor:a, notas:[], total:0 };
-    const n = (e.promedio_asesor != null) ? Number(e.promedio_asesor)
-            : (e.puntuacion_prom != null ? Number(e.puntuacion_prom) : null);
+    const n = promedioEncuesta(e);
     if(n != null && !isNaN(n)) grupos[a].notas.push(n);
     grupos[a].total++;
   });
@@ -1634,16 +1671,17 @@ function renderEncResumen(){
     return { ...g, prom };
   }).sort((a,b)=> (b.prom??-1) - (a.prom??-1));
 
-  // métricas generales
-  const todasNotas = arr.map(e => e.promedio_asesor!=null?Number(e.promedio_asesor):(e.puntuacion_prom!=null?Number(e.puntuacion_prom):null)).filter(n=>n!=null&&!isNaN(n));
+  // métricas generales (sobre las no anuladas)
+  const todasNotas = arr.filter(e=>!estaAnulada(e)).map(promedioEncuesta).filter(n=>n!=null&&!isNaN(n));
   const promGeneral = todasNotas.length ? (todasNotas.reduce((a,b)=>a+b,0)/todasNotas.length) : null;
   const mejor = filas.filter(f=>f.prom!=null)[0];
 
-  if(sub) sub.textContent = `${arr.length} encuestas · ${filas.length} asesores`;
+  const totalVigentes = arr.filter(e=>!estaAnulada(e)).length;
+  if(sub) sub.textContent = `${totalVigentes} encuestas · ${filas.length} asesores`;
   if(mrow){
     mrow.innerHTML = `
       ${metricCard('Promedio general', promGeneral!=null?promGeneral.toFixed(2):'—', '#4f46e5')}
-      ${metricCard('Encuestas', arr.length, '#0d9488')}
+      ${metricCard('Encuestas', totalVigentes, '#0d9488')}
       ${metricCard('Mejor asesor', mejor?mejor.asesor:'—', '#16a34a', mejor?mejor.prom.toFixed(2):'')}
     `;
   }
@@ -1689,7 +1727,7 @@ function renderEncDetalle(){
         ${['Fecha','Asesor','Prom. asesor','Sucursal','Servicio','Patente'].map(h=>`<th style="padding:11px 14px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-4);white-space:nowrap">${h}</th>`).join('')}
       </tr></thead><tbody>`;
   arr.slice(0, 500).forEach((e, i) => {
-    const nota = e.promedio_asesor!=null?Number(e.promedio_asesor):(e.puntuacion_prom!=null?Number(e.puntuacion_prom):null);
+    const nota = promedioEncuesta(e);
     const f = e.fecha ? new Date(e.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—';
     const rid = 'encrow-'+i;
     // fila principal (clickeable)
@@ -1714,20 +1752,22 @@ function renderEncDetalle(){
 
 // arma el bloque de detalle de una encuesta (las 9 preguntas + comentario)
 function encDetalleHtml(e){
-  const chip = (lbl, val, esAsesor) => {
+  const desest = preguntasDesestimadas(e);
+  const chip = (lbl, val, esAsesor, clave) => {
     const n = val!=null ? Number(val) : null;
-    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 11px;background:#fff;border:1px solid var(--border-1);border-radius:9px;${esAsesor?'border-left:3px solid #4f46e5':''}">
-      <span style="font-size:12px;color:var(--text-3)">${lbl}</span>
-      <span style="font-family:var(--mono);font-weight:700;font-size:14px;color:${notaColor(n)}">${n!=null?n:'—'}</span>
+    const tachada = clave && desest.includes(clave);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 11px;background:${tachada?'#f3f4f6':'#fff'};border:1px solid var(--border-1);border-radius:9px;${esAsesor?'border-left:3px solid #4f46e5':''};${tachada?'opacity:.55':''}">
+      <span style="font-size:12px;color:var(--text-3);${tachada?'text-decoration:line-through':''}">${lbl}${tachada?' <span style="font-size:10px;color:#dc2626">(desestimada)</span>':''}</span>
+      <span style="font-family:var(--mono);font-weight:700;font-size:14px;color:${notaColor(n)};${tachada?'text-decoration:line-through':''}">${n!=null?n:'—'}</span>
     </div>`;
   };
-  // las 5 del asesor
+  // las 5 del asesor (con su clave, para saber si están desestimadas)
   const asesor = [
-    ['Amabilidad', e.p_amabilidad],
-    ['Atención a solicitudes', e.p_atencion],
-    ['Puntualidad en entrega', e.p_puntualidad],
-    ['Explicación trabajos/costos', e.p_explicacion],
-    ['Limpieza del vehículo', e.p_limpieza],
+    ['Amabilidad', e.p_amabilidad, 'p_amabilidad'],
+    ['Atención a solicitudes', e.p_atencion, 'p_atencion'],
+    ['Puntualidad en entrega', e.p_puntualidad, 'p_puntualidad'],
+    ['Explicación trabajos/costos', e.p_explicacion, 'p_explicacion'],
+    ['Limpieza del vehículo', e.p_limpieza, 'p_limpieza'],
   ];
   // las otras
   const otras = [
@@ -1737,10 +1777,11 @@ function encDetalleHtml(e){
     ['Recomendación (NPS)', e.p_recomienda],
   ];
   return `
+    ${estaAnulada(e) ? `<div style="margin-top:14px;padding:9px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:9px;color:#b91c1c;font-size:13px;font-weight:600">⊘ Esta encuesta fue anulada por el administrador y no cuenta para el promedio.</div>` : ''}
     <div style="padding-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:20px">
       <div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#4f46e5;font-weight:700;margin-bottom:8px">Preguntas del asesor (promedio: ${e.promedio_asesor!=null?Number(e.promedio_asesor).toFixed(2):'—'})</div>
-        <div style="display:flex;flex-direction:column;gap:6px">${asesor.map(([l,v])=>chip(l,v,true)).join('')}</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#4f46e5;font-weight:700;margin-bottom:8px">Preguntas del asesor (promedio: ${promedioEncuesta(e)!=null?promedioEncuesta(e).toFixed(2):'—'})</div>
+        <div style="display:flex;flex-direction:column;gap:6px">${asesor.map(([l,v,k])=>chip(l,v,true,k)).join('')}</div>
       </div>
       <div>
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-4);font-weight:700;margin-bottom:8px">Otras preguntas</div>
