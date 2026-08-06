@@ -248,6 +248,16 @@ function buscarClave(obj, terminos) {
   return null;
 }
 
+// Busca una clave cuyo nombre contenga TODAS las palabras dadas
+// (útil para distinguir "Fecha Respuesta" de "Fecha Envío").
+function claveConPalabras(obj, palabras) {
+  const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return Object.keys(obj).find((k) => {
+    const nk = norm(k);
+    return palabras.every((p) => nk.includes(norm(p)));
+  }) || null;
+}
+
 // Convierte un valor de celda a número 0-10, o null si no aplica (ej "S/D")
 function aNota(v) {
   if (v == null) return null;
@@ -315,13 +325,22 @@ function extraerFunciono(fila) {
 // convierte una fila cruda de Wise en el registro que guardamos en Supabase
 function mapearFila(fila, idx) {
   const kAsesor   = buscarClave(fila, ["agente", "asesor", "usuario", "user"]);
-  const kFecha    = buscarClave(fila, ["fecha", "date", "survey_sent", "created"]);
   const kSucursal = buscarClave(fila, ["sucursal", "branch"]);
   const kServicio = buscarClave(fila, ["servicio", "service"]);
   const kDominio  = buscarClave(fila, ["dominio", "patente", "domain"]);
   const kEmpresa  = buscarClave(fila, ["empresa", "telefono", "phone", "cliente", "nombre"]);
   const kEncuesta = buscarClave(fila, ["encuesta", "survey"]);
   const kId       = buscarClave(fila, ["id", "caso", "case", "#"]);
+
+  // Fechas: buscamos por separado la de RESPUESTA y la de ENVÍO.
+  // (usamos claveConPalabras que exige TODAS las palabras en el nombre)
+  const kFechaResp  = claveConPalabras(fila, ["fecha", "respuesta"])
+                   || claveConPalabras(fila, ["response", "date"]);
+  const kFechaEnvio = claveConPalabras(fila, ["fecha", "envio"])
+                   || claveConPalabras(fila, ["survey", "sent"])
+                   || claveConPalabras(fila, ["fecha", "creado"]);
+  // 'fecha' general = la de envío si existe; si no, cualquier fecha
+  const kFecha = kFechaEnvio || buscarClave(fila, ["fecha", "date", "survey_sent", "created"]);
 
   // extraer cada pregunta a su columna
   const preguntas = extraerPreguntas(fila);
@@ -346,16 +365,19 @@ function mapearFila(fila, idx) {
     : `${kDominio ? fila[kDominio] : ""}_${kFecha ? fila[kFecha] : ""}`.trim();
   const wiseId = `${base}#${idx}`;
 
-  // parseo de fecha tolerante
-  let fecha = null;
-  if (kFecha && fila[kFecha]) {
-    const d = new Date(fila[kFecha].replace(" ", "T"));
-    if (!isNaN(d.getTime())) fecha = d.toISOString();
-  }
+  // parseo de fechas tolerante
+  const parseFecha = (val) => {
+    if (!val) return null;
+    const d = new Date(String(val).replace(" ", "T"));
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  };
+  const fecha          = parseFecha(kFecha       && fila[kFecha]);
+  const fechaRespuesta = parseFecha(kFechaResp   && fila[kFechaResp]);
 
   return {
     wise_id: wiseId,
     fecha,
+    fecha_respuesta: fechaRespuesta,
     asesor:    kAsesor   ? fila[kAsesor]   : null,
     // las 9 preguntas en columnas separadas
     ...preguntas,
