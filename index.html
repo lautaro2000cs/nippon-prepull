@@ -430,6 +430,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
           <option value="repuestos">Repuestos</option>
           <option value="compras">Compras</option>
           <option value="supervisor">Supervisor</option>
+          <option value="asesor">Asesor</option>
         </select>
       </div>
       <button class="btn-in" id="btn-login" onclick="doLogin()">Ingresar</button>
@@ -727,12 +728,15 @@ tbody td{padding:11px 12px;vertical-align:middle}
                 <h2>Promedio por asesor</h2>
                 <div class="tb-sub" id="enc-resumen-sub" style="margin-top:4px"></div>
               </div>
-              <div class="hdr-actions">
-                <select id="enc-rango" class="filter-sel" onchange="renderEncuestas()">
-                  <option value="7">Últimos 7 días</option>
-                  <option value="30" selected>Últimos 30 días</option>
-                  <option value="90">Últimos 90 días</option>
-                  <option value="0">Todo</option>
+              <div class="hdr-actions" style="flex-wrap:wrap;gap:8px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <label style="font-size:12px;color:var(--text-4)">Desde</label>
+                  <input type="date" id="enc-desde" class="filter-sel" onchange="renderEncuestas()" style="padding:7px 9px">
+                  <label style="font-size:12px;color:var(--text-4)">Hasta</label>
+                  <input type="date" id="enc-hasta" class="filter-sel" onchange="renderEncuestas()" style="padding:7px 9px">
+                </div>
+                <select id="enc-mes-rapido" class="filter-sel" onchange="setMesRapido(this.value)" title="Atajo por mes">
+                  <option value="">Mes rápido…</option>
                 </select>
                 <button class="btn-sm" id="enc-sync-btn" onclick="sincronizarEncuestas()" title="Traer encuestas nuevas desde Wise ahora">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
@@ -1211,7 +1215,7 @@ async function doLogin(){
     if(data.password!==p){throw new Error('Contraseña incorrecta');}
     if(data.rol!==r&&data.rol!=='admin'){throw new Error('Sector incorrecto');}
 
-    cu={username:u,nombre:data.nombre,rol:data.rol,sucursalFija:data.sucursal_fija};
+    cu={username:u,nombre:data.nombre,rol:data.rol,sucursalFija:data.sucursal_fija,asesorWise:data.asesor_wise};
     document.getElementById('lerr').style.display='none';
     loginOk = true;
   }catch(err){
@@ -1461,6 +1465,8 @@ function swSubTabEnc(t, el){
 
 // Carga desde Supabase (la web solo LEE; el backend es quien escribe)
 async function cargarEncuestas(){
+  // Ajustes de UI según el rol (asesor vs admin/supervisor)
+  ajustarUIEncuestas();
   if(encCargadas){ renderEncuestas(); return; }
   const cont = document.getElementById('enc-tabla-asesores');
   const { data, error } = await sb
@@ -1474,17 +1480,72 @@ async function cargarEncuestas(){
   }
   encuestas = data || [];
   encCargadas = true;
+  llenarMesesRapidos();
+  // por defecto: el mes actual (lo más usado para el análisis mensual)
+  const hoy = new Date();
+  const desdeEl = document.getElementById('enc-desde');
+  const hastaEl = document.getElementById('enc-hasta');
+  if(desdeEl && !desdeEl.value){
+    const primero = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const ultimo  = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0);
+    desdeEl.value = primero.toISOString().slice(0,10);
+    hastaEl.value = ultimo.toISOString().slice(0,10);
+  }
   renderEncuestas();
 }
 
+// Adapta textos y botones de la pestaña Encuestas según el usuario
+function ajustarUIEncuestas(){
+  const soyAsesor = esAsesor();
+  // el botón "Sincronizar" solo para admin/supervisor
+  const syncBtn = document.getElementById('enc-sync-btn');
+  if(syncBtn) syncBtn.style.display = soyAsesor ? 'none' : '';
+  // títulos: para el asesor el resumen es el "ranking"
+  const h2Resumen = document.querySelector('#subtc-enc-resumen h2');
+  if(h2Resumen) h2Resumen.textContent = soyAsesor ? 'Ranking general de asesores' : 'Promedio por asesor';
+  const h2Detalle = document.querySelector('#subtc-enc-detalle h2');
+  if(h2Detalle) h2Detalle.textContent = soyAsesor ? 'Mis encuestas' : 'Detalle de respuestas';
+  // sub-tab detalle
+  const detTab = document.getElementById('subtab-enc-detalle');
+  if(detTab){
+    detTab.firstChild.textContent = soyAsesor ? 'Mis encuestas ' : 'Detalle ';
+  }
+}
+
 // Filtra por rango de días + texto de búsqueda
-function encuestasFiltradas(){
-  const dias = parseInt(document.getElementById('enc-rango')?.value || '30', 10);
+// ¿el usuario actual es un asesor (ve solo lo suyo en el detalle)?
+function esAsesor(){
+  return cu && cu.rol === 'asesor' && cu.asesorWise;
+}
+
+// normaliza para comparar nombres de asesor (espacios/tildes/mayúsculas)
+function normAsesor(s){
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+}
+
+// filtra encuestas por rango de fechas (fecha_respuesta) + búsqueda.
+// soloMias=true además limita a las del asesor logueado (para el Detalle).
+function encuestasFiltradas(soloMias){
   let arr = encuestas.slice();
-  if(dias > 0){
-    const limite = new Date();
-    limite.setDate(limite.getDate() - dias);
-    arr = arr.filter(e => e.fecha && new Date(e.fecha) >= limite);
+
+  // fecha de referencia: la de respuesta; si no hay, cae a 'fecha'
+  const fechaDe = (e) => e.fecha_respuesta || e.fecha;
+
+  const desde = document.getElementById('enc-desde')?.value;
+  const hasta = document.getElementById('enc-hasta')?.value;
+  if(desde){
+    const d = new Date(desde + 'T00:00:00');
+    arr = arr.filter(e => { const f = fechaDe(e); return f && new Date(f) >= d; });
+  }
+  if(hasta){
+    const h = new Date(hasta + 'T23:59:59');
+    arr = arr.filter(e => { const f = fechaDe(e); return f && new Date(f) <= h; });
+  }
+
+  // si es asesor y pedimos solo las suyas, filtrar por su nombre de Wise
+  if(soloMias && esAsesor()){
+    const mio = normAsesor(cu.asesorWise);
+    arr = arr.filter(e => normAsesor(e.asesor) === mio);
   }
   const q = (document.getElementById('enc-buscar')?.value || '').toLowerCase().trim();
   if(q){
@@ -1496,11 +1557,46 @@ function encuestasFiltradas(){
   return arr;
 }
 
+// Aplica un mes completo a los campos desde/hasta (formato "2026-08")
+function setMesRapido(valor){
+  if(!valor) return;
+  const [anio, mes] = valor.split('-').map(Number);
+  const primero = new Date(anio, mes-1, 1);
+  const ultimo  = new Date(anio, mes, 0); // día 0 del mes siguiente = último del actual
+  const fmt = (d) => d.toISOString().slice(0,10);
+  const desdeEl = document.getElementById('enc-desde');
+  const hastaEl = document.getElementById('enc-hasta');
+  if(desdeEl) desdeEl.value = fmt(primero);
+  if(hastaEl) hastaEl.value = fmt(ultimo);
+  renderEncuestas();
+}
+
+// Llena el dropdown "Mes rápido" con los meses que existen en los datos
+function llenarMesesRapidos(){
+  const sel = document.getElementById('enc-mes-rapido');
+  if(!sel) return;
+  const meses = new Set();
+  encuestas.forEach(e => {
+    const f = e.fecha_respuesta || e.fecha;
+    if(f){ const d = new Date(f); meses.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
+  });
+  const ordenados = Array.from(meses).sort().reverse();
+  const nombresMes = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  sel.innerHTML = '<option value="">Mes rápido…</option>' +
+    ordenados.map(m => {
+      const [a, mm] = m.split('-');
+      return `<option value="${m}">${nombresMes[Number(mm)-1]} ${a}</option>`;
+    }).join('');
+}
+
 function renderEncuestas(){
   if(encSubTab === 'resumen') renderEncResumen();
   else renderEncDetalle();
   // contadores de las sub-tabs
-  const total = encuestas.length;
+  const misEncuestas = esAsesor()
+    ? encuestas.filter(e => normAsesor(e.asesor) === normAsesor(cu.asesorWise))
+    : encuestas;
+  const total = misEncuestas.length;
   const asesores = new Set(encuestas.map(e=>e.asesor).filter(Boolean)).size;
   const cAses = document.getElementById('cnt-enc-asesores');
   const cDet  = document.getElementById('cnt-enc-detalle');
@@ -1560,11 +1656,15 @@ function renderEncResumen(){
         <th style="padding:12px 16px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-4);text-align:center">Promedio</th>
         <th style="padding:12px 16px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-4);width:180px">Nivel</th>
       </tr></thead><tbody>`;
-  filas.forEach(f => {
+  filas.forEach((f, idx) => {
     const color = notaColor(f.prom);
     const pct = f.prom!=null ? (f.prom/10*100) : 0;
-    html += `<tr style="border-bottom:1px solid var(--border-1)">
-      <td style="padding:11px 16px;font-weight:600;color:var(--text-1)">${escapeHtml(f.asesor)}</td>
+    // ¿es la fila del asesor logueado? -> resaltar
+    const esMio = esAsesor() && normAsesor(f.asesor) === normAsesor(cu.asesorWise);
+    const bg = esMio ? 'background:#eef2ff;' : '';
+    const posBadge = esMio ? ` <span style="font-size:10px;background:#4f46e5;color:#fff;padding:1px 7px;border-radius:20px;vertical-align:1px;margin-left:6px">Vos · #${idx+1}</span>` : '';
+    html += `<tr style="border-bottom:1px solid var(--border-1);${bg}">
+      <td style="padding:11px 16px;font-weight:600;color:var(--text-1)">${escapeHtml(f.asesor)}${posBadge}</td>
       <td style="padding:11px 16px;text-align:center;color:var(--text-3);font-family:var(--mono)">${f.total}</td>
       <td style="padding:11px 16px;text-align:center;font-family:var(--mono);font-weight:700;font-size:15px;color:${color}">${f.prom!=null?f.prom.toFixed(2):'—'}</td>
       <td style="padding:11px 16px"><div style="background:var(--border-1);border-radius:6px;height:8px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${color};border-radius:6px"></div></div></td>
@@ -1576,7 +1676,7 @@ function renderEncResumen(){
 
 // --- Vista: detalle ---
 function renderEncDetalle(){
-  const arr = encuestasFiltradas();
+  const arr = encuestasFiltradas(true); // true = solo las del asesor (si aplica)
   const cont = document.getElementById('enc-tabla-detalle');
   if(arr.length === 0){
     cont.innerHTML = '<div class="access-note"><i class="ti ti-info-circle"></i> Sin resultados.</div>';
