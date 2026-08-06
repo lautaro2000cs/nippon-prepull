@@ -1452,6 +1452,17 @@ async function cargarUsuariosParaSelect(){
 let encuestas = [];            // filas crudas desde Supabase
 let encSubTab = 'resumen';
 let encCargadas = false;
+let desestimaciones = [];      // pedidos de desestimación
+
+// Carga los pedidos de desestimación desde Supabase
+async function cargarDesestimaciones(){
+  const { data, error } = await sb
+    .from('desestimaciones')
+    .select('*')
+    .order('creado_en', { ascending:false });
+  if(error){ console.warn('No se pudieron cargar desestimaciones:', error.message); desestimaciones = []; return; }
+  desestimaciones = data || [];
+}
 
 function swSubTabEnc(t, el){
   encSubTab = t;
@@ -1480,6 +1491,7 @@ async function cargarEncuestas(){
   }
   encuestas = data || [];
   encCargadas = true;
+  await cargarDesestimaciones();
   llenarMesesRapidos();
   // por defecto: el mes actual (lo más usado para el análisis mensual)
   const hoy = new Date();
@@ -1794,7 +1806,100 @@ function encDetalleHtml(e){
       <div style="font-size:13px;color:var(--text-2);font-style:italic">"${escapeHtml(e.comentario)}"</div>
     </div>` : ''}
     ${accionesAdminHtml(e)}
+    ${pedidoAsesorHtml(e)}
   `;
+}
+
+// Bloque del asesor: pedir desestimación + ver estado de su pedido
+function pedidoAsesorHtml(e){
+  if(!esAsesor()) return '';
+  const wid = e.wise_id;
+  // ¿ya hay un pedido para esta encuesta?
+  const pedido = (desestimaciones || []).find(d => d.encuesta_id === wid);
+
+  if(pedido){
+    // mostrar estado + decisión del admin
+    const colores = { pendiente:'#d97706', aprobado:'#16a34a', rechazado:'#dc2626' };
+    const etiquetas = { pendiente:'Pendiente de revisión', aprobado:'Aprobado', rechazado:'Rechazado' };
+    const col = colores[pedido.estado] || '#6b7280';
+    return `
+      <div style="margin-top:16px;padding:14px;background:#f8fafc;border:1px solid var(--border-1);border-radius:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-4);font-weight:700">Tu pedido de desestimación</span>
+          <span style="font-size:11px;padding:2px 9px;border-radius:20px;background:${col}22;color:${col};font-weight:700">${etiquetas[pedido.estado]||pedido.estado}</span>
+        </div>
+        <div style="font-size:13px;color:var(--text-2);margin-bottom:6px"><b>Motivo:</b> ${escapeHtml(pedido.motivo)}</div>
+        ${pedido.decision_admin ? `<div style="font-size:13px;color:var(--text-2);padding:8px 11px;background:#fff;border-radius:8px;border:1px solid var(--border-1)"><b>Respuesta del admin:</b> ${escapeHtml(pedido.decision_admin)}</div>` : ''}
+      </div>
+    `;
+  }
+
+  // formulario para pedir (colapsado en un botón que lo despliega)
+  const fid = 'ped-'+encodeURIComponent(wid).replace(/[^a-z0-9]/gi,'');
+  return `
+    <div style="margin-top:16px;padding:14px;background:#f8fafc;border:1px dashed var(--border-2);border-radius:10px">
+      <button onclick="togglePedidoForm('${fid}')" id="${fid}-btn"
+        style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid #4f46e5;background:#eef2ff;color:#4f46e5;font-weight:600">
+        Pedir desestimación de esta encuesta
+      </button>
+      <div id="${fid}" style="display:none;margin-top:12px">
+        <label style="font-size:12px;color:var(--text-3);display:block;margin-bottom:4px">¿Por qué considerás que esta encuesta debería revisarse?</label>
+        <textarea id="${fid}-motivo" rows="3" placeholder="Explicá el motivo…" style="width:100%;padding:9px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
+        <label style="font-size:12px;color:var(--text-3);display:block;margin:8px 0 4px">Evidencia (opcional): foto o documento</label>
+        <input type="file" id="${fid}-file" accept="image/*,.pdf" style="font-size:12px">
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button onclick="enviarPedidoDesestimacion('${encodeURIComponent(wid)}','${fid}')"
+            style="font-size:12px;padding:7px 16px;border-radius:8px;cursor:pointer;border:none;background:#4f46e5;color:#fff;font-weight:600">Enviar pedido</button>
+          <button onclick="togglePedidoForm('${fid}')" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid var(--border-2);background:#fff;color:var(--text-3)">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function togglePedidoForm(fid){
+  const f = document.getElementById(fid);
+  if(f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+// Envía el pedido de desestimación (con evidencia opcional) a Supabase
+async function enviarPedidoDesestimacion(widEnc, fid){
+  const wid = decodeURIComponent(widEnc);
+  const motivo = (document.getElementById(fid+'-motivo')?.value || '').trim();
+  if(!motivo){ alert('Escribí un motivo para el pedido.'); return; }
+  const fileInput = document.getElementById(fid+'-file');
+  const file = fileInput?.files?.[0] || null;
+
+  const btn = document.querySelector(`#${fid} button`);
+  try{
+    let evidenciaPath = null;
+    // subir evidencia si hay archivo
+    if(file){
+      const ext = file.name.split('.').pop();
+      const nombre = `${cu.username}_${Date.now()}.${ext}`;
+      const { data: up, error: upErr } = await sb.storage
+        .from('evidencias').upload(nombre, file, { upsert:false });
+      if(upErr) throw new Error('Al subir evidencia: ' + upErr.message);
+      evidenciaPath = up.path;
+    }
+    // crear el pedido
+    const { error } = await sb.from('desestimaciones').insert({
+      encuesta_id: wid,
+      solicitante_username: cu.username,
+      solicitante_nombre: cu.nombre,
+      asesor_wise: cu.asesorWise,
+      motivo,
+      evidencia_path: evidenciaPath,
+      estado: 'pendiente',
+    });
+    if(error) throw error;
+    // recargar pedidos y re-renderizar
+    await cargarDesestimaciones();
+    renderEncuestas();
+    alert('Pedido enviado. El administrador lo va a revisar.');
+  }catch(err){
+    alert('No se pudo enviar el pedido: ' + err.message);
+  }
 }
 
 // Barra de acciones del admin (solo visible para admin) sobre una encuesta
