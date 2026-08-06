@@ -1201,6 +1201,7 @@ async function doLogin(){
 
   btn.disabled=true;btn.textContent='Verificando...';
 
+  let loginOk = false;
   try{
     const {data,error}=await sb.from('usuarios').select('*').eq('username',u).single();
     if(error||!data){throw new Error('Usuario no encontrado');}
@@ -1209,12 +1210,18 @@ async function doLogin(){
 
     cu={username:u,nombre:data.nombre,rol:data.rol,sucursalFija:data.sucursal_fija};
     document.getElementById('lerr').style.display='none';
-    mostrarSelector();
+    loginOk = true;
   }catch(err){
     document.getElementById('lerr').textContent='Usuario, contraseña o sector incorrecto.';
     document.getElementById('lerr').style.display='block';
   }finally{
     btn.disabled=false;btn.textContent='Ingresar';
+  }
+
+  // El selector se muestra FUERA del try: así, si algo falla al dibujarlo,
+  // el error se ve de verdad y no se confunde con "login incorrecto".
+  if(loginOk){
+    mostrarSelector();
   }
 }
 initLoginSlideshow();
@@ -1262,34 +1269,47 @@ function modulosDelUsuario(){
 }
 
 function mostrarSelector(){
-  // ocultar otras pantallas
-  document.getElementById('s-login').classList.remove('active');
-  document.getElementById('s-app').classList.remove('active');
-  document.getElementById('s-selector').classList.add('active');
+  try {
+    console.log('[NIPPON] mostrarSelector llamado. Usuario:', cu);
+    // ocultar otras pantallas
+    document.getElementById('s-login').classList.remove('active');
+    document.getElementById('s-app').classList.remove('active');
+    document.getElementById('s-selector').classList.add('active');
 
-  document.getElementById('sel-nombre').textContent = cu.nombre;
-  // logo (reusa el mismo del topbar)
-  const logoImg = document.querySelector('.tb-left img');
-  if(logoImg) document.getElementById('sel-logo').src = logoImg.src;
+    const nEl = document.getElementById('sel-nombre');
+    if(nEl) nEl.textContent = cu.nombre || '';
 
-  // SIEMPRE se muestran los dos módulos; el bloqueo es al hacer click
-  const cont = document.getElementById('sel-cards');
-  cont.innerHTML = Object.keys(MODULOS).map(mid => {
-    const m = MODULOS[mid];
-    const acceso = puedeAcceder(mid);
-    return `<div class="sel-card${acceso?'':' sel-card-locked'}" onclick="abrirModulo('${m.id}')">
-      <div class="sel-card-ico" style="background:${acceso?m.color:'#9ca3af'}">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${m.icono}</svg>
-      </div>
-      <h2 class="sel-card-title">${m.nombre}</h2>
-      <p class="sel-card-desc">${m.desc}</p>
-      <div class="sel-card-go">${acceso?'Entrar':'Sin acceso'}
-        ${acceso
-          ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>'
-          : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'}
-      </div>
-    </div>`;
-  }).join('');
+    // logo (reusa el mismo del topbar) — si falla, no cortar
+    try {
+      const logoImg = document.querySelector('.tb-left img');
+      const selLogo = document.getElementById('sel-logo');
+      if(logoImg && selLogo) selLogo.src = logoImg.src;
+    } catch(e){ console.warn('[NIPPON] logo selector:', e); }
+
+    // SIEMPRE se muestran los dos módulos; el bloqueo es al hacer click
+    const cont = document.getElementById('sel-cards');
+    if(!cont){ console.error('[NIPPON] No existe #sel-cards en el DOM'); return; }
+    cont.innerHTML = Object.keys(MODULOS).map(mid => {
+      const m = MODULOS[mid];
+      const acceso = puedeAcceder(mid);
+      return `<div class="sel-card${acceso?'':' sel-card-locked'}" onclick="abrirModulo('${m.id}')">
+        <div class="sel-card-ico" style="background:${acceso?m.color:'#9ca3af'}">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${m.icono}</svg>
+        </div>
+        <h2 class="sel-card-title">${m.nombre}</h2>
+        <p class="sel-card-desc">${m.desc}</p>
+        <div class="sel-card-go">${acceso?'Entrar':'Sin acceso'}
+          ${acceso
+            ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>'
+            : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'}
+        </div>
+      </div>`;
+    }).join('');
+    console.log('[NIPPON] Selector renderizado con', Object.keys(MODULOS).length, 'tarjetas');
+  } catch(err){
+    console.error('[NIPPON] ERROR en mostrarSelector:', err);
+    alert('Error al mostrar el selector de módulos: ' + err.message);
+  }
 }
 
 function abrirModulo(moduloId){
