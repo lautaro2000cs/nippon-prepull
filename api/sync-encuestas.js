@@ -90,12 +90,14 @@ async function iniciarExport(token, dateFrom, dateTo) {
 
 // 3) Consulta el estado hasta que termine -> devuelve report_url
 async function esperarReporte(token, exportId) {
-  const MAX_INTENTOS = 40;   // 40 intentos
-  const ESPERA_MS = 4000;    // cada 4s  => hasta ~2.5 min de espera
+  // OJO: Vercel (plan Hobby) corta la función a los 60s. Ajustamos la espera
+  // para maximizar el tiempo útil dentro de ese límite.
+  const MAX_INTENTOS = 16;   // 16 intentos
+  const ESPERA_MS = 3000;    // cada 3s
 
   // espera inicial: Wise necesita unos segundos para registrar el export
   // antes de que /status lo reconozca (si no, devuelve EXPORT_NOT_FOUND)
-  await sleep(5000);
+  await sleep(3000);
 
   for (let i = 0; i < MAX_INTENTOS; i++) {
     const res = await fetch(
@@ -501,9 +503,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Rango de fechas que manda la web (por fecha de ENVÍO). Formato yyyy-MM-dd.
-    const dateFrom = req.query.date_from || null;
-    const dateTo   = req.query.date_to   || null;
+    // Rango de fechas (por fecha de ENVÍO / survey_sent_date). Formato yyyy-MM-dd.
+    // Si vienen en la URL (date_from/date_to) se usan. Si no (ej: cron diario),
+    // se calcula automáticamente "últimos 7 días" para traer solo lo nuevo,
+    // en lotes chicos que entran cómodos en el límite de 60s de Vercel.
+    let dateFrom = req.query.date_from || null;
+    let dateTo   = req.query.date_to   || null;
+    if (!dateFrom || !dateTo) {
+      const hoy = new Date();
+      dateTo = hoy.toISOString().slice(0, 10);
+      const hace7 = new Date(hoy);
+      hace7.setDate(hace7.getDate() - 7);
+      dateFrom = hace7.toISOString().slice(0, 10);
+    }
 
     const token = await autenticar();
     const { exportId, raw: exportRaw } = await iniciarExport(token, dateFrom, dateTo);
