@@ -57,12 +57,25 @@ async function autenticar() {
 
 // 2) Inicia la exportación del reporte -> devuelve export_id
 async function iniciarExport(token) {
+  // Le pedimos a Wise un rango de fechas EXPLÍCITO en vez de depender del
+  // filtro que el reporte tenga guardado. Así controlamos el período y no
+  // se nos escapan encuestas. La API permite hasta 12 meses por consulta.
+  const hoy = new Date();
+  const dateTo = hoy.toISOString().slice(0, 10);            // hoy (yyyy-MM-dd)
+  const desde = new Date(hoy);
+  desde.setMonth(desde.getMonth() - 12);                    // 12 meses atrás
+  const dateFrom = desde.toISOString().slice(0, 10);
+
   const res = await fetch(`${WISE_BASE}/analytics/export/${REPORT_ID}`, {
     method: "POST",
     headers: wiseHeaders(token),
-    // "all" = todas las columnas configuradas en el reporte (incluye AGENTE
-    // y las columnas de puntuación). Así no dependemos de nombres exactos.
-    body: JSON.stringify({ columns: "all" }),
+    body: JSON.stringify({
+      // "all" = todas las columnas configuradas en el reporte (incluye AGENTE
+      // y las columnas de puntuación). Así no dependemos de nombres exactos.
+      columns: "all",
+      // rango de fechas explícito (sobrescribe el filtro del reporte)
+      filter: { date_from: dateFrom, date_to: dateTo },
+    }),
   });
 
   const txt = await res.text();
