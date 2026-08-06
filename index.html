@@ -738,6 +738,10 @@ tbody td{padding:11px 12px;vertical-align:middle}
                 <select id="enc-mes-rapido" class="filter-sel" onchange="setMesRapido(this.value)" title="Atajo por mes">
                   <option value="">Mes rápido…</option>
                 </select>
+                <button class="btn-sm" id="enc-sync-btn" onclick="sincronizarEncuestas()" title="Traer de Wise las encuestas respondidas de los últimos días">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+                  Sincronizar
+                </button>
               </div>
             </div>
             <div class="metrics-row" id="enc-metricas-row"></div>
@@ -1758,6 +1762,39 @@ function toggleEncDetalle(rid){
   const abierto = row.style.display !== 'none';
   row.style.display = abierto ? 'none' : 'table-row';
   if(arr) arr.style.transform = abierto ? 'rotate(0deg)' : 'rotate(90deg)';
+}
+
+// Botón "Sincronizar" -> trae de Wise las respondidas de los últimos días
+// (el backend usa "últimos 7 días" cuando no le mandamos fechas) y recarga.
+async function sincronizarEncuestas(){
+  const btn = document.getElementById('enc-sync-btn');
+  if(!btn) return;
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Sincronizando…';
+  try{
+    let key = sessionStorage.getItem('sync_key');
+    if(!key){
+      key = prompt('Clave de sincronización (SYNC_SECRET de Vercel):') || '';
+      if(key) sessionStorage.setItem('sync_key', key);
+    }
+    // sin fechas => el backend trae los últimos 7 días (lote chico)
+    const r = await fetch('/api/sync-encuestas?key=' + encodeURIComponent(key));
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || ('HTTP '+r.status));
+    encCargadas = false;
+    await cargarEncuestas();
+    const cuantas = j.registros_guardados ?? j.respondidas ?? 0;
+    btn.innerHTML = '<i class="ti ti-check"></i> ' + cuantas + ' actualizadas';
+    setTimeout(()=>{ btn.innerHTML = orig; btn.disabled=false; }, 2500);
+  }catch(err){
+    console.error(err);
+    sessionStorage.removeItem('sync_key');
+    btn.innerHTML = '<i class="ti ti-alert-triangle"></i> Error';
+    alert('No se pudo sincronizar: ' + err.message
+      + '\n\nSi dice REPORT_LIMIT_EXCEDEED, esperá unos minutos.');
+    setTimeout(()=>{ btn.innerHTML = orig; btn.disabled=false; }, 2500);
+  }
 }
 
 // helpers de estilo
