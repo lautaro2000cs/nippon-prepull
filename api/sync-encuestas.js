@@ -74,7 +74,14 @@ async function iniciarExport(token, dateFrom, dateTo) {
   const txt = await res.text();
   if (!res.ok) throw new Error(`export falló (${res.status}): ${txt}`);
 
-  const data = JSON.parse(txt);
+  // Wise a veces devuelve un error en texto plano (no JSON). Lo detectamos
+  // para mostrar un mensaje claro en vez de "Unexpected token".
+  let data;
+  try {
+    data = JSON.parse(txt);
+  } catch (e) {
+    throw new Error(`Wise respondió algo inesperado (no es JSON): ${txt.slice(0, 300)}`);
+  }
   const exportId = data.export_id || data.id || data.exportId;
   if (!exportId) throw new Error("No se recibió export_id: " + txt);
   // devolvemos también el crudo para diagnóstico
