@@ -1793,7 +1793,87 @@ function encDetalleHtml(e){
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#b45309;font-weight:700;margin-bottom:4px">Comentario del cliente</div>
       <div style="font-size:13px;color:var(--text-2);font-style:italic">"${escapeHtml(e.comentario)}"</div>
     </div>` : ''}
+    ${accionesAdminHtml(e)}
   `;
+}
+
+// Barra de acciones del admin (solo visible para admin) sobre una encuesta
+function accionesAdminHtml(e){
+  if(!cu || cu.rol !== 'admin') return '';
+  const desest = preguntasDesestimadas(e);
+  const wid = e.wise_id;
+  // botones para desestimar/restaurar cada una de las 5 preguntas
+  const botonesPreguntas = PREGUNTAS_ASESOR.map(([clave, label]) => {
+    const activa = desest.includes(clave);
+    return `<button onclick="toggleDesestimarPregunta('${encodeURIComponent(wid)}','${clave}')"
+      style="font-size:11px;padding:5px 10px;border-radius:7px;cursor:pointer;border:1px solid ${activa?'#dc2626':'var(--border-2)'};background:${activa?'#fef2f2':'#fff'};color:${activa?'#dc2626':'var(--text-2)'}">
+      ${activa?'↩ Restaurar':'✕ Desestimar'} ${label}
+    </button>`;
+  }).join('');
+
+  return `
+    <div style="margin-top:16px;padding:14px;background:#f8fafc;border:1px dashed var(--border-2);border-radius:10px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-4);font-weight:700;margin-bottom:10px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Acciones del administrador
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${botonesPreguntas}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border-1);padding-top:10px">
+        ${estaAnulada(e)
+          ? `<button onclick="anularEncuesta('${encodeURIComponent(wid)}',false)" style="font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;font-weight:600">↩ Reactivar encuesta</button>`
+          : `<button onclick="anularEncuesta('${encodeURIComponent(wid)}',true)" style="font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer;border:1px solid #dc2626;background:#fef2f2;color:#dc2626;font-weight:600">⊘ Anular encuesta completa</button>`}
+      </div>
+    </div>
+  `;
+}
+
+// Aplica/quita la desestimación de una pregunta puntual en Supabase
+async function toggleDesestimarPregunta(widEnc, clave){
+  const wid = decodeURIComponent(widEnc);
+  const e = encuestas.find(x => x.wise_id === wid);
+  if(!e) return;
+  let desest = preguntasDesestimadas(e);
+  if(desest.includes(clave)) desest = desest.filter(c => c !== clave);
+  else desest = [...desest, clave];
+  try{
+    const { error } = await sb.from('encuestas')
+      .update({ preguntas_desestimadas: desest })
+      .eq('wise_id', wid);
+    if(error) throw error;
+    // actualizar en memoria y re-renderizar
+    e.preguntas_desestimadas = desest;
+    renderEncuestas();
+    // reabrir el detalle de esta fila (se cierra al re-render)
+    setTimeout(()=>reabrirDetalle(wid), 50);
+  }catch(err){
+    alert('No se pudo aplicar: ' + err.message);
+  }
+}
+
+// Anula o reactiva una encuesta completa
+async function anularEncuesta(widEnc, anular){
+  const wid = decodeURIComponent(widEnc);
+  if(anular && !confirm('¿Anular esta encuesta? No contará para el promedio del asesor.')) return;
+  const e = encuestas.find(x => x.wise_id === wid);
+  if(!e) return;
+  try{
+    const { error } = await sb.from('encuestas')
+      .update({ anulada: anular })
+      .eq('wise_id', wid);
+    if(error) throw error;
+    e.anulada = anular;
+    renderEncuestas();
+    setTimeout(()=>reabrirDetalle(wid), 50);
+  }catch(err){
+    alert('No se pudo aplicar: ' + err.message);
+  }
+}
+
+// Reabre el detalle de una encuesta por su wise_id (tras re-render)
+function reabrirDetalle(wid){
+  const arr = encSubTab === 'detalle' ? encuestasFiltradas(true) : [];
+  const idx = arr.findIndex(x => x.wise_id === wid);
+  if(idx >= 0) toggleEncDetalle('encrow-'+idx);
 }
 
 function toggleEncDetalle(rid){
