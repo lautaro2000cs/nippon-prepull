@@ -738,10 +738,6 @@ tbody td{padding:11px 12px;vertical-align:middle}
                 <select id="enc-mes-rapido" class="filter-sel" onchange="setMesRapido(this.value)" title="Atajo por mes">
                   <option value="">Mes rápido…</option>
                 </select>
-                <button class="btn-sm" id="enc-sync-btn" onclick="sincronizarEncuestas()" title="Traer de Wise las encuestas del rango de fechas elegido">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-                  Traer de Wise
-                </button>
               </div>
             </div>
             <div class="metrics-row" id="enc-metricas-row"></div>
@@ -1612,7 +1608,7 @@ function renderEncResumen(){
   const mrow = document.getElementById('enc-metricas-row');
 
   if(arr.length === 0){
-    cont.innerHTML = '<div class="access-note"><i class="ti ti-info-circle"></i> No hay encuestas en este período. Probá "Sincronizar" o ampliá el rango.</div>';
+    cont.innerHTML = '<div class="access-note"><i class="ti ti-info-circle"></i> No hay encuestas en este período. Probá ampliar el rango de fechas.</div>';
     if(mrow) mrow.innerHTML = '';
     if(sub) sub.textContent = '';
     return;
@@ -1762,58 +1758,6 @@ function toggleEncDetalle(rid){
   const abierto = row.style.display !== 'none';
   row.style.display = abierto ? 'none' : 'table-row';
   if(arr) arr.style.transform = abierto ? 'rotate(0deg)' : 'rotate(90deg)';
-}
-
-// Botón "Traer de Wise" -> le pide a Wise el rango Desde/Hasta (por envío),
-// guarda en el histórico (sin borrar, sin duplicar) y recarga la vista.
-async function sincronizarEncuestas(){
-  const btn = document.getElementById('enc-sync-btn');
-  if(!btn) return;
-
-  // tomar el rango de fechas de los campos Desde/Hasta
-  const desde = document.getElementById('enc-desde')?.value;
-  const hasta = document.getElementById('enc-hasta')?.value;
-  if(!desde || !hasta){
-    alert('Elegí primero un rango de fechas (Desde y Hasta) antes de traer de Wise.');
-    return;
-  }
-  if(desde > hasta){
-    alert('La fecha "Desde" no puede ser posterior a "Hasta".');
-    return;
-  }
-
-  const orig = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Consultando Wise… (puede tardar)';
-  try{
-    // el secreto lo definís en Vercel (SYNC_SECRET). Se pide por prompt la 1a vez
-    // y queda en memoria de sesión para no exponerlo en el código.
-    let key = sessionStorage.getItem('sync_key');
-    if(!key){
-      key = prompt('Clave de sincronización (SYNC_SECRET de Vercel):') || '';
-      if(key) sessionStorage.setItem('sync_key', key);
-    }
-    const url = '/api/sync-encuestas'
-      + '?key=' + encodeURIComponent(key)
-      + '&date_from=' + encodeURIComponent(desde)
-      + '&date_to='   + encodeURIComponent(hasta);
-    const r = await fetch(url);
-    const j = await r.json();
-    if(!r.ok || !j.ok) throw new Error(j.error || ('HTTP '+r.status));
-    // recargar datos frescos desde Supabase (que ahora tiene el histórico acumulado)
-    encCargadas = false;
-    await cargarEncuestas();
-    const cuantas = j.registros_guardados ?? j.respondidas ?? 0;
-    btn.innerHTML = '<i class="ti ti-check"></i> ' + cuantas + ' traídas';
-    setTimeout(()=>{ btn.innerHTML = orig; btn.disabled=false; }, 3000);
-  }catch(err){
-    console.error(err);
-    sessionStorage.removeItem('sync_key'); // por si la clave estaba mal
-    btn.innerHTML = '<i class="ti ti-alert-triangle"></i> Error';
-    alert('No se pudo traer de Wise: ' + err.message
-      + '\n\nSi dice REPORT_LIMIT_EXCEDEED, esperá unos minutos (Wise limita las consultas seguidas).');
-    setTimeout(()=>{ btn.innerHTML = orig; btn.disabled=false; }, 3000);
-  }
 }
 
 // helpers de estilo
