@@ -507,6 +507,11 @@ tbody td{padding:11px 12px;vertical-align:middle}
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg>
           Encuestas
         </button>
+        <button class="nav-item" id="tab-desest" style="display:none" onclick="swTab('desest',this)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c1.5 0 2.9.37 4.15 1.02"/></svg>
+          Desestimaciones
+          <span id="desest-badge" style="display:none;margin-left:auto;background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px">0</span>
+        </button>
       </nav>
 
       <div class="sidebar-divider"></div>
@@ -761,6 +766,26 @@ tbody td{padding:11px 12px;vertical-align:middle}
             </div>
             <div id="enc-tabla-detalle"></div>
           </div>
+        </div>
+
+        <!-- DESESTIMACIONES (bandeja del admin) -->
+        <div class="tc" id="tc-desest">
+          <div class="sec-hdr">
+            <div class="sec-hdr-left">
+              <div class="sec-eyebrow">Pedidos de los asesores · Wise CX</div>
+              <h2>Desestimaciones</h2>
+              <div class="tb-sub" id="desest-sub" style="margin-top:4px"></div>
+            </div>
+            <div class="hdr-actions">
+              <select id="desest-filtro" class="filter-sel" onchange="renderDesest()">
+                <option value="pendiente">Pendientes</option>
+                <option value="aprobado">Aprobados</option>
+                <option value="rechazado">Rechazados</option>
+                <option value="todos">Todos</option>
+              </select>
+            </div>
+          </div>
+          <div id="desest-lista"></div>
         </div>
 
       </div><!-- /main-inner -->
@@ -1360,6 +1385,7 @@ async function showApp(){
   document.getElementById('tab-usr').style.display=(enPrepull && cu.rol==='admin')?'':'none';
   document.getElementById('tab-compras').style.display=(enPrepull && (cu.rol==='compras'||cu.rol==='admin'||cu.username==='repuestos.aguado'))?'':'none';
   document.getElementById('tab-encuestas').style.display=enEncuestas?'':'none';
+  document.getElementById('tab-desest').style.display=(enEncuestas && (cu.rol==='admin'||cu.rol==='supervisor'))?'':'none';
 
   // Elegir pestaña inicial según el módulo
   let startTab;
@@ -1462,6 +1488,186 @@ async function cargarDesestimaciones(){
     .order('creado_en', { ascending:false });
   if(error){ console.warn('No se pudieron cargar desestimaciones:', error.message); desestimaciones = []; return; }
   desestimaciones = data || [];
+  actualizarBadgeDesest();
+}
+
+// Actualiza el contador rojo de pendientes en el sidebar
+function actualizarBadgeDesest(){
+  const badge = document.getElementById('desest-badge');
+  if(!badge) return;
+  const pend = desestimaciones.filter(d => d.estado === 'pendiente').length;
+  if(pend > 0){ badge.textContent = pend; badge.style.display = ''; }
+  else badge.style.display = 'none';
+}
+
+// Carga la bandeja del admin (necesita encuestas + desestimaciones)
+async function cargarBandejaDesest(){
+  // asegurarnos de tener las encuestas cargadas (para mostrar datos de cada una)
+  if(!encCargadas){
+    const { data } = await sb.from('encuestas').select('*').order('fecha',{ascending:false});
+    encuestas = data || [];
+    encCargadas = true;
+  }
+  await cargarDesestimaciones();
+  renderDesest();
+}
+
+// URL pública de una evidencia en Storage
+function urlEvidencia(path){
+  if(!path) return null;
+  const { data } = sb.storage.from('evidencias').getPublicUrl(path);
+  return data?.publicUrl || null;
+}
+
+function renderDesest(){
+  const cont = document.getElementById('desest-lista');
+  const sub = document.getElementById('desest-sub');
+  const filtro = document.getElementById('desest-filtro')?.value || 'pendiente';
+  let arr = desestimaciones.slice();
+  if(filtro !== 'todos') arr = arr.filter(d => d.estado === filtro);
+
+  const pend = desestimaciones.filter(d=>d.estado==='pendiente').length;
+  if(sub) sub.textContent = `${pend} pendiente${pend===1?'':'s'} · ${desestimaciones.length} en total`;
+
+  if(arr.length === 0){
+    cont.innerHTML = '<div class="access-note"><i class="ti ti-info-circle"></i> No hay pedidos en esta categoría.</div>';
+    return;
+  }
+
+  cont.innerHTML = arr.map(d => tarjetaDesest(d)).join('');
+}
+
+// Tarjeta de un pedido de desestimación
+function tarjetaDesest(d){
+  const e = encuestas.find(x => x.wise_id === d.encuesta_id);
+  const fecha = d.creado_en ? new Date(d.creado_en).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '';
+  const colores = { pendiente:'#d97706', aprobado:'#16a34a', rechazado:'#dc2626' };
+  const etiquetas = { pendiente:'Pendiente', aprobado:'Aprobado', rechazado:'Rechazado' };
+  const col = colores[d.estado] || '#6b7280';
+  const evUrl = urlEvidencia(d.evidencia_path);
+  const did = 'desest-'+d.id;
+
+  // datos de la encuesta
+  let encHtml = '<div style="font-size:12px;color:var(--text-4)">Encuesta no encontrada en la base actual.</div>';
+  if(e){
+    encHtml = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12.5px;color:var(--text-3)">
+        <div><b>Asesor:</b> ${escapeHtml(e.asesor||'—')}</div>
+        <div><b>Sucursal:</b> ${escapeHtml(e.sucursal||'—')}</div>
+        <div><b>Servicio:</b> ${escapeHtml(e.servicio||'—')}</div>
+        <div><b>Patente:</b> ${escapeHtml(e.dominio||'—')}</div>
+        <div><b>Promedio actual:</b> <span style="color:${notaColor(promedioEncuesta(e))};font-weight:700">${promedioEncuesta(e)!=null?promedioEncuesta(e).toFixed(2):'—'}</span></div>
+      </div>`;
+  }
+
+  return `
+    <div style="background:#fff;border:1px solid var(--border-1);border-radius:14px;padding:18px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px">
+        <div>
+          <div style="font-weight:700;color:var(--text-1);font-size:15px">${escapeHtml(d.solicitante_nombre||d.solicitante_username)}</div>
+          <div style="font-size:12px;color:var(--text-4)">Pedido del ${fecha}</div>
+        </div>
+        <span style="font-size:11px;padding:3px 11px;border-radius:20px;background:${col}22;color:${col};font-weight:700;white-space:nowrap">${etiquetas[d.estado]||d.estado}</span>
+      </div>
+
+      ${encHtml}
+
+      <div style="margin:12px 0;padding:10px 13px;background:#f8fafc;border-radius:9px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-4);font-weight:700;margin-bottom:3px">Motivo del asesor</div>
+        <div style="font-size:13px;color:var(--text-2)">${escapeHtml(d.motivo)}</div>
+        ${evUrl ? `<div style="margin-top:8px"><a href="${evUrl}" target="_blank" style="font-size:12px;color:#4f46e5;font-weight:600;text-decoration:none">📎 Ver evidencia adjunta</a></div>` : '<div style="margin-top:6px;font-size:12px;color:var(--text-4)">Sin evidencia adjunta</div>'}
+      </div>
+
+      ${d.estado === 'pendiente' && e ? bloqueResolver(d, e, did) : ''}
+      ${d.estado !== 'pendiente' ? `<div style="margin-top:8px;padding:10px 13px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;font-size:13px;color:var(--text-2)"><b>Resolución:</b> ${escapeHtml(d.decision_admin||'—')}${d.resuelto_por?` <span style="color:var(--text-4)">— por ${escapeHtml(d.resuelto_por)}</span>`:''}</div>` : ''}
+    </div>
+  `;
+}
+
+// Bloque con los controles para que el admin resuelva un pedido pendiente
+function bloqueResolver(d, e, did){
+  const desest = preguntasDesestimadas(e);
+  const checks = PREGUNTAS_ASESOR.map(([clave, label]) => {
+    const marcada = desest.includes(clave);
+    return `<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);margin-right:12px">
+      <input type="checkbox" id="${did}-${clave}" ${marcada?'checked':''}> ${label}
+    </label>`;
+  }).join('');
+
+  return `
+    <div style="margin-top:12px;border-top:1px solid var(--border-1);padding-top:12px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-4);font-weight:700;margin-bottom:8px">Resolver pedido</div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:6px">Marcá las preguntas a desestimar (si aplica):</div>
+      <div style="margin-bottom:12px">${checks}</div>
+      <textarea id="${did}-nota" rows="2" placeholder="Nota / respuesta para el asesor (opcional)…" style="width:100%;padding:8px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;margin-bottom:10px"></textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="resolverDesest(${d.id},'aprobar_preguntas','${did}')" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:none;background:#4f46e5;color:#fff;font-weight:600">Aplicar preguntas marcadas</button>
+        <button onclick="resolverDesest(${d.id},'anular','${did}')" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid #dc2626;background:#fef2f2;color:#dc2626;font-weight:600">Anular encuesta completa</button>
+        <button onclick="resolverDesest(${d.id},'rechazar','${did}')" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid var(--border-2);background:#fff;color:var(--text-3)">Rechazar pedido</button>
+      </div>
+    </div>
+  `;
+}
+
+// Aplica la resolución del admin
+async function resolverDesest(id, accion, did){
+  const d = desestimaciones.find(x => x.id === id);
+  if(!d) return;
+  const e = encuestas.find(x => x.wise_id === d.encuesta_id);
+  const nota = document.getElementById(did+'-nota')?.value.trim() || '';
+
+  try{
+    let decision = '';
+    let nuevoEstado = 'aprobado';
+    let preguntasAfectadas = [];
+    let encuestaEliminada = false;
+
+    if(accion === 'aprobar_preguntas'){
+      // leer qué preguntas marcó
+      preguntasAfectadas = PREGUNTAS_ASESOR
+        .map(([clave]) => clave)
+        .filter(clave => document.getElementById(did+'-'+clave)?.checked);
+      if(preguntasAfectadas.length === 0){
+        alert('Marcá al menos una pregunta, o usá "Anular" / "Rechazar".');
+        return;
+      }
+      // aplicar a la encuesta
+      const { error: e1 } = await sb.from('encuestas')
+        .update({ preguntas_desestimadas: preguntasAfectadas })
+        .eq('wise_id', d.encuesta_id);
+      if(e1) throw e1;
+      if(e) e.preguntas_desestimadas = preguntasAfectadas;
+      const labels = PREGUNTAS_ASESOR.filter(([c])=>preguntasAfectadas.includes(c)).map(([,l])=>l).join(', ');
+      decision = `Se desestimaron: ${labels}.` + (nota?` ${nota}`:'');
+    } else if(accion === 'anular'){
+      const { error: e1 } = await sb.from('encuestas')
+        .update({ anulada: true })
+        .eq('wise_id', d.encuesta_id);
+      if(e1) throw e1;
+      if(e) e.anulada = true;
+      encuestaEliminada = true;
+      decision = 'Encuesta anulada completa.' + (nota?` ${nota}`:'');
+    } else if(accion === 'rechazar'){
+      nuevoEstado = 'rechazado';
+      decision = nota || 'Pedido rechazado.';
+    }
+
+    // actualizar el pedido
+    const { error: e2 } = await sb.from('desestimaciones').update({
+      estado: nuevoEstado,
+      decision_admin: decision,
+      preguntas_afectadas: preguntasAfectadas,
+      encuesta_eliminada: encuestaEliminada,
+      resuelto_por: cu.nombre,
+      resuelto_en: new Date().toISOString(),
+    }).eq('id', id);
+    if(e2) throw e2;
+
+    await cargarDesestimaciones();
+    renderDesest();
+  }catch(err){
+    alert('No se pudo resolver: ' + err.message);
+  }
 }
 
 function swSubTabEnc(t, el){
@@ -2050,6 +2256,7 @@ function swTab(t,el){
   if(t==='dash') renderDash();
   if(t==='compras') renderCompras();
   if(t==='encuestas') cargarEncuestas();
+  if(t==='desest') cargarBandejaDesest();
 }
 function swSubTab(t,el){const cont=document.getElementById('tc-turnos');cont.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('act'));cont.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));el.classList.add('act');document.getElementById('subtc-'+t).classList.add('act');if(t==='noshow')renderNoShow();if(t==='historico')renderHistorico();}
 function swSubTabRep(t,el){
