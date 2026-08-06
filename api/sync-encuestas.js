@@ -56,14 +56,19 @@ async function autenticar() {
 }
 
 // 2) Inicia la exportación del reporte -> devuelve export_id
-async function iniciarExport(token) {
+async function iniciarExport(token, dateFrom, dateTo) {
+  // Body base: todas las columnas del reporte
+  const body = { columns: "all" };
+  // Si la web mandó un rango, lo pasamos como filtro (Wise filtra por
+  // fecha de ENVÍO / survey_sent_date). Si no, el reporte usa su filtro propio.
+  if (dateFrom && dateTo) {
+    body.filter = { date_from: dateFrom, date_to: dateTo };
+  }
+
   const res = await fetch(`${WISE_BASE}/analytics/export/${REPORT_ID}`, {
     method: "POST",
     headers: wiseHeaders(token),
-    // NO mandamos filtro de fecha: dejamos que el reporte use el suyo propio
-    // (configurado en Wise). Así traemos exactamente lo que muestra el reporte.
-    // "all" = todas las columnas configuradas (incluye AGENTE y puntuaciones).
-    body: JSON.stringify({ columns: "all" }),
+    body: JSON.stringify(body),
   });
 
   const txt = await res.text();
@@ -417,6 +422,24 @@ function limpiarNulos(valor) {
   return valor;
 }
 
+// ¿La encuesta fue respondida? Se fija en el campo "Respondida" (SI/NO) del
+// raw, o si tiene fecha de respuesta, o si tiene alguna nota cargada.
+function esRespondida(registro){
+  const raw = registro.raw || {};
+  // buscar campo "Respondida" en el raw
+  for (const [k, v] of Object.entries(raw)) {
+    const nk = k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (nk.includes("respondida") || nk.includes("responded") || nk === "is_responsed") {
+      const s = String(v).trim().toLowerCase();
+      return s === "si" || s === "sí" || s === "1" || s === "yes" || s === "true";
+    }
+  }
+  // si no hay campo explícito: la damos por respondida si tiene fecha de
+  // respuesta o al menos una nota de las 5 preguntas
+  if (registro.fecha_respuesta) return true;
+  return registro.promedio_asesor != null;
+}
+
 // 5) Upsert a Supabase vía REST (sin SDK, para mantener la función liviana)
 async function guardarEnSupabase(registros) {
   if (registros.length === 0) return { insertados: 0 };
@@ -471,8 +494,12 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Rango de fechas que manda la web (por fecha de ENVÍO). Formato yyyy-MM-dd.
+    const dateFrom = req.query.date_from || null;
+    const dateTo   = req.query.date_to   || null;
+
     const token = await autenticar();
-    const { exportId, raw: exportRaw } = await iniciarExport(token);
+    const { exportId, raw: exportRaw } = await iniciarExport(token, dateFrom, dateTo);
 
     // modo diagnóstico: /api/sync-encuestas?key=...&debug=1
     // muestra qué devolvió Wise al iniciar el export, sin esperar el resto
@@ -480,6 +507,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         modo: "debug",
+        rango_pedido: { date_from: dateFrom, date_to: dateTo },
         export_id_detectado: exportId,
         respuesta_cruda_del_export: exportRaw,
       });
@@ -487,12 +515,19 @@ export default async function handler(req, res) {
 
     const reportUrl = await esperarReporte(token, exportId);
     const filas = await descargarFilas(reportUrl);
-    const registros = filas.map(mapearFila);
+
+    // Mapear y quedarnos SOLO con las respondidas (descarta las no contestadas)
+    let registros = filas.map(mapearFila);
+    const antesDeFiltrar = registros.length;
+    registros = registros.filter(esRespondida);
+
     const r = await guardarEnSupabase(registros);
 
     return res.status(200).json({
       ok: true,
-      filas_recibidas: filas.length,
+      rango_pedido: { date_from: dateFrom, date_to: dateTo },
+      filas_recibidas: antesDeFiltrar,
+      respondidas: registros.length,
       registros_guardados: r.insertados,
       muestra: registros.slice(0, 2), // primeras 2 para verificar el mapeo
     });
