@@ -513,6 +513,10 @@ tbody td{padding:11px 12px;vertical-align:middle}
           Desestimaciones
           <span id="desest-badge" style="display:none;margin-left:auto;background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px">0</span>
         </button>
+        <button class="nav-item" id="tab-minutas" style="display:none" onclick="swTab('minutas',this)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg>
+          Minutas
+        </button>
       </nav>
 
       <div class="sidebar-divider"></div>
@@ -787,6 +791,24 @@ tbody td{padding:11px 12px;vertical-align:middle}
             </div>
           </div>
           <div id="desest-lista"></div>
+        </div>
+
+        <!-- MINUTAS -->
+        <div class="tc" id="tc-minutas">
+          <div class="sec-hdr">
+            <div class="sec-hdr-left">
+              <div class="sec-eyebrow">Minutas de reunión · Nippon Car</div>
+              <h2>Minutas</h2>
+              <div class="tb-sub" id="minutas-sub" style="margin-top:4px"></div>
+            </div>
+            <div class="hdr-actions">
+              <button class="btn-sm" onclick="nuevaMinuta()" style="background:#0d9488;color:#fff;border:none">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nueva minuta
+              </button>
+            </div>
+          </div>
+          <div id="minutas-cont"></div>
         </div>
 
       </div><!-- /main-inner -->
@@ -1344,6 +1366,13 @@ const MODULOS = {
     desc: 'Satisfacción de clientes, promedios por asesor y desestimaciones.',
     color: '#4f46e5',
     icono: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/>'
+  },
+  minutas: {
+    id: 'minutas',
+    nombre: 'Minutas',
+    desc: 'Crear minutas de reunión con formato Nippon Car y guardar el historial.',
+    color: '#0d9488',
+    icono: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/>'
   }
 };
 
@@ -1358,6 +1387,10 @@ function puedeAcceder(moduloId){
   if(moduloId === 'encuestas'){
     // acceso a Encuestas: admin, supervisor y asesor
     return ['admin','supervisor','asesor'].includes(r);
+  }
+  if(moduloId === 'minutas'){
+    // acceso a Minutas: admin y supervisor
+    return ['admin','supervisor'].includes(r);
   }
   return false;
 }
@@ -1445,6 +1478,7 @@ async function showApp(){
   // Mostrar/ocultar pestañas según MÓDULO activo + rol
   const enPrepull = cu.modulo === 'prepull';
   const enEncuestas = cu.modulo === 'encuestas';
+  const enMinutas = cu.modulo === 'minutas';
 
   document.getElementById('tab-dash').style.display=(enPrepull && cu.rol!=='supervisor')?'':'none';
   document.getElementById('tab-turnos').style.display=(enPrepull && (cu.rol==='citas'||cu.rol==='admin'||cu.rol==='compras'||cu.rol==='supervisor'))?'':'none';
@@ -1453,11 +1487,15 @@ async function showApp(){
   document.getElementById('tab-compras').style.display=(enPrepull && (cu.rol==='compras'||cu.rol==='admin'||cu.username==='repuestos.aguado'))?'':'none';
   document.getElementById('tab-encuestas').style.display=enEncuestas?'':'none';
   document.getElementById('tab-desest').style.display=(enEncuestas && (cu.rol==='admin'||cu.rol==='supervisor'))?'':'none';
+  const tabMin = document.getElementById('tab-minutas');
+  if(tabMin) tabMin.style.display=enMinutas?'':'none';
 
   // Elegir pestaña inicial según el módulo
   let startTab;
   if(enEncuestas){
     startTab = 'encuestas';
+  } else if(enMinutas){
+    startTab = 'minutas';
   } else {
     startTab = 'dash';
     if(cu.rol==='repuestos') startTab='repuestos';
@@ -1484,6 +1522,8 @@ async function showApp(){
     iniciarRealtime();
   } else if(enEncuestas){
     cargarEncuestas();
+  } else if(enMinutas){
+    cargarMinutas();
   }
 }
 
@@ -2316,6 +2356,57 @@ async function sincronizarEncuestas(){
   }
 }
 
+// ============================================================
+//  MÓDULO MINUTAS
+// ============================================================
+let minutas = [];
+
+async function cargarMinutas(){
+  const cont = document.getElementById('minutas-cont');
+  const { data, error } = await sb.from('minutas').select('*').order('creado_en',{ascending:false});
+  if(error){
+    if(cont) cont.innerHTML = '<div class="access-note" style="color:#b91c1c"><i class="ti ti-alert-triangle"></i> No se pudieron cargar las minutas. ¿Creaste la tabla en Supabase?</div>';
+    return;
+  }
+  minutas = data || [];
+  renderMinutas();
+}
+
+function renderMinutas(){
+  const cont = document.getElementById('minutas-cont');
+  const sub = document.getElementById('minutas-sub');
+  if(sub) sub.textContent = `${minutas.length} minuta${minutas.length===1?'':'s'} guardada${minutas.length===1?'':'s'}`;
+  if(minutas.length === 0){
+    cont.innerHTML = '<div class="access-note"><i class="ti ti-info-circle"></i> Todavía no hay minutas. Creá una con "Nueva minuta".</div>';
+    return;
+  }
+  cont.innerHTML = minutas.map(m => {
+    const f = m.fecha_reunion ? new Date(m.fecha_reunion+'T00:00:00').toLocaleDateString('es-AR') : '—';
+    const parts = Array.isArray(m.participantes) ? m.participantes.length : 0;
+    return `<div style="background:#fff;border:1px solid var(--border-1);border-radius:12px;padding:16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <div>
+        <div style="font-weight:700;color:var(--text-1)">${escapeHtml(m.asunto||'(sin asunto)')}</div>
+        <div style="font-size:12.5px;color:var(--text-4);margin-top:3px">${escapeHtml(m.lugar||'—')} · ${f} · ${parts} participante${parts===1?'':'s'}</div>
+        <div style="font-size:11px;color:var(--text-4);margin-top:2px">Creada por ${escapeHtml(m.creado_por_nombre||m.creado_por||'—')}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        ${m.pdf_path ? `<a href="${urlMinutaPdf(m.pdf_path)}" target="_blank" class="btn-sm" style="text-decoration:none">📄 Ver PDF</a>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function urlMinutaPdf(path){
+  if(!path) return '#';
+  const { data } = sb.storage.from('minutas').getPublicUrl(path);
+  return data?.publicUrl || '#';
+}
+
+// Placeholder — el formulario completo viene en Min-2
+function nuevaMinuta(){
+  alert('El formulario de nueva minuta se activa en el próximo paso.');
+}
+
 // helpers de estilo
 function metricCard(lbl, val, color, sub){
   return `<div class="metric-card" style="--m-color:${color};cursor:default">
@@ -2344,6 +2435,7 @@ function swTab(t,el){
   if(t==='compras') renderCompras();
   if(t==='encuestas') cargarEncuestas();
   if(t==='desest') cargarBandejaDesest();
+  if(t==='minutas') cargarMinutas();
 }
 function swSubTab(t,el){const cont=document.getElementById('tc-turnos');cont.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('act'));cont.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));el.classList.add('act');document.getElementById('subtc-'+t).classList.add('act');if(t==='noshow')renderNoShow();if(t==='historico')renderHistorico();}
 function swSubTabRep(t,el){
