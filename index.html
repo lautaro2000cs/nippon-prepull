@@ -414,14 +414,14 @@ tbody td{padding:11px 12px;vertical-align:middle}
       </div>
       <div class="brand-sub">Sistema Pre Pull</div>
       <div class="fg">
-        <label>Usuario</label>
-        <input type="text" id="lu" placeholder="nombre.apellido" autocomplete="username">
+        <label>Correo o usuario</label>
+        <input type="text" id="lu" placeholder="correo@nipponcarsrl.com.ar" autocomplete="username" oninput="onLoginUserInput()">
       </div>
       <div class="fg">
         <label>Contraseña</label>
         <input type="password" id="lp" placeholder="••••••••" autocomplete="current-password">
       </div>
-      <div class="fg">
+      <div class="fg" id="sector-wrap">
         <label>Sector</label>
         <select id="lr">
           <option value="">Seleccioná tu sector</option>
@@ -435,6 +435,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
       </div>
       <button class="btn-in" id="btn-login" onclick="doLogin()">Ingresar</button>
       <p class="login-err" id="lerr">Usuario, contraseña o sector incorrecto.</p>
+      <div style="text-align:center;margin-top:10px"><a href="#" onclick="olvideContrasena();return false" style="font-size:12px;color:var(--text-4);text-decoration:none">¿Olvidaste tu contraseña?</a></div>
       <div class="conn-status conn-loading" id="conn-status"><i class="ti ti-loader-2" style="font-size:13px;vertical-align:-2px"></i> Conectando con la base de datos...</div>
     </div>
   </div>
@@ -1225,39 +1226,105 @@ function initLoginSlideshow(){
 // ============================================
 async function doLogin(){
   const btn=document.getElementById('btn-login');
-  const u=document.getElementById('lu').value.trim().toLowerCase();
+  const u=document.getElementById('lu').value.trim();
   const p=document.getElementById('lp').value;
   const r=document.getElementById('lr').value;
 
-  if(!u||!p||!r){document.getElementById('lerr').textContent='Completá usuario, contraseña y sector.';document.getElementById('lerr').style.display='block';return;}
+  const esEmail = u.includes('@');
+
+  // Validación según el método
+  if(!u || !p || (!esEmail && !r)){
+    document.getElementById('lerr').textContent = esEmail
+      ? 'Completá tu correo y contraseña.'
+      : 'Completá usuario, contraseña y sector.';
+    document.getElementById('lerr').style.display='block';
+    return;
+  }
 
   btn.disabled=true;btn.textContent='Verificando...';
-
   let loginOk = false;
-  try{
-    const {data,error}=await sb.from('usuarios').select('*').eq('username',u).single();
-    if(error||!data){throw new Error('Usuario no encontrado');}
-    if(data.password!==p){throw new Error('Contraseña incorrecta');}
-    if(data.rol!==r&&data.rol!=='admin'){throw new Error('Sector incorrecto');}
 
-    cu={username:u,nombre:data.nombre,rol:data.rol,sucursalFija:data.sucursal_fija,asesorWise:data.asesor_wise};
+  try{
+    if(esEmail){
+      // ---- LOGIN NUEVO: correo + Supabase Auth ----
+      const email = u.toLowerCase();
+      const { data: authData, error: authErr } =
+        await sb.auth.signInWithPassword({ email, password: p });
+      if(authErr) throw new Error('Correo o contraseña incorrectos');
+
+      // buscar el perfil (rol, nombre, etc.) en la tabla usuarios por email
+      const { data: perfil, error: perfErr } =
+        await sb.from('usuarios').select('*').ilike('email', email).maybeSingle();
+      if(perfErr || !perfil){
+        await sb.auth.signOut();
+        throw new Error('Tu correo no está habilitado en el sistema. Avisá al administrador.');
+      }
+      cu = { username:perfil.username, nombre:perfil.nombre, rol:perfil.rol,
+             sucursalFija:perfil.sucursal_fija, asesorWise:perfil.asesor_wise,
+             email:perfil.email, viaAuth:true };
+    } else {
+      // ---- LOGIN VIEJO: usuario + contraseña de la tabla ----
+      const uname = u.toLowerCase();
+      const {data,error}=await sb.from('usuarios').select('*').eq('username',uname).single();
+      if(error||!data){throw new Error('Usuario no encontrado');}
+      if(data.password!==p){throw new Error('Contraseña incorrecta');}
+      if(data.rol!==r&&data.rol!=='admin'){throw new Error('Sector incorrecto');}
+      cu={username:uname,nombre:data.nombre,rol:data.rol,sucursalFija:data.sucursal_fija,asesorWise:data.asesor_wise,email:data.email,viaAuth:false};
+    }
     document.getElementById('lerr').style.display='none';
     loginOk = true;
   }catch(err){
-    document.getElementById('lerr').textContent='Usuario, contraseña o sector incorrecto.';
+    document.getElementById('lerr').textContent = err.message || 'No se pudo iniciar sesión.';
     document.getElementById('lerr').style.display='block';
   }finally{
     btn.disabled=false;btn.textContent='Ingresar';
   }
 
-  // El selector se muestra FUERA del try: así, si algo falla al dibujarlo,
-  // el error se ve de verdad y no se confunde con "login incorrecto".
   if(loginOk){
     mostrarSelector();
   }
 }
+
+// Muestra/oculta el campo Sector según si el usuario escribió un email
+function onLoginUserInput(){
+  const u = document.getElementById('lu').value;
+  const sectorWrap = document.getElementById('sector-wrap');
+  if(sectorWrap){
+    sectorWrap.style.display = u.includes('@') ? 'none' : '';
+  }
+}
+
+// "Olvidé mi contraseña": manda email de recuperación (solo para correos)
+async function olvideContrasena(){
+  const u = document.getElementById('lu').value.trim();
+  if(!u.includes('@')){
+    alert('Escribí tu correo corporativo en el campo de arriba y volvé a tocar "¿Olvidaste tu contraseña?".');
+    return;
+  }
+  try{
+    const { error } = await sb.auth.resetPasswordForEmail(u.toLowerCase(), {
+      redirectTo: window.location.origin + '?recuperar=1'
+    });
+    if(error) throw error;
+    alert('Te enviamos un correo con instrucciones para restablecer tu contraseña.\n\nRevisá tu bandeja de entrada (y la carpeta de spam).');
+  }catch(err){
+    alert('No se pudo enviar el correo: ' + err.message);
+  }
+}
 initLoginSlideshow();
 document.addEventListener('keydown',function(e){if(e.key==='Enter'&&document.getElementById('s-login').classList.contains('active'))doLogin();});
+
+// Si el usuario volvió desde el email de recuperación, pedirle la nueva clave
+sb.auth.onAuthStateChange(async (event, session) => {
+  if(event === 'PASSWORD_RECOVERY' || (new URLSearchParams(location.search).get('recuperar')==='1' && session)){
+    const nueva = prompt('Ingresá tu nueva contraseña (mínimo 6 caracteres):');
+    if(nueva && nueva.length >= 6){
+      const { error } = await sb.auth.updateUser({ password: nueva });
+      if(error) alert('No se pudo cambiar: ' + error.message);
+      else { alert('Contraseña actualizada. Ya podés ingresar con tu correo y la nueva contraseña.'); await sb.auth.signOut(); location.href = location.origin; }
+    }
+  }
+});
 
 // ============================================================
 //  SELECTOR DE MÓDULOS
@@ -1440,7 +1507,7 @@ function iniciarRealtime(){
 function detenerRealtime(){
   if(realtimeChannel){sb.removeChannel(realtimeChannel);realtimeChannel=null;}
 }
-function doLogout(){detenerRealtime();cu=null;document.getElementById('s-app').classList.remove('active');document.getElementById('s-selector').classList.remove('active');document.getElementById('s-login').classList.add('active');['lu','lp'].forEach(id=>document.getElementById(id).value='');document.getElementById('lr').value='';}
+function doLogout(){detenerRealtime();sb.auth.signOut().catch(()=>{});cu=null;document.getElementById('s-app').classList.remove('active');document.getElementById('s-selector').classList.remove('active');document.getElementById('s-login').classList.add('active');['lu','lp'].forEach(id=>document.getElementById(id).value='');document.getElementById('lr').value='';onLoginUserInput();}
 
 // ============================================
 // CARGA DE DATOS DESDE SUPABASE
@@ -1677,6 +1744,17 @@ function swSubTabEnc(t, el){
   cont.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));
   el.classList.add('act');
   document.getElementById('subtc-enc-'+t).classList.add('act');
+  // refrescar datos frescos (por si el admin resolvió algo) y renderizar
+  refrescarYRender();
+}
+
+// Relee encuestas + desestimaciones y re-renderiza (sin recargar la página)
+async function refrescarYRender(){
+  try{
+    const { data } = await sb.from('encuestas').select('*').order('fecha',{ascending:false});
+    if(data) encuestas = data;
+    await cargarDesestimaciones();
+  }catch(e){ /* si falla, igual renderizamos lo que hay */ }
   renderEncuestas();
 }
 
@@ -1684,7 +1762,16 @@ function swSubTabEnc(t, el){
 async function cargarEncuestas(){
   // Ajustes de UI según el rol (asesor vs admin/supervisor)
   ajustarUIEncuestas();
-  if(encCargadas){ renderEncuestas(); return; }
+  // Si ya se cargó antes, igual refrescamos los datos que pueden haber
+  // cambiado (desestimaciones aplicadas, pedidos resueltos) para que el
+  // asesor vea la resolución del admin sin tener que apretar F5.
+  if(encCargadas){
+    const { data } = await sb.from('encuestas').select('*').order('fecha',{ascending:false});
+    if(data) encuestas = data;
+    await cargarDesestimaciones();
+    renderEncuestas();
+    return;
+  }
   const cont = document.getElementById('enc-tabla-asesores');
   const { data, error } = await sb
     .from('encuestas')
