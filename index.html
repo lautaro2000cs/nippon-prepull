@@ -431,6 +431,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
           <option value="compras">Compras</option>
           <option value="supervisor">Supervisor</option>
           <option value="asesor">Asesor</option>
+          <option value="seguridad">Seguridad e Higiene</option>
         </select>
       </div>
       <button class="btn-in" id="btn-login" onclick="doLogin()">Ingresar</button>
@@ -1389,8 +1390,8 @@ function puedeAcceder(moduloId){
     return ['admin','supervisor','asesor'].includes(r);
   }
   if(moduloId === 'minutas'){
-    // acceso a Minutas: admin y supervisor
-    return ['admin','supervisor'].includes(r);
+    // acceso a Minutas: admin, supervisor y seguridad e higiene
+    return ['admin','supervisor','seguridad'].includes(r);
   }
   return false;
 }
@@ -1464,7 +1465,7 @@ async function showApp(){
   document.getElementById('s-login').classList.remove('active');
   document.getElementById('s-app').classList.add('active');
   document.getElementById('tb-user').textContent=cu.nombre;
-  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor'}[cu.rol]||cu.rol;
+  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene'}[cu.rol]||cu.rol;
   const sucEl=document.getElementById('tb-suc');
   if(cu.sucursalFija){sucEl.style.display='inline-flex';sucEl.innerHTML=`<i class="ti ti-map-pin" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${cu.sucursalFija}`;}
   else sucEl.style.display='none';
@@ -1489,6 +1490,7 @@ async function showApp(){
   document.getElementById('tab-desest').style.display=(enEncuestas && (cu.rol==='admin'||cu.rol==='supervisor'))?'':'none';
   const tabMin = document.getElementById('tab-minutas');
   if(tabMin) tabMin.style.display=enMinutas?'':'none';
+  // (dentro del módulo minutas, admin/supervisor/seguridad ya tienen acceso)
 
   // Elegir pestaña inicial según el módulo
   let startTab;
