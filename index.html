@@ -2402,9 +2402,134 @@ function urlMinutaPdf(path){
   return data?.publicUrl || '#';
 }
 
-// Placeholder — el formulario completo viene en Min-2
+// Estado del formulario de minuta en edición
+let minutaForm = null;
+
+// Abre el formulario para crear una minuta nueva
 function nuevaMinuta(){
-  alert('El formulario de nueva minuta se activa en el próximo paso.');
+  minutaForm = {
+    asunto:'', lugar:'', fecha_reunion:new Date().toISOString().slice(0,10), hora_inicio:'',
+    participantes:[{nombre:'',cargo:'',iniciales:''}],
+    descripcion:[''],
+    soluciones:[''],
+  };
+  renderMinutaForm();
+}
+
+function renderMinutaForm(){
+  const cont = document.getElementById('minutas-cont');
+  const sub = document.getElementById('minutas-sub');
+  if(sub) sub.textContent = 'Nueva minuta';
+  const m = minutaForm;
+
+  const partsRows = m.participantes.map((p,i)=>`
+    <div style="display:grid;grid-template-columns:1fr 1fr 90px 34px;gap:8px;margin-bottom:6px">
+      <input placeholder="Nombre" value="${escapeHtml(p.nombre)}" oninput="minutaForm.participantes[${i}].nombre=this.value" style="padding:8px 10px;border:1px solid var(--border-2);border-radius:7px;font-size:13px">
+      <input placeholder="Cargo" value="${escapeHtml(p.cargo)}" oninput="minutaForm.participantes[${i}].cargo=this.value" style="padding:8px 10px;border:1px solid var(--border-2);border-radius:7px;font-size:13px">
+      <input placeholder="Iniciales" value="${escapeHtml(p.iniciales)}" oninput="minutaForm.participantes[${i}].iniciales=this.value.toUpperCase()" style="padding:8px 10px;border:1px solid var(--border-2);border-radius:7px;font-size:13px;text-transform:uppercase">
+      <button onclick="quitarFilaMinuta('participantes',${i})" title="Quitar" style="border:1px solid var(--border-2);background:#fff;border-radius:7px;cursor:pointer;color:#dc2626">✕</button>
+    </div>`).join('');
+
+  const descRows = m.descripcion.map((d,i)=>`
+    <div style="display:flex;gap:8px;margin-bottom:6px">
+      <span style="width:24px;text-align:center;color:var(--text-4);font-weight:700;padding-top:8px">${i+1}</span>
+      <textarea rows="2" placeholder="Describí el punto tratado…" oninput="minutaForm.descripcion[${i}]=this.value" style="flex:1;padding:8px 10px;border:1px solid var(--border-2);border-radius:7px;font-size:13px;resize:vertical;font-family:inherit">${escapeHtml(d)}</textarea>
+      <button onclick="quitarFilaMinuta('descripcion',${i})" style="border:1px solid var(--border-2);background:#fff;border-radius:7px;cursor:pointer;color:#dc2626;align-self:flex-start;padding:8px">✕</button>
+    </div>`).join('');
+
+  const solRows = m.soluciones.map((s,i)=>`
+    <div style="display:flex;gap:8px;margin-bottom:6px">
+      <span style="width:24px;text-align:center;color:var(--text-4);font-weight:700;padding-top:8px">${i+1}</span>
+      <textarea rows="2" placeholder="Describí la solución acordada…" oninput="minutaForm.soluciones[${i}]=this.value" style="flex:1;padding:8px 10px;border:1px solid var(--border-2);border-radius:7px;font-size:13px;resize:vertical;font-family:inherit">${escapeHtml(s)}</textarea>
+      <button onclick="quitarFilaMinuta('soluciones',${i})" style="border:1px solid var(--border-2);background:#fff;border-radius:7px;cursor:pointer;color:#dc2626;align-self:flex-start;padding:8px">✕</button>
+    </div>`).join('');
+
+  cont.innerHTML = `
+    <div style="background:#fff;border:1px solid var(--border-1);border-radius:14px;padding:22px;max-width:900px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+        <div style="grid-column:1/3">
+          <label style="font-size:12px;color:var(--text-3);display:block;margin-bottom:4px">Asunto *</label>
+          <input value="${escapeHtml(m.asunto)}" oninput="minutaForm.asunto=this.value" placeholder="Ej: Capacitación y presentación de manual…" style="width:100%;padding:9px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px">
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--text-3);display:block;margin-bottom:4px">Lugar</label>
+          <input value="${escapeHtml(m.lugar)}" oninput="minutaForm.lugar=this.value" placeholder="Ej: Casa Central, Neuquén" style="width:100%;padding:9px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px">
+        </div>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1">
+            <label style="font-size:12px;color:var(--text-3);display:block;margin-bottom:4px">Fecha</label>
+            <input type="date" value="${m.fecha_reunion}" oninput="minutaForm.fecha_reunion=this.value" style="width:100%;padding:9px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px">
+          </div>
+          <div style="flex:1">
+            <label style="font-size:12px;color:var(--text-3);display:block;margin-bottom:4px">Hora inicio</label>
+            <input value="${escapeHtml(m.hora_inicio)}" oninput="minutaForm.hora_inicio=this.value" placeholder="15:30" style="width:100%;padding:9px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px">
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-4);font-weight:700;margin-bottom:8px">Participantes</div>
+        ${partsRows}
+        <button onclick="agregarFilaMinuta('participantes')" class="btn-sm" style="margin-top:4px">+ Agregar participante</button>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-4);font-weight:700;margin-bottom:8px">Descripción (puntos tratados)</div>
+        ${descRows}
+        <button onclick="agregarFilaMinuta('descripcion')" class="btn-sm" style="margin-top:4px">+ Agregar punto</button>
+      </div>
+
+      <div style="margin-bottom:20px">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-4);font-weight:700;margin-bottom:8px">Soluciones acordadas</div>
+        ${solRows}
+        <button onclick="agregarFilaMinuta('soluciones')" class="btn-sm" style="margin-top:4px">+ Agregar solución</button>
+      </div>
+
+      <div style="display:flex;gap:10px;border-top:1px solid var(--border-1);padding-top:16px">
+        <button onclick="guardarMinuta()" style="background:#0d9488;color:#fff;border:none;padding:10px 20px;border-radius:9px;font-weight:600;cursor:pointer;font-size:13px">Guardar y generar PDF</button>
+        <button onclick="cancelarMinuta()" style="background:#fff;border:1px solid var(--border-2);padding:10px 18px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--text-3)">Cancelar</button>
+      </div>
+    </div>
+  `;
+}
+
+function agregarFilaMinuta(campo){
+  if(campo==='participantes') minutaForm.participantes.push({nombre:'',cargo:'',iniciales:''});
+  else minutaForm[campo].push('');
+  renderMinutaForm();
+}
+function quitarFilaMinuta(campo,i){
+  minutaForm[campo].splice(i,1);
+  if(minutaForm[campo].length===0){
+    if(campo==='participantes') minutaForm.participantes.push({nombre:'',cargo:'',iniciales:''});
+    else minutaForm[campo].push('');
+  }
+  renderMinutaForm();
+}
+function cancelarMinuta(){ minutaForm=null; renderMinutas(); }
+
+// Guarda la minuta en Supabase (el PDF se agrega en Min-3)
+async function guardarMinuta(){
+  const m = minutaForm;
+  if(!m.asunto.trim()){ alert('El asunto es obligatorio.'); return; }
+  // limpiar filas vacías
+  const participantes = m.participantes.filter(p=>p.nombre.trim()||p.cargo.trim());
+  const descripcion = m.descripcion.filter(d=>d.trim());
+  const soluciones = m.soluciones.filter(s=>s.trim());
+  try{
+    const { error } = await sb.from('minutas').insert({
+      asunto:m.asunto.trim(), lugar:m.lugar.trim(), fecha_reunion:m.fecha_reunion,
+      hora_inicio:m.hora_inicio.trim(),
+      participantes, descripcion, soluciones,
+      creado_por:cu.username, creado_por_nombre:cu.nombre,
+    });
+    if(error) throw error;
+    minutaForm=null;
+    await cargarMinutas();
+    alert('Minuta guardada. (La generación de PDF se activa en el próximo paso.)');
+  }catch(err){
+    alert('No se pudo guardar: ' + err.message);
+  }
 }
 
 // helpers de estilo
