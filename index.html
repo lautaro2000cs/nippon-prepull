@@ -442,6 +442,27 @@ tbody td{padding:11px 12px;vertical-align:middle}
   </div>
 </div>
 
+<!-- ══ CAMBIO DE CONTRASEÑA OBLIGATORIO (primer ingreso) ═════════════════ -->
+<div class="screen" id="s-cambio-pass" style="background:#f4f3f0">
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem">
+    <div class="login-card" style="max-width:400px">
+      <div class="brand-sub" style="margin-bottom:6px">Primer ingreso</div>
+      <h2 style="font-size:19px;margin:0 0 6px;color:var(--text-1)">Creá tu contraseña</h2>
+      <p style="font-size:13px;color:var(--text-3);margin:0 0 18px;line-height:1.4">Por seguridad, definí una contraseña nueva antes de continuar. La vas a usar para tus próximos ingresos.</p>
+      <div class="fg">
+        <label>Nueva contraseña</label>
+        <input type="password" id="cp-new" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+      </div>
+      <div class="fg">
+        <label>Repetir contraseña</label>
+        <input type="password" id="cp-confirm" placeholder="Repetí la contraseña" autocomplete="new-password">
+      </div>
+      <button class="btn-in" id="btn-cp" onclick="guardarNuevaPassObligatoria()">Guardar y continuar</button>
+      <p class="login-err" id="cp-err"></p>
+    </div>
+  </div>
+</div>
+
 <!-- ══ SELECTOR DE MÓDULOS ═══════════════════════════════════════════════ -->
 <div class="screen" id="s-selector" style="background:#f4f3f0">
   <div class="sel-wrap">
@@ -1266,6 +1287,7 @@ async function doLogin(){
 
   btn.disabled=true;btn.textContent='Verificando...';
   let loginOk = false;
+  let forzarCambio = false;
 
   try{
     if(esEmail){
@@ -1285,6 +1307,8 @@ async function doLogin(){
       cu = { username:perfil.username, nombre:perfil.nombre, rol:perfil.rol,
              sucursalFija:perfil.sucursal_fija, asesorWise:perfil.asesor_wise,
              email:perfil.email, viaAuth:true };
+      // Si el admin marcó que debe cambiar la contraseña, lo obligamos antes de entrar
+      forzarCambio = !!perfil.debe_cambiar_password;
     } else {
       // ---- LOGIN VIEJO: usuario + contraseña de la tabla ----
       const uname = u.toLowerCase();
@@ -1304,7 +1328,8 @@ async function doLogin(){
   }
 
   if(loginOk){
-    mostrarSelector();
+    if(forzarCambio){ mostrarCambioPassObligatorio(); }
+    else { mostrarSelector(); }
   }
 }
 
@@ -1348,6 +1373,52 @@ sb.auth.onAuthStateChange(async (event, session) => {
     }
   }
 });
+
+// ============================================================
+//  CAMBIO DE CONTRASEÑA OBLIGATORIO (primer ingreso)
+// ============================================================
+// Se muestra cuando el perfil del usuario tiene debe_cambiar_password = true.
+// En este punto el usuario YA está autenticado (signInWithPassword fue exitoso),
+// así que podemos actualizar su contraseña directamente.
+function mostrarCambioPassObligatorio(){
+  document.getElementById('s-login').classList.remove('active');
+  document.getElementById('s-selector').classList.remove('active');
+  document.getElementById('s-app').classList.remove('active');
+  document.getElementById('cp-new').value='';
+  document.getElementById('cp-confirm').value='';
+  document.getElementById('cp-err').style.display='none';
+  document.getElementById('s-cambio-pass').classList.add('active');
+  setTimeout(function(){ var el=document.getElementById('cp-new'); if(el) el.focus(); }, 60);
+}
+
+async function guardarNuevaPassObligatoria(){
+  const nueva = document.getElementById('cp-new').value;
+  const rep   = document.getElementById('cp-confirm').value;
+  const errEl = document.getElementById('cp-err');
+  const btn   = document.getElementById('btn-cp');
+  errEl.style.display='none';
+  if(nueva.length < 6){ errEl.textContent='La contraseña debe tener al menos 6 caracteres.'; errEl.style.display='block'; return; }
+  if(nueva !== rep){ errEl.textContent='Las contraseñas no coinciden.'; errEl.style.display='block'; return; }
+  btn.disabled=true; btn.textContent='Guardando...';
+  try{
+    // 1) Cambiar la contraseña en Supabase Auth
+    const { error: e1 } = await sb.auth.updateUser({ password: nueva });
+    if(e1) throw e1;
+    // 2) Marcar en la tabla que ya no necesita cambiarla
+    if(cu && cu.email){
+      await sb.from('usuarios').update({ debe_cambiar_password:false }).ilike('email', cu.email);
+    }
+    // 3) Continuar al selector de módulos
+    document.getElementById('s-cambio-pass').classList.remove('active');
+    mostrarSelector();
+  }catch(err){
+    errEl.textContent = 'No se pudo guardar: ' + (err.message||'error'); errEl.style.display='block';
+  }finally{
+    btn.disabled=false; btn.textContent='Guardar y continuar';
+  }
+}
+// Enter para confirmar en la pantalla de cambio de contraseña
+document.addEventListener('keydown',function(e){if(e.key==='Enter'&&document.getElementById('s-cambio-pass').classList.contains('active'))guardarNuevaPassObligatoria();});
 
 // ============================================================
 //  SELECTOR DE MÓDULOS
