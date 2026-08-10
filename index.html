@@ -1054,7 +1054,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
       <div><label>Nombre completo</label><input type="text" id="f-usr-nombre" placeholder="Apellido, Nombre"/></div>
       <div><label>Usuario (para ingresar)</label><input type="text" id="f-usr-username" placeholder="nombre.apellido"/></div>
       <div><label>Contraseña</label><input type="text" id="f-usr-pass" placeholder="Mínimo 4 caracteres"/></div>
-      <div><label>Sector</label><select id="f-usr-rol" onchange="toggleSucUsr()"><option value="">Seleccionar...</option><option value="admin">Admin</option><option value="citas">Citas</option><option value="repuestos">Repuestos</option><option value="supervisor">Supervisor</option></select></div>
+      <div><label>Sector</label><select id="f-usr-rol" onchange="toggleSucUsr()"><option value="">Seleccionar...</option><option value="admin">Admin</option><option value="citas">Citas</option><option value="repuestos">Repuestos</option><option value="supervisor">Supervisor</option><option value="jefe_servicio">Jefe de Servicio</option></select></div>
       <div id="f-usr-suc-wrap"><label>Sucursal fija (opcional)</label><select id="f-usr-suc"><option value="">Sin sucursal fija — ve todas</option><option>Roca</option><option>Perticone</option><option>Aguado</option></select></div>
     </div>
     <p class="login-err" id="usr-err" style="display:none"></p>
@@ -1306,6 +1306,7 @@ async function doLogin(){
       }
       cu = { username:perfil.username, nombre:perfil.nombre, rol:perfil.rol,
              sucursalFija:perfil.sucursal_fija, asesorWise:perfil.asesor_wise,
+             sucursalesAsignadas:perfil.sucursales_asignadas,
              email:perfil.email, viaAuth:true };
       // Si el admin marcó que debe cambiar la contraseña, lo obligamos antes de entrar
       forzarCambio = !!perfil.debe_cambiar_password;
@@ -1316,7 +1317,7 @@ async function doLogin(){
       if(error||!data){throw new Error('Usuario no encontrado');}
       if(data.password!==p){throw new Error('Contraseña incorrecta');}
       if(data.rol!==r&&data.rol!=='admin'){throw new Error('Sector incorrecto');}
-      cu={username:uname,nombre:data.nombre,rol:data.rol,sucursalFija:data.sucursal_fija,asesorWise:data.asesor_wise,email:data.email,viaAuth:false};
+      cu={username:uname,nombre:data.nombre,rol:data.rol,sucursalFija:data.sucursal_fija,asesorWise:data.asesor_wise,sucursalesAsignadas:data.sucursales_asignadas,email:data.email,viaAuth:false};
     }
     document.getElementById('lerr').style.display='none';
     loginOk = true;
@@ -1457,8 +1458,8 @@ function puedeAcceder(moduloId){
            || cu.username === 'repuestos.aguado';
   }
   if(moduloId === 'encuestas'){
-    // acceso a Encuestas: admin, supervisor y asesor
-    return ['admin','supervisor','asesor'].includes(r);
+    // acceso a Encuestas: admin, supervisor, asesor y jefe de servicio
+    return ['admin','supervisor','asesor','jefe_servicio'].includes(r);
   }
   if(moduloId === 'minutas'){
     // acceso a Minutas: admin, supervisor y seguridad e higiene
@@ -1536,7 +1537,7 @@ async function showApp(){
   document.getElementById('s-login').classList.remove('active');
   document.getElementById('s-app').classList.add('active');
   document.getElementById('tb-user').textContent=cu.nombre;
-  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene'}[cu.rol]||cu.rol;
+  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene',jefe_servicio:'Jefe de Servicio'}[cu.rol]||cu.rol;
   const sucEl=document.getElementById('tb-suc');
   if(cu.sucursalFija){sucEl.style.display='inline-flex';sucEl.innerHTML=`<i class="ti ti-map-pin" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${cu.sucursalFija}`;}
   else sucEl.style.display='none';
@@ -1915,9 +1916,10 @@ async function cargarEncuestas(){
 // Adapta textos y botones de la pestaña Encuestas según el usuario
 function ajustarUIEncuestas(){
   const soyAsesor = esAsesor();
-  // el botón "Sincronizar" solo para admin/supervisor
+  // el botón "Sincronizar" solo para admin/supervisor (no asesor ni jefe de servicio)
+  const puedeSync = cu && (cu.rol === 'admin' || cu.rol === 'supervisor');
   const syncBtn = document.getElementById('enc-sync-btn');
-  if(syncBtn) syncBtn.style.display = soyAsesor ? 'none' : '';
+  if(syncBtn) syncBtn.style.display = puedeSync ? '' : 'none';
   // títulos: para el asesor el resumen es el "ranking"
   const h2Resumen = document.querySelector('#subtc-enc-resumen h2');
   if(h2Resumen) h2Resumen.textContent = soyAsesor ? 'Ranking general de asesores' : 'Promedio por asesor';
@@ -1934,6 +1936,31 @@ function ajustarUIEncuestas(){
 // ¿el usuario actual es un asesor (ve solo lo suyo en el detalle)?
 function esAsesor(){
   return cu && cu.rol === 'asesor' && cu.asesorWise;
+}
+
+// ¿el usuario actual es jefe de servicio? (ve las encuestas de su/s sucursal/es)
+function esJefeServicio(){
+  return cu && cu.rol === 'jefe_servicio';
+}
+
+// normaliza el nombre de una sucursal para comparar tolerando errores de Wise
+// (tildes, mayúsculas, puntos y espacios de más). Ej: "S.T.M." == "stm", "Neuquén" == "neuquen"
+function normSucursal(s){
+  return String(s||'').toLowerCase().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')  // saca tildes
+    .replace(/[^a-z0-9]/g,'');       // saca espacios, puntos, guiones, etc.
+}
+
+// sucursales asignadas al jefe (columna sucursales_asignadas, separadas por coma), normalizadas
+function sucursalesJefe(){
+  if(!cu || !cu.sucursalesAsignadas) return [];
+  return String(cu.sucursalesAsignadas).split(',').map(normSucursal).filter(Boolean);
+}
+
+// ¿esta encuesta pertenece a la/s sucursal/es del jefe logueado?
+function encuestaEnSucursalDelJefe(e){
+  const sucs = sucursalesJefe();
+  return sucs.length > 0 && sucs.includes(normSucursal(e.sucursal));
 }
 
 // normaliza para comparar nombres de asesor (espacios/tildes/mayúsculas)
@@ -1984,6 +2011,11 @@ function promedioEncuesta(e){
 function encuestasFiltradas(soloMias){
   let arr = encuestas.slice();
 
+  // Jefe de servicio: solo ve las encuestas de su/s sucursal/es (en todas las vistas)
+  if(esJefeServicio()){
+    arr = arr.filter(encuestaEnSucursalDelJefe);
+  }
+
   // fecha de referencia: la de respuesta; si no hay, cae a 'fecha'
   const fechaDe = (e) => e.fecha_respuesta || e.fecha;
 
@@ -2032,7 +2064,8 @@ function llenarMesesRapidos(){
   const sel = document.getElementById('enc-mes-rapido');
   if(!sel) return;
   const meses = new Set();
-  encuestas.forEach(e => {
+  const baseMeses = esJefeServicio() ? encuestas.filter(encuestaEnSucursalDelJefe) : encuestas;
+  baseMeses.forEach(e => {
     const f = e.fecha_respuesta || e.fecha;
     if(f){ const d = new Date(f); meses.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
   });
@@ -2049,11 +2082,15 @@ function renderEncuestas(){
   if(encSubTab === 'resumen') renderEncResumen();
   else renderEncDetalle();
   // contadores de las sub-tabs
+  // conjunto base visible según el rol (jefe de servicio: solo su sucursal)
+  const baseVisible = esJefeServicio()
+    ? encuestas.filter(encuestaEnSucursalDelJefe)
+    : encuestas;
   const misEncuestas = esAsesor()
     ? encuestas.filter(e => normAsesor(e.asesor) === normAsesor(cu.asesorWise))
-    : encuestas;
+    : baseVisible;
   const total = misEncuestas.length;
-  const asesores = new Set(encuestas.map(e=>e.asesor).filter(Boolean)).size;
+  const asesores = new Set(baseVisible.map(e=>e.asesor).filter(Boolean)).size;
   const cAses = document.getElementById('cnt-enc-asesores');
   const cDet  = document.getElementById('cnt-enc-detalle');
   if(cAses) cAses.textContent = asesores;
@@ -2218,7 +2255,7 @@ function encDetalleHtml(e){
 
 // Bloque del asesor: pedir desestimación + ver estado de su pedido
 function pedidoAsesorHtml(e){
-  if(!esAsesor()) return '';
+  if(!esAsesor() && !esJefeServicio()) return '';
   const wid = e.wise_id;
   // ¿ya hay un pedido para esta encuesta?
   const pedido = (desestimaciones || []).find(d => d.encuesta_id === wid);
@@ -2288,12 +2325,16 @@ async function enviarPedidoDesestimacion(widEnc, fid){
       if(upErr) throw new Error('Al subir evidencia: ' + upErr.message);
       evidenciaPath = up.path;
     }
+    // asesor al que corresponde la encuesta (para que el admin sepa a quién afecta).
+    // Si lo pide el propio asesor, es él; si lo pide un jefe, es el asesor de la encuesta.
+    const encRef = (encuestas || []).find(x => x.wise_id === wid);
+    const asesorWiseDest = esAsesor() ? cu.asesorWise : (encRef ? encRef.asesor : null);
     // crear el pedido
     const { error } = await sb.from('desestimaciones').insert({
       encuesta_id: wid,
       solicitante_username: cu.username,
       solicitante_nombre: cu.nombre,
-      asesor_wise: cu.asesorWise,
+      asesor_wise: asesorWiseDest,
       motivo,
       evidencia_path: evidenciaPath,
       estado: 'pendiente',
@@ -2935,7 +2976,7 @@ function valePill(v){return v?'<span class="pill p-vale"><i class="ti ti-check" 
 function priPill(p){const m={Alta:'pri-alta',Mediana:'pri-med',Baja:'pri-baja'};return`<span class="pill ${m[p]||'pri-baja'}">${p||'-'}</span>`;}
 function estPill(e){const m={pendiente:['p-pend','Pendiente'],arribo:['p-arr','Arribó'],faltante:['p-falt','Faltante'],bo:['p-bo','<i class="ti ti-alert-triangle" style="font-size:12px;vertical-align:-1px"></i> B/O']};const[c,l]=m[e]||['p-pend','Pendiente'];return`<span class="pill ${c}">${l}</span>`;}
 function valePill(v){return v?'<span class="pill vale-yes"><i class="ti ti-check" style="font-size:11px"></i> Con vale</span>':'<span class="pill vale-no"><i class="ti ti-x" style="font-size:11px"></i> Sin vale</span>';}
-function rolPill(r){const m={admin:'<span class="pill" style="background:#fbeceb;color:#c62a27">Admin</span>',citas:'<span class="pill" style="background:#e6f4ec;color:#1f7a48">Citas</span>',repuestos:'<span class="pill" style="background:#eef0ff;color:#4f46e5">Repuestos</span>',compras:'<span class="pill" style="background:#fbf1de;color:#9a6a08">Compras</span>',supervisor:'<span class="pill" style="background:#e6f1fb;color:#0c447c">Supervisor</span>'};return m[r]||`<span style="font-size:11px">${r}</span>`;}
+function rolPill(r){const m={admin:'<span class="pill" style="background:#fbeceb;color:#c62a27">Admin</span>',citas:'<span class="pill" style="background:#e6f4ec;color:#1f7a48">Citas</span>',repuestos:'<span class="pill" style="background:#eef0ff;color:#4f46e5">Repuestos</span>',compras:'<span class="pill" style="background:#fbf1de;color:#9a6a08">Compras</span>',supervisor:'<span class="pill" style="background:#e6f1fb;color:#0c447c">Supervisor</span>',jefe_servicio:'<span class="pill" style="background:#f3e8ff;color:#7c3aed">Jefe de Servicio</span>'};return m[r]||`<span style="font-size:11px">${r}</span>`;}
 
 function renderGroups(cid,items,fn,horizFilt){
   // Cachear el grupo de cada item una sola vez (diffHabil puede ser lento con muchos turnos)
