@@ -180,6 +180,34 @@ a{color:#c62a27;text-decoration:none}
 .suc-chip-all{border-style:dashed}
 .suc-chip-clear{border:none;background:none;color:var(--text-4);font-size:12px;cursor:pointer;padding:5px 8px;text-decoration:underline;text-underline-offset:2px}
 .suc-chip-clear:hover{color:var(--accent-h)}
+/* ── TABLEROS estilo Power BI ─────────────────────────── */
+.tb-card{background:#fff;border:1px solid var(--border-1);border-radius:14px;overflow:hidden;margin-bottom:22px}
+.tb-card-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border-1)}
+.tb-card-hd h3{margin:0;font-size:15px;font-weight:700;color:var(--text-1);letter-spacing:-0.01em}
+.tb-card-hd .tb-hint{font-size:11.5px;color:var(--text-4)}
+.tb-scroll{overflow-x:auto}
+.tb-matrix{border-collapse:collapse;width:100%;font-size:12.5px;white-space:nowrap}
+.tb-matrix thead th{background:#2f3033;color:#fff;font-weight:600;font-size:11px;letter-spacing:.01em;padding:10px 12px;text-align:right;position:sticky;top:0;vertical-align:middle}
+.tb-matrix thead th.tb-lbl{text-align:left}
+.tb-matrix tbody td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--border-1);color:var(--text-1);font-variant-numeric:tabular-nums}
+.tb-matrix tbody td.tb-lbl{text-align:left;font-weight:600;color:var(--text-1)}
+.tb-matrix tbody tr:nth-child(even){background:#fafafa}
+.tb-matrix tbody tr:hover{background:#f1f5f9}
+.tb-matrix tfoot td{padding:10px 12px;text-align:right;background:#2f3033;color:#fff;font-weight:700;font-variant-numeric:tabular-nums}
+.tb-matrix tfoot td.tb-lbl{text-align:left}
+.tb-cell{display:inline-flex;align-items:center;justify-content:flex-end;gap:5px}
+.tb-cnt{font-family:var(--mono);font-size:12px;color:var(--text-3)}
+.tb-matrix tfoot .tb-cnt{color:#fff}
+.tb-up{color:#16a34a}
+.tb-down{color:#dc2626}
+.tb-flat{color:#c99a2e}
+.tb-up,.tb-down,.tb-flat{font-size:15px;line-height:1}
+.tb-prom{border-radius:6px;padding:3px 8px;font-weight:700;color:#1f2937}
+.tb-chart-wrap{padding:8px 12px 16px}
+.tb-legend{display:flex;gap:16px;flex-wrap:wrap;padding:4px 16px 10px;font-size:12px;color:var(--text-3)}
+.tb-legend .lg{display:inline-flex;align-items:center;gap:6px}
+.tb-legend .lg .dot{width:11px;height:11px;border-radius:50%}
+.tb-svg text{font-family:'Hanken Grotesk',system-ui,sans-serif}
 .sub-tc{display:none}
 .sub-tc.act{display:block}
 
@@ -762,6 +790,9 @@ tbody td{padding:11px 12px;vertical-align:middle}
             <button class="sub-tab" id="subtab-enc-detalle" onclick="swSubTabEnc('detalle',this)">
               Detalle <span class="sub-tab-count" id="cnt-enc-detalle">0</span>
             </button>
+            <button class="sub-tab" id="subtab-enc-tablero" onclick="swSubTabEnc('tablero',this)" style="display:none">
+              <i class="ti ti-layout-dashboard" style="font-size:15px"></i> Tableros
+            </button>
           </div>
 
           <!-- RESUMEN POR ASESOR (promedios) -->
@@ -806,6 +837,25 @@ tbody td{padding:11px 12px;vertical-align:middle}
             </div>
             <div class="suc-slicer" id="enc-suc-chips-detalle" style="display:none"></div>
             <div id="enc-tabla-detalle"></div>
+          </div>
+
+          <!-- TABLEROS (dashboards estilo Power BI) -->
+          <div class="sub-tc" id="subtc-enc-tablero">
+            <div class="sec-hdr">
+              <div class="sec-hdr-left">
+                <div class="sec-eyebrow">Tableros de satisfacción · Wise CX</div>
+                <h2>Tableros</h2>
+                <div class="tb-sub" id="tablero-sub" style="margin-top:4px"></div>
+              </div>
+              <div class="hdr-actions" style="flex-wrap:wrap;gap:8px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <label style="font-size:12px;color:var(--text-4)">Mes</label>
+                  <select id="dash-mes" class="filter-sel" onchange="onDashMesChange(this.value)" style="padding:7px 9px"></select>
+                </div>
+              </div>
+            </div>
+            <div class="suc-slicer" id="enc-suc-chips-tablero" style="display:none"></div>
+            <div id="tablero-cont"></div>
           </div>
         </div>
 
@@ -1945,6 +1995,12 @@ function ajustarUIEncuestas(){
   if(detTab){
     detTab.firstChild.textContent = soyAsesor ? 'Mis encuestas ' : 'Detalle ';
   }
+  // sub-tab Tableros: para admin, supervisor y jefe de servicio (no asesor)
+  const tabTablero = document.getElementById('subtab-enc-tablero');
+  if(tabTablero){
+    const veTableros = cu && (cu.rol === 'admin' || cu.rol === 'supervisor' || cu.rol === 'jefe_servicio');
+    tabTablero.style.display = veTableros ? '' : 'none';
+  }
 }
 
 // Filtra por rango de días + texto de búsqueda
@@ -2065,7 +2121,8 @@ function limpiarFiltroSucursal(){
 function renderSucursalChips(){
   const conts = [
     document.getElementById('enc-suc-chips-resumen'),
-    document.getElementById('enc-suc-chips-detalle')
+    document.getElementById('enc-suc-chips-detalle'),
+    document.getElementById('enc-suc-chips-tablero')
   ].filter(Boolean);
   if(!conts.length) return;
 
@@ -2182,6 +2239,7 @@ function llenarMesesRapidos(){
 function renderEncuestas(){
   renderSucursalChips();
   if(encSubTab === 'resumen') renderEncResumen();
+  else if(encSubTab === 'tablero') renderTableros();
   else renderEncDetalle();
   // contadores de las sub-tabs
   // conjunto base visible según el rol (jefe de servicio: solo su sucursal)
@@ -2198,6 +2256,316 @@ function renderEncuestas(){
   if(cAses) cAses.textContent = asesores;
   if(cDet)  cDet.textContent  = total;
 }
+
+// ══════════════════════════════════════════════════════════════════
+//  TABLEROS (dashboards estilo Power BI)
+// ══════════════════════════════════════════════════════════════════
+
+// Columnas de cada matriz: [clave interna, etiqueta]
+const TB_COLS_SUC = [
+  ['p_turnos',      'Fac. para turnos'],
+  ['p_espera',      'Tiempo de espera'],
+  ['p_amabilidad',  'Amabilidad AS'],
+  ['p_atencion',    'Atención sol. y nec.'],
+  ['p_puntualidad', 'Punt. entrega'],
+  ['p_explicacion', 'Exp. de trabajos'],
+  ['p_limpieza',    'Limpieza vehículo'],
+  ['p_calidad',     'Calidad del serv.'],
+];
+const TB_COLS_ASE = [
+  ['p_amabilidad',  'Amabilidad del AS'],
+  ['p_atencion',    'Atención a sol. y nec.'],
+  ['p_explicacion', 'Exp. de trabajos'],
+  ['p_puntualidad', 'Puntualidad entrega'],
+  ['p_limpieza',    'Limpieza del vehículo'],
+];
+const TB_NOMBRES_MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+let dashMes = null; // "YYYY-MM" del mes seleccionado en el tablero
+
+// Mes (YYYY-MM) de una encuesta, según fecha de respuesta (o de envío)
+function mesDeEnc(e){
+  const f = e.fecha_respuesta || e.fecha;
+  if(!f) return null;
+  const d = new Date(f);
+  if(isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function etiquetaMes(m){
+  if(!m) return '';
+  const [a,mm] = m.split('-');
+  return `${TB_NOMBRES_MES[Number(mm)-1]} ${a}`;
+}
+// Mes inmediatamente anterior a "YYYY-MM"
+function mesAnterior(m){
+  const [a,mm] = m.split('-').map(Number);
+  const d = new Date(a, mm-2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+// Nota de una pregunta respetando anuladas y desestimaciones
+function notaEnc(e, clave){
+  if(estaAnulada(e)) return null;
+  if(preguntasDesestimadas(e).includes(clave)) return null;
+  const v = e[clave];
+  return (v!=null && !isNaN(Number(v))) ? Number(v) : null;
+}
+// Promedio de una pregunta sobre un conjunto de encuestas
+function promedioDe(encs, clave){
+  const notas = encs.map(e => notaEnc(e, clave)).filter(v => v!=null);
+  if(!notas.length) return null;
+  return notas.reduce((a,b)=>a+b,0)/notas.length;
+}
+// Promedio general = media de los promedios de columna disponibles
+function promedioGeneralDe(encs, cols){
+  const ms = cols.map(([c]) => promedioDe(encs, c)).filter(v => v!=null);
+  if(!ms.length) return null;
+  return ms.reduce((a,b)=>a+b,0)/ms.length;
+}
+
+// Base del tablero: aplica scope de jefe + slicer de sucursal + saca anuladas.
+// (el mes se filtra aparte, porque comparamos mes actual vs anterior)
+function encuestasTableroBase(){
+  let arr = encuestas.slice();
+  if(esJefeServicio()) arr = arr.filter(encuestaEnSucursalDelJefe);
+  if(puedeFiltrarSucursal() && filtroSucursales.size > 0){
+    arr = arr.filter(e => filtroSucursales.has(normSucursal(e.sucursal)));
+  }
+  arr = arr.filter(e => !estaAnulada(e));
+  return arr;
+}
+// Meses con datos (asc) sobre la base del tablero
+function mesesTablero(){
+  const set = new Set();
+  encuestasTableroBase().forEach(e => { const m = mesDeEnc(e); if(m) set.add(m); });
+  return Array.from(set).sort();
+}
+
+// Agrupa encuestas por sucursal o asesor -> filas ordenadas por promedio desc
+function agruparTablero(encs, keyFn, cols){
+  const groups = new Map();
+  encs.forEach(e => {
+    const raw = (keyFn(e) || '').trim();
+    if(!raw) return;
+    const k = raw.toLowerCase();
+    if(!groups.has(k)) groups.set(k, { label: raw, encs: [] });
+    groups.get(k).encs.push(e);
+  });
+  const filas = [];
+  groups.forEach((g) => {
+    const vals = {};
+    cols.forEach(([c]) => { vals[c] = promedioDe(g.encs, c); });
+    filas.push({ label: g.label, count: g.encs.length, vals, prom: promedioGeneralDe(g.encs, cols) });
+  });
+  filas.sort((a,b) => (b.prom ?? -1) - (a.prom ?? -1));
+  return filas;
+}
+
+// Formato de nota estilo planilla: 2 decimales con coma. null -> vacío
+function fmtNota(v){ return v==null ? '' : v.toFixed(2).replace('.', ','); }
+
+// Flecha de tendencia comparando contra el mismo valor del mes anterior
+function flechaHTML(cur, prev){
+  if(cur==null || prev==null) return '';
+  const d = cur - prev;
+  if(Math.abs(d) < 0.05) return '<i class="ti ti-minus tb-flat" title="Igual que el mes anterior"></i>';
+  return d > 0
+    ? '<i class="ti ti-caret-up-filled tb-up" title="Mejor que el mes anterior"></i>'
+    : '<i class="ti ti-caret-down-filled tb-down" title="Peor que el mes anterior"></i>';
+}
+
+// Color de fondo (semáforo) para la columna de promedio, según el valor
+function gradPromedio(v){
+  if(v==null) return '';
+  // interpola rojo(8.5) -> amarillo(9.2) -> verde(9.8), pastel
+  const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
+  const t = clamp((v - 8.5) / (9.8 - 8.5), 0, 1);
+  let r,g,b;
+  if(t < 0.5){ const k=t/0.5; r=248+(253-248)*k; g=180+(224-180)*k; b=180+(130-180)*k; }
+  else       { const k=(t-0.5)/0.5; r=253+(167-253)*k; g=224+(230-224)*k; b=130+(160-130)*k; }
+  return `background:rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+}
+
+// Cambia el mes seleccionado
+function onDashMesChange(v){ dashMes = v || null; renderTableros(); }
+
+// Construye una matriz (HTML) con encabezado oscuro, filas, total y flechas
+function matrizHTML(titulo, hint, filas, total, prevMap, prevTotal, cols, opts){
+  opts = opts || {};
+  const th = cols.map(([,lbl]) => `<th>${escapeHtml(lbl)}</th>`).join('');
+  const cuerpo = filas.map(f => {
+    const prev = prevMap.get(f.label.toLowerCase());
+    const celdas = cols.map(([c]) => {
+      const v = f.vals[c];
+      const pv = prev ? prev.vals[c] : null;
+      return `<td><span class="tb-cell">${flechaHTML(v, pv)}<span>${fmtNota(v)}</span></span></td>`;
+    }).join('');
+    const pv = prev ? prev.prom : null;
+    const promCell = `<td><span class="tb-cell">${flechaHTML(f.prom, pv)}<span class="tb-prom" style="${gradPromedio(f.prom)}">${fmtNota(f.prom)}</span></span></td>`;
+    return `<tr>
+      <td class="tb-lbl">${escapeHtml(f.label)}</td>
+      <td><span class="tb-cnt">${f.count}</span></td>
+      ${celdas}${promCell}
+    </tr>`;
+  }).join('');
+
+  const totCeldas = cols.map(([c]) => {
+    const v = total.vals[c];
+    const pv = prevTotal ? prevTotal.vals[c] : null;
+    return `<td><span class="tb-cell">${flechaHTML(v, pv)}<span>${fmtNota(v)}</span></span></td>`;
+  }).join('');
+  const totProm = `<td><span class="tb-cell">${flechaHTML(total.prom, prevTotal?prevTotal.prom:null)}<span>${fmtNota(total.prom)}</span></span></td>`;
+
+  return `<div class="tb-card">
+    <div class="tb-card-hd"><h3>${escapeHtml(titulo)}</h3><span class="tb-hint">${escapeHtml(hint)}</span></div>
+    <div class="tb-scroll">
+      <table class="tb-matrix">
+        <thead><tr>
+          <th class="tb-lbl">${escapeHtml(opts.colLabel || '')}</th>
+          <th>Encuestas</th>${th}<th>${escapeHtml(opts.promLabel || 'Promedio')}</th>
+        </tr></thead>
+        <tbody>${cuerpo || `<tr><td class="tb-lbl" colspan="${cols.length+3}" style="text-align:center;color:var(--text-4);padding:20px">Sin datos para este mes</td></tr>`}</tbody>
+        <tfoot><tr>
+          <td class="tb-lbl">Total</td>
+          <td><span class="tb-cnt">${total.count}</span></td>
+          ${totCeldas}${totProm}
+        </tr></tfoot>
+      </table>
+    </div>
+  </div>`;
+}
+
+// Arma el objeto "total" (una sola fila agregada) para un conjunto
+function totalTablero(encs, cols){
+  const vals = {};
+  cols.forEach(([c]) => { vals[c] = promedioDe(encs, c); });
+  return { count: encs.length, vals, prom: promedioGeneralDe(encs, cols) };
+}
+// Convierte filas en un Map por etiqueta (para buscar el mes anterior)
+function mapPorEtiqueta(filas){
+  const m = new Map();
+  filas.forEach(f => m.set(f.label.toLowerCase(), f));
+  return m;
+}
+
+// Gráfico de líneas (SVG puro) para la evolución mensual
+function evolucionSVG(labels, series){
+  const W = 900, H = 320, pad = { t: 20, r: 20, b: 46, l: 40 };
+  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
+  const todos = series.flatMap(s => s.values).filter(v => v!=null);
+  if(!todos.length || labels.length === 0){
+    return `<div style="padding:24px;text-align:center;color:var(--text-4)">Sin datos suficientes para la evolución</div>`;
+  }
+  let min = Math.min(...todos), max = Math.max(...todos);
+  min = Math.max(0, Math.floor((min - 0.3) * 10) / 10);
+  max = Math.min(10, Math.ceil((max + 0.3) * 10) / 10);
+  if(max - min < 0.5){ max = Math.min(10, min + 0.5); }
+  const x = (i) => pad.l + (labels.length === 1 ? iw/2 : (iw * i / (labels.length - 1)));
+  const y = (v) => pad.t + ih - ((v - min) / (max - min)) * ih;
+
+  // gridlines + labels Y
+  const ticks = 4; let grid = '';
+  for(let i=0;i<=ticks;i++){
+    const val = min + (max-min) * i / ticks;
+    const yy = y(val);
+    grid += `<line x1="${pad.l}" y1="${yy}" x2="${W-pad.r}" y2="${yy}" stroke="#eceff3" stroke-width="1"/>`;
+    grid += `<text x="${pad.l-8}" y="${yy+3}" text-anchor="end" font-size="10" fill="#9aa2ad">${val.toFixed(1)}</text>`;
+  }
+  // labels X
+  let xlab = '';
+  labels.forEach((lb,i) => {
+    xlab += `<text x="${x(i)}" y="${H-pad.b+20}" text-anchor="middle" font-size="10.5" fill="#6b7280">${escapeHtml(lb)}</text>`;
+  });
+  // series
+  let paths = '';
+  series.forEach(s => {
+    const pts = s.values.map((v,i) => v==null ? null : [x(i), y(v)]).filter(Boolean);
+    if(pts.length){
+      const d = pts.map((p,i) => (i===0?'M':'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+      paths += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      s.values.forEach((v,i) => {
+        if(v==null) return;
+        paths += `<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="#fff" stroke="${s.color}" stroke-width="2"/>`;
+        paths += `<text x="${x(i)}" y="${y(v)-9}" text-anchor="middle" font-size="9.5" font-weight="600" fill="${s.color}">${v.toFixed(2).replace('.',',')}</text>`;
+      });
+    }
+  });
+  return `<svg class="tb-svg" viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet">${grid}${xlab}${paths}</svg>`;
+}
+
+// Render principal del apartado Tableros
+function renderTableros(){
+  const cont = document.getElementById('tablero-cont');
+  if(!cont) return;
+
+  // poblar selector de meses (desc) y elegir default = último mes con datos
+  const meses = mesesTablero();           // asc
+  const sel = document.getElementById('dash-mes');
+  if(sel){
+    const desc = meses.slice().reverse();
+    sel.innerHTML = desc.map(m => `<option value="${m}">${etiquetaMes(m)}</option>`).join('');
+    if(!dashMes || !meses.includes(dashMes)) dashMes = desc[0] || null;
+    if(dashMes) sel.value = dashMes;
+  }
+
+  const sub = document.getElementById('tablero-sub');
+  if(!meses.length || !dashMes){
+    if(sub) sub.textContent = 'Todavía no hay encuestas para mostrar.';
+    cont.innerHTML = `<div class="empty" style="padding:40px;text-align:center;color:var(--text-4)">Sin datos</div>`;
+    return;
+  }
+
+  const base = encuestasTableroBase();
+  const mesPrev = mesAnterior(dashMes);
+  const encMes  = base.filter(e => mesDeEnc(e) === dashMes);
+  const encPrev = base.filter(e => mesDeEnc(e) === mesPrev);
+  const hayPrev = encPrev.length > 0;
+  if(sub){
+    sub.innerHTML = `Mostrando <b>${etiquetaMes(dashMes)}</b> · ${encMes.length} encuesta(s). ` +
+      (hayPrev ? `Las flechas comparan contra <b>${etiquetaMes(mesPrev)}</b>.` : `No hay mes anterior para comparar (sin flechas).`);
+  }
+
+  // ── Matriz 1: por sucursal ──
+  const filasSuc = agruparTablero(encMes,  e => e.sucursal, TB_COLS_SUC);
+  const prevSuc  = mapPorEtiqueta(agruparTablero(encPrev, e => e.sucursal, TB_COLS_SUC));
+  const totSuc   = totalTablero(encMes, TB_COLS_SUC);
+  const totSucP  = hayPrev ? totalTablero(encPrev, TB_COLS_SUC) : null;
+  const m1 = matrizHTML('Por sucursal', etiquetaMes(dashMes), filasSuc, totSuc, prevSuc, totSucP, TB_COLS_SUC,
+    { colLabel: 'Sucursal', promLabel: 'Promedio General' });
+
+  // ── Matriz 2: por asesor de servicio ──
+  const filasAse = agruparTablero(encMes,  e => e.asesor, TB_COLS_ASE);
+  const prevAse  = mapPorEtiqueta(agruparTablero(encPrev, e => e.asesor, TB_COLS_ASE));
+  const totAse   = totalTablero(encMes, TB_COLS_ASE);
+  const totAseP  = hayPrev ? totalTablero(encPrev, TB_COLS_ASE) : null;
+  const m2 = matrizHTML('Por asesor de servicio', etiquetaMes(dashMes), filasAse, totAse, prevAse, totAseP, TB_COLS_ASE,
+    { colLabel: 'Asesor de servicio', promLabel: 'Promedio AS' });
+
+  // ── Evolución mensual (todas los meses con datos) ──
+  const labels = meses.map(etiquetaMes);
+  const serieGen = meses.map(m => {
+    const encs = base.filter(e => mesDeEnc(e) === m);
+    return encs.length ? redondear2(promedioGeneralDe(encs, TB_COLS_SUC)) : null;
+  });
+  const serieAS = meses.map(m => {
+    const encs = base.filter(e => mesDeEnc(e) === m);
+    return encs.length ? redondear2(promedioGeneralDe(encs, TB_COLS_ASE)) : null;
+  });
+  const chart = `<div class="tb-card">
+    <div class="tb-card-hd"><h3>Evolución mensual</h3><span class="tb-hint">Promedio por mes${filtroSucursales.size>0?' · sucursal(es) filtrada(s)':''}</span></div>
+    <div class="tb-legend">
+      <span class="lg"><span class="dot" style="background:#4f46e5"></span> Promedio General</span>
+      <span class="lg"><span class="dot" style="background:#0d9488"></span> Promedio AS</span>
+    </div>
+    <div class="tb-chart-wrap">${evolucionSVG(labels, [
+      { name:'Promedio General', color:'#4f46e5', values: serieGen },
+      { name:'Promedio AS',      color:'#0d9488', values: serieAS },
+    ])}</div>
+  </div>`;
+
+  cont.innerHTML = m1 + m2 + chart;
+}
+function redondear2(v){ return v==null ? null : Math.round(v*100)/100; }
 
 // --- Vista: promedio por asesor ---
 function renderEncResumen(){
