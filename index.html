@@ -2141,12 +2141,19 @@ function encuestasFiltradas(soloMias){
 // Aplica un mes completo a los campos desde/hasta (formato "2026-08")
 function setMesRapido(valor){
   if(!valor) return;
+  const desdeEl = document.getElementById('enc-desde');
+  const hastaEl = document.getElementById('enc-hasta');
+  // "Todo el histórico": limpia el rango para mostrar todo lo acumulado en Supabase
+  if(valor === '__all__'){
+    if(desdeEl) desdeEl.value = '';
+    if(hastaEl) hastaEl.value = '';
+    renderEncuestas();
+    return;
+  }
   const [anio, mes] = valor.split('-').map(Number);
   const primero = new Date(anio, mes-1, 1);
   const ultimo  = new Date(anio, mes, 0); // día 0 del mes siguiente = último del actual
   const fmt = (d) => d.toISOString().slice(0,10);
-  const desdeEl = document.getElementById('enc-desde');
-  const hastaEl = document.getElementById('enc-hasta');
   if(desdeEl) desdeEl.value = fmt(primero);
   if(hastaEl) hastaEl.value = fmt(ultimo);
   renderEncuestas();
@@ -2165,6 +2172,7 @@ function llenarMesesRapidos(){
   const ordenados = Array.from(meses).sort().reverse();
   const nombresMes = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   sel.innerHTML = '<option value="">Mes rápido…</option>' +
+    '<option value="__all__">Todo el histórico</option>' +
     ordenados.map(m => {
       const [a, mm] = m.split('-');
       return `<option value="${m}">${nombresMes[Number(mm)-1]} ${a}</option>`;
