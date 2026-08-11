@@ -208,6 +208,18 @@ a{color:#c62a27;text-decoration:none}
 .tb-legend .lg{display:inline-flex;align-items:center;gap:6px}
 .tb-legend .lg .dot{width:11px;height:11px;border-radius:50%}
 .tb-svg text{font-family:'Hanken Grotesk',system-ui,sans-serif}
+/* Reconocimiento: asesor del mes por sucursal */
+.tb-award-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;padding:14px 16px}
+.tb-award{border:1px solid var(--border-1);border-radius:12px;padding:13px 14px;background:linear-gradient(180deg,#fffdf7,#fff);position:relative;overflow:hidden}
+.tb-award .aw-suc{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-4);margin-bottom:6px}
+.tb-award .aw-name{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;color:var(--text-1);line-height:1.2}
+.tb-award .aw-trophy{color:#d4af37;font-size:18px;flex-shrink:0}
+.tb-award .aw-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:9px}
+.tb-award .aw-prom{font-weight:800;font-size:15px;padding:3px 10px;border-radius:8px;color:#1f2937}
+.tb-award .aw-cnt{font-size:11.5px;color:var(--text-4);font-family:var(--mono)}
+.tb-chips-leg{display:flex;flex-wrap:wrap;gap:12px;padding:4px 16px 12px;font-size:11.5px;color:var(--text-3)}
+.tb-chips-leg .lg{display:inline-flex;align-items:center;gap:6px}
+.tb-chips-leg .lg .dot{width:11px;height:3px;border-radius:2px}
 .sub-tc{display:none}
 .sub-tc.act{display:block}
 
@@ -1752,6 +1764,7 @@ async function cargarBandejaDesest(){
   if(!encCargadas){
     const { data } = await sb.from('encuestas').select('*').order('fecha',{ascending:false});
     encuestas = data || [];
+    normalizarSucursales();
     encCargadas = true;
   }
   await cargarDesestimaciones();
@@ -1931,7 +1944,7 @@ function swSubTabEnc(t, el){
 async function refrescarYRender(){
   try{
     const { data } = await sb.from('encuestas').select('*').order('fecha',{ascending:false});
-    if(data) encuestas = data;
+    if(data){ encuestas = data; normalizarSucursales(); }
     await cargarDesestimaciones();
   }catch(e){ /* si falla, igual renderizamos lo que hay */ }
   renderEncuestas();
@@ -1946,7 +1959,7 @@ async function cargarEncuestas(){
   // asesor vea la resolución del admin sin tener que apretar F5.
   if(encCargadas){
     const { data } = await sb.from('encuestas').select('*').order('fecha',{ascending:false});
-    if(data) encuestas = data;
+    if(data){ encuestas = data; normalizarSucursales(); }
     await cargarDesestimaciones();
     renderEncuestas();
     return;
@@ -1962,6 +1975,7 @@ async function cargarEncuestas(){
     return;
   }
   encuestas = data || [];
+  normalizarSucursales();
   encCargadas = true;
   await cargarDesestimaciones();
   llenarMesesRapidos();
@@ -2020,6 +2034,26 @@ function normSucursal(s){
   return String(s||'').toLowerCase().normalize('NFD')
     .replace(/[\u0300-\u036f]/g,'')  // saca tildes
     .replace(/[^a-z0-9]/g,'');       // saca espacios, puntos, guiones, etc.
+}
+
+// Fusiones de sucursales: variante -> etiqueta canónica.
+// La clave se compara con normSucursal(), así que tolera tildes/mayúsculas/espacios.
+// "Neuquén Capital" se integra a NEUQUEN; "San Martín de los Andes" a S.T.M.
+const SUCURSAL_CANON = {
+  'neuquencapital':      'NEUQUEN',
+  'sanmartindelosandes': 'S.T.M.',
+};
+// Devuelve la etiqueta canónica de una sucursal (o la original si no hay fusión)
+function canonSucursal(raw){
+  const r = String(raw||'').trim();
+  if(!r) return r;
+  return SUCURSAL_CANON[normSucursal(r)] || r;
+}
+// Reescribe en memoria la sucursal de cada encuesta a su forma canónica.
+// (La web solo LEE de Supabase; esto no toca la base, solo lo que se muestra.)
+function normalizarSucursales(){
+  if(!Array.isArray(encuestas)) return;
+  encuestas.forEach(e => { if(e && e.sucursal != null) e.sucursal = canonSucursal(e.sucursal); });
 }
 
 // sucursales asignadas al jefe (columna sucursales_asignadas, separadas por coma), normalizadas
@@ -2449,7 +2483,8 @@ function mapPorEtiqueta(filas){
 }
 
 // Gráfico de líneas (SVG puro) para la evolución mensual
-function evolucionSVG(labels, series){
+function evolucionSVG(labels, series, opts){
+  opts = opts || {};
   const W = 900, H = 320, pad = { t: 20, r: 20, b: 46, l: 40 };
   const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
   const todos = series.flatMap(s => s.values).filter(v => v!=null);
@@ -2486,11 +2521,41 @@ function evolucionSVG(labels, series){
       s.values.forEach((v,i) => {
         if(v==null) return;
         paths += `<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="#fff" stroke="${s.color}" stroke-width="2"/>`;
-        paths += `<text x="${x(i)}" y="${y(v)-9}" text-anchor="middle" font-size="9.5" font-weight="600" fill="${s.color}">${v.toFixed(2).replace('.',',')}</text>`;
+        if(!opts.hideLabels){
+          paths += `<text x="${x(i)}" y="${y(v)-9}" text-anchor="middle" font-size="9.5" font-weight="600" fill="${s.color}">${v.toFixed(2).replace('.',',')}</text>`;
+        }
       });
     }
   });
   return `<svg class="tb-svg" viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet">${grid}${xlab}${paths}</svg>`;
+}
+
+// Paleta para las líneas por sucursal
+const TB_PALETA = ['#4f46e5','#0d9488','#dc2626','#d97706','#2563eb','#7c3aed','#059669','#db2777','#65a30d','#0891b2','#ea580c','#9333ea'];
+
+// Asesor del mes por sucursal: mejor Promedio AS de cada sucursal en el mes.
+// Preferimos asesores con al menos MIN_ENC encuestas; si ninguno llega, usamos el top igual.
+function asesorDelMesPorSucursal(encMes){
+  const MIN_ENC = 3;
+  const porSuc = new Map();
+  encMes.forEach(e => {
+    const s = (e.sucursal || '').trim();
+    if(!s) return;
+    if(!porSuc.has(s)) porSuc.set(s, []);
+    porSuc.get(s).push(e);
+  });
+  const res = [];
+  porSuc.forEach((encs, suc) => {
+    const filas = agruparTablero(encs, e => e.asesor, TB_COLS_ASE).filter(f => f.prom != null);
+    if(!filas.length) return;
+    const conMin = filas.filter(f => f.count >= MIN_ENC);
+    const pool = conMin.length ? conMin : filas;
+    pool.sort((a,b) => (b.prom - a.prom) || (b.count - a.count));
+    const top = pool[0];
+    res.push({ sucursal: suc, asesor: top.label, prom: top.prom, count: top.count });
+  });
+  res.sort((a,b) => a.sucursal.localeCompare(b.sucursal, 'es'));
+  return res;
 }
 
 // Render principal del apartado Tableros
@@ -2541,29 +2606,55 @@ function renderTableros(){
   const m2 = matrizHTML('Por asesor de servicio', etiquetaMes(dashMes), filasAse, totAse, prevAse, totAseP, TB_COLS_ASE,
     { colLabel: 'Asesor de servicio', promLabel: 'Promedio AS' });
 
-  // ── Evolución mensual (todas los meses con datos) ──
+  // ── Asesor del mes por sucursal (reconocimiento) ──
+  const premios = asesorDelMesPorSucursal(encMes);
+  const awardCards = premios.length
+    ? premios.map(p => `<div class="tb-award">
+        <div class="aw-suc">${escapeHtml(p.sucursal)}</div>
+        <div class="aw-name"><i class="ti ti-trophy-filled aw-trophy"></i>${escapeHtml(p.asesor)}</div>
+        <div class="aw-bottom">
+          <span class="aw-prom" style="${gradPromedio(p.prom)}">${fmtNota(p.prom)}</span>
+          <span class="aw-cnt">${p.count} enc.</span>
+        </div>
+      </div>`).join('')
+    : `<div style="padding:20px 16px;color:var(--text-4)">Sin datos para elegir asesor del mes.</div>`;
+  const award = `<div class="tb-card">
+    <div class="tb-card-hd"><h3>🏆 Asesor del mes por sucursal</h3><span class="tb-hint">${etiquetaMes(dashMes)} · mejor Promedio AS (mín. 3 encuestas)</span></div>
+    <div class="tb-award-grid">${awardCards}</div>
+  </div>`;
+
+  // ── Evolución general (una sola línea: Promedio General) ──
   const labels = meses.map(etiquetaMes);
   const serieGen = meses.map(m => {
     const encs = base.filter(e => mesDeEnc(e) === m);
     return encs.length ? redondear2(promedioGeneralDe(encs, TB_COLS_SUC)) : null;
   });
-  const serieAS = meses.map(m => {
-    const encs = base.filter(e => mesDeEnc(e) === m);
-    return encs.length ? redondear2(promedioGeneralDe(encs, TB_COLS_ASE)) : null;
-  });
-  const chart = `<div class="tb-card">
-    <div class="tb-card-hd"><h3>Evolución mensual</h3><span class="tb-hint">Promedio por mes${filtroSucursales.size>0?' · sucursal(es) filtrada(s)':''}</span></div>
-    <div class="tb-legend">
-      <span class="lg"><span class="dot" style="background:#4f46e5"></span> Promedio General</span>
-      <span class="lg"><span class="dot" style="background:#0d9488"></span> Promedio AS</span>
-    </div>
+  const chartGen = `<div class="tb-card">
+    <div class="tb-card-hd"><h3>Evolución del Promedio General</h3><span class="tb-hint">Por mes${filtroSucursales.size>0?' · sucursal(es) filtrada(s)':''}</span></div>
     <div class="tb-chart-wrap">${evolucionSVG(labels, [
       { name:'Promedio General', color:'#4f46e5', values: serieGen },
-      { name:'Promedio AS',      color:'#0d9488', values: serieAS },
     ])}</div>
   </div>`;
 
-  cont.innerHTML = m1 + m2 + chart;
+  // ── Evolución por sucursal (una línea por sucursal) ──
+  const sucList = Array.from(new Set(base.map(e => (e.sucursal||'').trim()).filter(Boolean)))
+    .sort((a,b) => a.localeCompare(b,'es'));
+  const seriesSuc = sucList.map((suc, idx) => ({
+    name: suc,
+    color: TB_PALETA[idx % TB_PALETA.length],
+    values: meses.map(m => {
+      const encs = base.filter(e => mesDeEnc(e) === m && (e.sucursal||'').trim() === suc);
+      return encs.length ? redondear2(promedioGeneralDe(encs, TB_COLS_SUC)) : null;
+    })
+  }));
+  const legSuc = seriesSuc.map(s => `<span class="lg"><span class="dot" style="background:${s.color}"></span> ${escapeHtml(s.name)}</span>`).join('');
+  const chartSuc = `<div class="tb-card">
+    <div class="tb-card-hd"><h3>Evolución del promedio por sucursal</h3><span class="tb-hint">Promedio General de cada sucursal, por mes</span></div>
+    <div class="tb-chips-leg">${legSuc}</div>
+    <div class="tb-chart-wrap">${evolucionSVG(labels, seriesSuc, { hideLabels:true })}</div>
+  </div>`;
+
+  cont.innerHTML = award + m1 + m2 + chartGen + chartSuc;
 }
 function redondear2(v){ return v==null ? null : Math.round(v*100)/100; }
 
