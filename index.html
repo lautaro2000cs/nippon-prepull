@@ -3933,7 +3933,7 @@ function renderUsers(){
   document.getElementById('lista-usuarios').innerHTML = html;
 
   if(cu&&cu.rol==='admin') renderTargetConfig();
-  if(can('prepull.usuarios.ver')) cargarRolesPermisos();
+  if(cu&&cu.rol==='admin') cargarRolesPermisos();
   renderFeriados();
 }
 
