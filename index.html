@@ -220,6 +220,24 @@ a{color:#c62a27;text-decoration:none}
 .tb-chips-leg{display:flex;flex-wrap:wrap;gap:12px;padding:4px 16px 12px;font-size:11.5px;color:var(--text-3)}
 .tb-chips-leg .lg{display:inline-flex;align-items:center;gap:6px}
 .tb-chips-leg .lg .dot{width:11px;height:3px;border-radius:2px}
+/* ── Matriz Roles y permisos (Administración) ─────────── */
+.rp-wrap{background:#fff;border:1px solid var(--border-1);border-radius:14px;overflow:hidden}
+.rp-scroll{overflow-x:auto}
+.rp-matrix{border-collapse:collapse;width:100%;font-size:12.5px;white-space:nowrap}
+.rp-matrix th,.rp-matrix td{border-bottom:1px solid var(--border-1);padding:10px 12px}
+.rp-matrix thead th{background:#2f3033;color:#fff;font-weight:600;font-size:11px;text-align:center;position:sticky;top:0}
+.rp-matrix thead th.rp-permlbl{text-align:left;min-width:230px}
+.rp-matrix td.rp-permlbl{text-align:left}
+.rp-matrix td{text-align:center}
+.rp-permlbl .rp-desc{font-weight:600;color:var(--text-1)}
+.rp-permlbl .rp-key{font-size:10.5px;color:var(--text-4);font-family:var(--mono)}
+.rp-modrow td{background:#f6f7f9;font-weight:700;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);text-align:left;padding:7px 12px}
+.rp-matrix tbody tr:hover td{background:#f5f8ff}
+.rp-check{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--border-2);background:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:background .12s,border-color .12s;color:#fff;font-size:13px}
+.rp-check.on{background:#16a34a;border-color:#16a34a}
+.rp-check.off:hover{border-color:#dc2626}
+.rp-check.locked{background:#e5e7eb;border-color:#e5e7eb;cursor:not-allowed;color:#9ca3af}
+.rp-check.locked.on{background:#9ca3af;border-color:#9ca3af;color:#fff}
 .sub-tc{display:none}
 .sub-tc.act{display:block}
 
@@ -698,6 +716,10 @@ tbody td{padding:11px 12px;vertical-align:middle}
           </div>
           <div class="access-note"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0"></i><div>Cada usuario tiene un <strong>sector</strong> y opcionalmente una <strong>sucursal fija</strong>.</div></div>
           <div id="lista-usuarios"></div>
+
+          <div class="sec-hdr-plain" style="margin-top:2rem"><h2>Roles y permisos</h2></div>
+          <div class="access-note"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0"></i><div>Marcá qué puede ver/hacer cada sector. Los cambios se guardan al instante y aplican la próxima vez que la persona inicia sesión. <strong>Admin</strong> siempre tiene todo.</div></div>
+          <div id="panel-roles-permisos"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando permisos...</div></div>
 
           <div class="sec-hdr-plain" style="margin-top:2rem"><h2>Target anual · Equipamiento &amp; Cubiertas</h2></div>
           <div class="access-note"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0"></i><div>Meta anual de compras visible en la pestaña Compras para el responsable.</div></div>
@@ -3881,7 +3903,105 @@ function renderUsers(){
       <button class="btn-sm btn-edit" onclick='openUserModal(${JSON.stringify(u.id)})' title="Editar usuario"><i class="ti ti-edit" style="font-size:12px"></i></button>
     </div>`).join('');
   if(cu&&cu.rol==='admin') renderTargetConfig();
+  if(can('prepull.usuarios.ver')) cargarRolesPermisos();
   renderFeriados();
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  ADMINISTRACIÓN · Roles y permisos (matriz editable)
+// ══════════════════════════════════════════════════════════════════
+let RP_ROLES = [];         // [{id,label,acceso_total,orden}]
+let RP_PERMISOS = [];      // [{clave,modulo,descripcion,orden}]
+let RP_ASIGNADOS = new Set(); // 'rolId|permiso'
+const RP_MOD_LABEL = { prepull:'Pre Pull', encuestas:'Encuestas', minutas:'Minutas' };
+
+async function cargarRolesPermisos(){
+  const cont = document.getElementById('panel-roles-permisos');
+  try{
+    const [r1, r2, r3] = await Promise.all([
+      sb.from('roles').select('*').order('orden'),
+      sb.from('permisos').select('*').order('orden'),
+      sb.from('rol_permiso').select('*'),
+    ]);
+    if(r1.error || r2.error || r3.error) throw (r1.error || r2.error || r3.error);
+    RP_ROLES = r1.data || [];
+    RP_PERMISOS = r2.data || [];
+    RP_ASIGNADOS = new Set((r3.data || []).map(x => x.rol_id + '|' + x.permiso));
+    renderRolesPermisos();
+  }catch(err){
+    if(cont) cont.innerHTML = `<div class="access-note" style="color:#b91c1c"><i class="ti ti-alert-triangle"></i> No se pudo cargar la matriz de permisos: ${escapeHtml(err.message||'error')}. ¿Corriste el SQL de la Capa B?</div>`;
+  }
+}
+
+function renderRolesPermisos(){
+  const cont = document.getElementById('panel-roles-permisos');
+  if(!cont) return;
+  if(!RP_ROLES.length || !RP_PERMISOS.length){
+    cont.innerHTML = '<div class="access-note">No hay roles o permisos cargados todavía.</div>';
+    return;
+  }
+  const th = RP_ROLES.map(r => `<th title="${escapeHtml(r.label)}">${escapeHtml(r.label)}</th>`).join('');
+
+  // agrupar permisos por módulo, respetando el orden
+  const modulos = [];
+  RP_PERMISOS.forEach(p => { if(!modulos.includes(p.modulo)) modulos.push(p.modulo); });
+
+  let filas = '';
+  modulos.forEach(mod => {
+    filas += `<tr class="rp-modrow"><td colspan="${RP_ROLES.length + 1}">${escapeHtml(RP_MOD_LABEL[mod] || mod)}</td></tr>`;
+    RP_PERMISOS.filter(p => p.modulo === mod).forEach(p => {
+      const celdas = RP_ROLES.map(r => {
+        const total = !!r.acceso_total;
+        const on = total || RP_ASIGNADOS.has(r.id + '|' + p.clave);
+        const cls = 'rp-check ' + (on ? 'on ' : 'off ') + (total ? 'locked' : '');
+        const onclick = total ? '' : `onclick="togglePermiso('${r.id}','${p.clave}', this)"`;
+        const check = on ? '<i class="ti ti-check"></i>' : '';
+        return `<td><span class="${cls}" ${onclick}>${check}</span></td>`;
+      }).join('');
+      filas += `<tr>
+        <td class="rp-permlbl"><div class="rp-desc">${escapeHtml(p.descripcion)}</div><div class="rp-key">${escapeHtml(p.clave)}</div></td>
+        ${celdas}
+      </tr>`;
+    });
+  });
+
+  cont.innerHTML = `<div class="rp-wrap"><div class="rp-scroll">
+    <table class="rp-matrix">
+      <thead><tr><th class="rp-permlbl">Permiso</th>${th}</tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+  </div></div>`;
+}
+
+async function togglePermiso(rolId, permiso, el){
+  const key = rolId + '|' + permiso;
+  const estaba = RP_ASIGNADOS.has(key);
+  const nuevo = !estaba;
+  // UI optimista
+  RP_ASIGNADOS[nuevo ? 'add' : 'delete'](key);
+  if(el){
+    el.classList.toggle('on', nuevo);
+    el.classList.toggle('off', !nuevo);
+    el.innerHTML = nuevo ? '<i class="ti ti-check"></i>' : '';
+  }
+  try{
+    if(nuevo){
+      const { error } = await sb.from('rol_permiso').upsert({ rol_id: rolId, permiso }, { onConflict: 'rol_id,permiso' });
+      if(error) throw error;
+    }else{
+      const { error } = await sb.from('rol_permiso').delete().eq('rol_id', rolId).eq('permiso', permiso);
+      if(error) throw error;
+    }
+  }catch(err){
+    // revertir si falló
+    RP_ASIGNADOS[estaba ? 'add' : 'delete'](key);
+    if(el){
+      el.classList.toggle('on', estaba);
+      el.classList.toggle('off', !estaba);
+      el.innerHTML = estaba ? '<i class="ti ti-check"></i>' : '';
+    }
+    alert('No se pudo guardar el cambio: ' + (err.message || 'error') + '\n(¿Tenés rol admin? Solo un admin puede editar permisos.)');
+  }
 }
 
 let editUsrId=null;
