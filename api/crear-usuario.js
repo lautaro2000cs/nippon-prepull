@@ -81,6 +81,7 @@ export default async function handler(req, res) {
     const sucursalesAsignadas = (body.sucursales_asignadas || "").trim() || null;
     const asesorWise = (body.asesor_wise || "").trim() || null;
     const permisosExtra = Array.isArray(body.permisos_extra) ? body.permisos_extra : [];
+    const reusarId = body.reusar_id || null; // id de una fila-agente a convertir en cuenta
 
     if (!nombre || !email || !rol) {
       return res.status(400).json({ ok: false, error: "Faltan datos: nombre, correo y rol son obligatorios" });
@@ -108,7 +109,9 @@ export default async function handler(req, res) {
       return res.status(409).json({ ok: false, error: "No se pudo crear la cuenta (¿el correo ya existe?): " + t });
     }
 
-    // ---- 4) Crear/actualizar fila en 'usuarios' (upsert por email) -------
+    // ---- 4) Guardar el perfil en 'usuarios' ------------------------------
+    // Si viene reusar_id (convertir una agente existente en cuenta), actualizamos
+    // ESA fila. Si no, upsert por email (alta normal, sin duplicar).
     const fila = {
       username, nombre, email, rol,
       sucursal_fija: sucursalFija,
@@ -116,11 +119,20 @@ export default async function handler(req, res) {
       asesor_wise: asesorWise,
       debe_cambiar_password: true,
     };
-    const upRes = await fetch(`${URL}/rest/v1/usuarios?on_conflict=email`, {
-      method: "POST",
-      headers: sbHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" }),
-      body: JSON.stringify(fila),
-    });
+    let upRes;
+    if (reusarId) {
+      upRes = await fetch(`${URL}/rest/v1/usuarios?id=eq.${encodeURIComponent(reusarId)}`, {
+        method: "PATCH",
+        headers: sbHeaders({ Prefer: "return=minimal" }),
+        body: JSON.stringify(fila),
+      });
+    } else {
+      upRes = await fetch(`${URL}/rest/v1/usuarios?on_conflict=email`, {
+        method: "POST",
+        headers: sbHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" }),
+        body: JSON.stringify(fila),
+      });
+    }
     if (!upRes.ok) {
       const t = await upRes.text();
       return res.status(500).json({ ok: false, error: "Cuenta creada, pero falló guardar el perfil: " + t });
