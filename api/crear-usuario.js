@@ -98,15 +98,43 @@ export default async function handler(req, res) {
     const username = slugUsername(nombre, email);
     const password = tempPass();
 
-    // ---- 3) Crear cuenta en Auth (Admin API) -----------------------------
+    // ---- 3) Crear la cuenta en Auth (Admin API) --------------------------
+    // Si el correo YA existe en Auth (cuenta huérfana de un intento previo),
+    // no fallamos: buscamos esa cuenta y le reseteamos la contraseña temporal.
+    let authUserId = null;
     const cRes = await fetch(`${URL}/auth/v1/admin/users`, {
       method: "POST",
       headers: sbHeaders(),
       body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { nombre, rol } }),
     });
-    if (!cRes.ok) {
-      const t = await cRes.text();
-      return res.status(409).json({ ok: false, error: "No se pudo crear la cuenta (¿el correo ya existe?): " + t });
+    if (cRes.ok) {
+      const created = await cRes.json();
+      authUserId = created?.id || created?.user?.id || null;
+    } else {
+      const errTxt = await cRes.text();
+      const yaExiste = errTxt.includes("email_exists") || errTxt.includes("already been registered");
+      if (!yaExiste) {
+        return res.status(409).json({ ok: false, error: "No se pudo crear la cuenta: " + errTxt });
+      }
+      // buscar el usuario existente por email y resetearle la contraseña
+      const listRes = await fetch(
+        `${URL}/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
+        { headers: sbHeaders() }
+      );
+      const listJson = await listRes.json();
+      const found = (listJson?.users || []).find(
+        (u) => (u.email || "").toLowerCase() === email
+      );
+      if (!found) {
+        return res.status(409).json({ ok: false, error: "El correo ya existe en Auth pero no se pudo recuperar la cuenta." });
+      }
+      authUserId = found.id;
+      // resetear contraseña + confirmar
+      await fetch(`${URL}/auth/v1/admin/users/${authUserId}`, {
+        method: "PUT",
+        headers: sbHeaders(),
+        body: JSON.stringify({ password, email_confirm: true, user_metadata: { nombre, rol } }),
+      });
     }
 
     // ---- 4) Guardar el perfil en 'usuarios' ------------------------------
