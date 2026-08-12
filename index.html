@@ -1679,9 +1679,12 @@ async function showApp(){
   }
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('act'));
   document.querySelectorAll('.tc').forEach(c=>c.classList.remove('act'));
-  const btnId = 'tab-'+(startTab==='repuestos'?'rep':startTab);
-  document.getElementById(btnId).classList.add('act');
-  document.getElementById('tc-'+startTab).classList.add('act');
+  // el id del botón difiere del nombre en dos casos: repuestos->rep, usuarios->usr
+  const btnSuffix = startTab==='repuestos' ? 'rep' : (startTab==='usuarios' ? 'usr' : startTab);
+  const btnEl = document.getElementById('tab-'+btnSuffix);
+  if(btnEl) btnEl.classList.add('act');
+  const tcEl = document.getElementById('tc-'+startTab);
+  if(tcEl) tcEl.classList.add('act');
 
   // filtros del sidebar solo tienen sentido en Pre Pull
   const sidebarFilters = document.getElementById('sidebar-filters');
