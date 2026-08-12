@@ -712,7 +712,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
         <div class="tc" id="tc-usuarios">
           <div class="sec-hdr-plain">
             <h2>Usuarios y permisos</h2>
-            <div class="hdr-actions"><button class="btn-add" onclick="openUserModal()"><i class="ti ti-user-plus"></i> Nuevo usuario</button></div>
+            <div class="hdr-actions"><button class="btn-add" onclick="nuevoUsuario()"><i class="ti ti-user-plus"></i> Nuevo usuario</button></div>
           </div>
           <div class="access-note"><i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0"></i><div>Cada usuario tiene un <strong>sector</strong> y opcionalmente una <strong>sucursal fija</strong>.</div></div>
           <div id="lista-usuarios"></div>
@@ -3932,12 +3932,24 @@ function renderUsers(){
   const cuentas = usuarios.filter(u => u.email);
   const agentes = usuarios.filter(u => !u.email);
 
+  const tarjetaAgente = (u) => `
+    <div class="user-card">
+      <div class="user-card-left">
+        <div class="avatar">${u.nombre.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase()}</div>
+        <div class="user-info">
+          <div class="un">${u.nombre}</div>
+          <div class="us"><code style="font-size:11px;background:var(--color-background-secondary);padding:1px 5px;border-radius:4px">${u.username}</code> ${rolPill(u.rol)} <span style="color:var(--color-text-secondary)">agente (sin login)</span></div>
+        </div>
+      </div>
+      <button class="btn-add" style="padding:6px 12px;font-size:12px" onclick='convertirAgente(${JSON.stringify(u.id)})' title="Crear cuenta de acceso para esta persona"><i class="ti ti-user-plus" style="font-size:13px"></i> Crear cuenta</button>
+    </div>`;
+
   let html = `<div class="rp-subhdr" style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-4);margin:2px 0 10px">Cuentas de acceso · ${cuentas.length}</div>`;
   html += cuentas.map(tarjeta).join('');
   if(agentes.length){
     html += `<div class="rp-subhdr" style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-4);margin:22px 0 6px">Agentes de Citas · ${agentes.length}</div>`;
-    html += `<div class="access-note" style="margin-bottom:12px"><i class="ti ti-info-circle" style="font-size:15px;flex-shrink:0"></i><div>No inician sesión: se eligen como "quién agenda" al cargar un turno. El acceso de Citas es la cuenta compartida <strong>turnos@</strong>.</div></div>`;
-    html += agentes.map(tarjeta).join('');
+    html += `<div class="access-note" style="margin-bottom:12px"><i class="ti ti-info-circle" style="font-size:15px;flex-shrink:0"></i><div>No inician sesión. Para darles su propio acceso, tocá <strong>Crear cuenta</strong> y asignales su correo.</div></div>`;
+    html += agentes.map(tarjetaAgente).join('');
   }
   document.getElementById('lista-usuarios').innerHTML = html;
 
@@ -4044,9 +4056,36 @@ async function togglePermiso(rolId, permiso, el){
 }
 
 let editUsrId=null;
+let convertUsrId=null;  // id de una agente que estamos convirtiendo en cuenta
 function toggleSucUsr(){
   const rol=document.getElementById('f-usr-rol').value;
   document.getElementById('f-usr-suc-wrap').style.display=rol?'block':'none';
+}
+
+// Sugerir correo con el formato de la empresa: inicial del nombre + apellido
+function sugerirEmail(nombre){
+  const partes=String(nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z ,]/g,'').replace(',',' ').trim().split(/\s+/).filter(Boolean);
+  if(partes.length<2) return '';
+  // heurística: si viene "Apellido Nombre" o "Nombre Apellido", probamos inicial+segundo token
+  const inicial=partes[0][0];
+  const apellido=partes[partes.length-1];
+  return `${inicial}${apellido}@nipponcarsrl.com.ar`;
+}
+
+// Alta normal desde el botón "Nuevo usuario" (limpia cualquier conversión previa)
+function nuevoUsuario(){ convertUsrId=null; openUserModal(); }
+
+// Abre el alta pre-cargada para convertir una agente en cuenta
+function convertirAgente(id){
+  const u=usuarios.find(x=>x.id===id);
+  if(!u) return;
+  convertUsrId=id;
+  openUserModal();  // modo alta
+  document.getElementById('usr-modal-title').innerHTML=`<i class="ti ti-user-plus" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Crear cuenta · ${escapeHtml(u.nombre)}`;
+  document.getElementById('f-usr-nombre').value=u.nombre;
+  document.getElementById('f-usr-email').value=sugerirEmail(u.nombre);
+  document.getElementById('f-usr-rol').value=u.rol||'citas';
+  toggleSucUsr(); renderExtrasUsr(new Set());
 }
 
 // Llena el <select> de roles con el catálogo (RP_ROLES); si no cargó, usa fijos
@@ -4100,7 +4139,7 @@ async function openUserModal(id){
   llenarRolesUsr();
   const emailEl=document.getElementById('f-usr-email');
   const saveBtn=document.getElementById('usr-save-btn');
-  saveBtn.disabled=false; saveBtn.textContent='Guardar';
+  saveBtn.disabled=false; saveBtn.textContent='Guardar'; saveBtn.style.display='';
 
   if(esEdicion){
     const u=usuarios.find(x=>x.id===id);
@@ -4173,7 +4212,7 @@ async function guardarUsuario(){
     const r = await fetch('/api/crear-usuario', {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
-      body: JSON.stringify({ nombre, email, rol, sucursal_fija, permisos_extra: extras }),
+      body: JSON.stringify({ nombre, email, rol, sucursal_fija, permisos_extra: extras, reusar_id: convertUsrId }),
     });
     const out = await r.json();
     if(!out.ok) throw new Error(out.error||'No se pudo crear el usuario');
@@ -4182,6 +4221,7 @@ async function guardarUsuario(){
     document.getElementById('usr-ok-pass').textContent = out.password_temporal;
     document.getElementById('usr-ok').style.display='block';
     saveBtn.style.display='none'; // ya se creó; el admin copia la clave y cierra
+    convertUsrId=null;
     await cargarUsuariosParaSelect();
     renderUsers();
   }catch(err){
