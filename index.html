@@ -1366,6 +1366,11 @@ async function doLogin(){
            sucursalFija:perfil.sucursal_fija, asesorWise:perfil.asesor_wise,
            sucursalesAsignadas:perfil.sucursales_asignadas,
            email:perfil.email, viaAuth:true };
+    // Permisos efectivos desde la matriz (rol + overrides). Si falla, can() usa el respaldo por rol.
+    try{
+      const { data: permData } = await sb.rpc('mis_permisos');
+      if(Array.isArray(permData)) cu.permisos = new Set(permData);
+    }catch(e){ /* red de seguridad: can() cae al mapa por rol */ }
     // Si el admin marcó que debe cambiar la contraseña, lo obligamos antes de entrar
     forzarCambio = !!perfil.debe_cambiar_password;
 
@@ -1498,23 +1503,37 @@ const MODULOS = {
   }
 };
 
+// ── PERMISOS CENTRALIZADOS ──────────────────────────────────────────
+// can('permiso') es la única puerta de decisión de la UI. Usa los permisos
+// efectivos que trae el RPC mis_permisos() (cu.permisos). Si por lo que sea
+// no se cargaron, cae a un mapa por rol idéntico a la matriz sembrada en la
+// base, así nunca deja a nadie trabado.
+function can(p){
+  if(cu && cu.permisos instanceof Set) return cu.permisos.has(p);
+  return canFallback(p);
+}
+function canFallback(p){
+  if(!cu) return false;
+  if(cu.rol === 'admin') return true;
+  const M = {
+    supervisor:   ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','encuestas.sincronizar','minutas.ver'],
+    citas:        ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver'],
+    repuestos:    ['prepull.ver','prepull.dashboard.ver','prepull.repuestos.ver'],
+    compras:      ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar'],
+    asesor:       ['encuestas.ver'],
+    jefe_servicio:['encuestas.ver','encuestas.tableros.ver'],
+    seguridad:    ['minutas.ver'],
+  };
+  const perms = new Set(M[cu.rol] || []);
+  // overrides por usuario (mismos que en usuario_permiso)
+  if(cu.username === 'repuestos.aguado'){ perms.add('prepull.compras.ver'); }
+  if(cu.username === 'dani.castañares'){ perms.add('prepull.compras.ver'); perms.add('compras.editar'); }
+  return perms.has(p);
+}
+
 // Qué módulos puede ACCEDER cada rol (para el control al hacer click)
 function puedeAcceder(moduloId){
-  const r = cu.rol;
-  if(moduloId === 'prepull'){
-    // acceso a Pre Pull: todos los roles operativos + admin/supervisor
-    return ['admin','supervisor','citas','repuestos','compras'].includes(r)
-           || cu.username === 'repuestos.aguado';
-  }
-  if(moduloId === 'encuestas'){
-    // acceso a Encuestas: admin, supervisor, asesor y jefe de servicio
-    return ['admin','supervisor','asesor','jefe_servicio'].includes(r);
-  }
-  if(moduloId === 'minutas'){
-    // acceso a Minutas: admin, supervisor y seguridad e higiene
-    return ['admin','supervisor','seguridad'].includes(r);
-  }
-  return false;
+  return can(moduloId + '.ver');
 }
 
 // (compat) módulos accesibles como lista — se usa para el botón "Módulos"
@@ -1602,13 +1621,13 @@ async function showApp(){
   const enEncuestas = cu.modulo === 'encuestas';
   const enMinutas = cu.modulo === 'minutas';
 
-  document.getElementById('tab-dash').style.display=(enPrepull && cu.rol!=='supervisor')?'':'none';
-  document.getElementById('tab-turnos').style.display=(enPrepull && (cu.rol==='citas'||cu.rol==='admin'||cu.rol==='compras'||cu.rol==='supervisor'))?'':'none';
-  document.getElementById('tab-rep').style.display=(enPrepull && (cu.rol==='repuestos'||cu.rol==='admin'||cu.rol==='compras'||cu.rol==='supervisor'))?'':'none';
-  document.getElementById('tab-usr').style.display=(enPrepull && cu.rol==='admin')?'':'none';
-  document.getElementById('tab-compras').style.display=(enPrepull && (cu.rol==='compras'||cu.rol==='admin'||cu.username==='repuestos.aguado'))?'':'none';
+  document.getElementById('tab-dash').style.display=(enPrepull && can('prepull.dashboard.ver'))?'':'none';
+  document.getElementById('tab-turnos').style.display=(enPrepull && can('prepull.turnos.ver'))?'':'none';
+  document.getElementById('tab-rep').style.display=(enPrepull && can('prepull.repuestos.ver'))?'':'none';
+  document.getElementById('tab-usr').style.display=(enPrepull && can('prepull.usuarios.ver'))?'':'none';
+  document.getElementById('tab-compras').style.display=(enPrepull && can('prepull.compras.ver'))?'':'none';
   document.getElementById('tab-encuestas').style.display=enEncuestas?'':'none';
-  document.getElementById('tab-desest').style.display=(enEncuestas && (cu.rol==='admin'||cu.rol==='supervisor'))?'':'none';
+  document.getElementById('tab-desest').style.display=(enEncuestas && can('encuestas.desestimaciones.ver'))?'':'none';
   const tabMin = document.getElementById('tab-minutas');
   if(tabMin) tabMin.style.display=enMinutas?'':'none';
   // (dentro del módulo minutas, admin/supervisor/seguridad ya tienen acceso)
@@ -1640,8 +1659,8 @@ async function showApp(){
   if(enPrepull){
     buildFilters();
     await cargarTodo();
-    if(cu.rol==='admin') renderUsers();
-    if(cu.rol==='compras'||cu.rol==='admin'||cu.username==='repuestos.aguado') await cargarPedidos();
+    if(can('prepull.usuarios.ver')) renderUsers();
+    if(can('prepull.compras.ver')) await cargarPedidos();
     iniciarRealtime();
   } else if(enEncuestas){
     cargarEncuestas();
@@ -1968,7 +1987,7 @@ async function cargarEncuestas(){
 function ajustarUIEncuestas(){
   const soyAsesor = esAsesor();
   // el botón "Sincronizar" solo para admin/supervisor (no asesor ni jefe de servicio)
-  const puedeSync = cu && (cu.rol === 'admin' || cu.rol === 'supervisor');
+  const puedeSync = can('encuestas.sincronizar');
   const syncBtn = document.getElementById('enc-sync-btn');
   if(syncBtn) syncBtn.style.display = puedeSync ? '' : 'none';
   // títulos: para el asesor el resumen es el "ranking"
@@ -1984,7 +2003,7 @@ function ajustarUIEncuestas(){
   // sub-tab Tableros: para admin, supervisor y jefe de servicio (no asesor)
   const tabTablero = document.getElementById('subtab-enc-tablero');
   if(tabTablero){
-    const veTableros = cu && (cu.rol === 'admin' || cu.rol === 'supervisor' || cu.rol === 'jefe_servicio');
+    const veTableros = can('encuestas.tableros.ver');
     tabTablero.style.display = veTableros ? '' : 'none';
   }
 }
@@ -3480,7 +3499,7 @@ function buildFilters(){
       +`<button class="btn-add" onclick="abrirModalReporte()"><i class="ti ti-download"></i> Descargar reporte</button>`;
   }
   const fc=document.getElementById('fil-compras-wrap');
-  if(fc) fc.innerHTML=(cu.rol==='compras'||cu.rol==='admin')?`<button class="btn-add" onclick="openCompModal(null)"><i class="ti ti-plus"></i> Nuevo pedido</button>`:'';
+  if(fc) fc.innerHTML=(can('compras.editar'))?`<button class="btn-add" onclick="openCompModal(null)"><i class="ti ti-plus"></i> Nuevo pedido</button>`:'';
 }
 
 function aplicarFiltrosSidebar(){renderTurnos();if(typeof renderRepuestos==='function')renderRepuestos();if(typeof renderRepHistorico==='function'&&document.getElementById('subtc-rep-hist')&&document.getElementById('subtc-rep-hist').classList.contains('act'))renderRepHistorico();}
@@ -4136,7 +4155,7 @@ function renderCompras(){
     home.style.display='none'; sec.style.display='block';
     const info=COMP_SECCIONES.find(s=>s.key===compSeccionActual);
     document.getElementById('comp-sec-titulo').textContent=info?.lbl||'';
-    const esEdit=cu&&(cu.rol==='compras'||cu.rol==='admin');
+    const esEdit=cu&&(can('compras.editar'));
     document.getElementById('comp-sec-actions').innerHTML=esEdit?`<button class="btn-add" onclick="openCompModal(null)"><i class="ti ti-plus"></i> Nuevo registro</button>`:'';
     renderFiltrosCompras();
     cargarRegistrosSec();
@@ -4227,7 +4246,7 @@ function renderSeccionTabla(){
   const mes=document.getElementById('fil-c-mes')?.value||'';
   const item=(document.getElementById('fil-c-item')?.value||'').toLowerCase().trim();
   const marca=(document.getElementById('fil-c-marca')?.value||'').toLowerCase();
-  const esEdit=cu&&(cu.rol==='compras'||cu.rol==='admin');
+  const esEdit=cu&&(can('compras.editar'));
   const puedeRecibir=cu&&(cu.rol==='repuestos'||cu.rol==='admin'||cu.rol==='compras');
 
   let items=compRegistros.filter(r=>{
@@ -4317,7 +4336,7 @@ function renderSeccionTabla(){
 function renderTargetBanner(){
   const banner=document.getElementById('target-banner');
   if(!banner)return;
-  const esVisible=cu&&(cu.rol==='compras'||cu.rol==='admin');
+  const esVisible=cu&&(can('compras.editar'));
   if(!esVisible||!['equipamiento','cubiertas'].includes(compSeccionActual)){banner.style.display='none';return;}
   const anio=new Date().getFullYear();
   if(compSeccionActual==='equipamiento'){
@@ -4453,7 +4472,7 @@ function getSchema(key){
 }
 
 function openCompModal(id){
-  if(!(cu&&(cu.rol==='compras'||cu.rol==='admin'))) return; // solo compras/admin editan; el resto es solo lectura
+  if(!(cu&&(can('compras.editar')))) return; // solo compras/admin editan; el resto es solo lectura
   compEditId=id||null;
   const schema=getSchema(compSeccionActual);
   if(!schema)return;
@@ -4485,7 +4504,7 @@ function openCompModal(id){
 function closeCompModal(){document.getElementById('compov').classList.remove('open');}
 
 async function guardarPedido(){
-  if(!(cu&&(cu.rol==='compras'||cu.rol==='admin'))) return;
+  if(!(cu&&(can('compras.editar')))) return;
   const errEl=document.getElementById('comp-err');
   errEl.style.display='none';
   const schema=getSchema(compSeccionActual);
@@ -4524,7 +4543,7 @@ async function guardarPedido(){
 }
 
 async function eliminarPedido(id){
-  if(!(cu&&(cu.rol==='compras'||cu.rol==='admin'))) return;
+  if(!(cu&&(can('compras.editar')))) return;
   if(!confirm('¿Eliminar este registro? No se puede deshacer.'))return;
   const sec=COMP_SECCIONES.find(s=>s.key===compSeccionActual);
   if(!sec)return;
@@ -4535,7 +4554,7 @@ async function eliminarPedido(id){
 
 /* ===================== ISD & CALENDARIO TRANSPORTE ===================== */
 const MESES_UP=MESES_ANIO.map(m=>m.toUpperCase());
-function _puedeEditarComp(){return cu&&(cu.rol==='compras'||cu.rol==='admin');}
+function _puedeEditarComp(){return cu&&(can('compras.editar'));}
 function _ocultarVistasCompras(){['comp-home','comp-seccion','comp-isd','comp-transporte'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});}
 
 /* ---------- ISD ---------- */
