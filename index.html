@@ -3925,7 +3925,10 @@ function renderUsers(){
           <div class="us"><code style="font-size:11px;background:var(--color-background-secondary);padding:1px 5px;border-radius:4px">${u.username}</code> ${rolPill(u.rol)} ${u.sucursal_fija?`<span class="suc-pill"><i class="ti ti-map-pin" style="font-size:10px;vertical-align:-1px"></i> ${u.sucursal_fija}</span>`:'<span style="color:var(--color-text-secondary)">Todas las sucursales</span>'}</div>
         </div>
       </div>
-      <button class="btn-sm btn-edit" onclick='openUserModal(${JSON.stringify(u.id)})' title="Editar usuario"><i class="ti ti-edit" style="font-size:12px"></i></button>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn-sm btn-edit" onclick='openUserModal(${JSON.stringify(u.id)})' title="Editar usuario"><i class="ti ti-edit" style="font-size:12px"></i></button>
+        <button class="btn-sm" onclick='eliminarUsuario(${JSON.stringify(u.id)})' title="Eliminar usuario" style="border:1px solid #fecaca;background:#fef2f2;color:#dc2626"><i class="ti ti-trash" style="font-size:12px"></i></button>
+      </div>
     </div>`;
 
   // Cuentas de acceso = tienen correo (entran por login). Agentes = sin correo.
@@ -4074,6 +4077,29 @@ function sugerirEmail(nombre){
 
 // Alta normal desde el botón "Nuevo usuario" (limpia cualquier conversión previa)
 function nuevoUsuario(){ convertUsrId=null; openUserModal(); }
+
+// Elimina un usuario (Auth + fila) vía el endpoint seguro, con confirmación
+async function eliminarUsuario(id){
+  const u=usuarios.find(x=>x.id===id);
+  if(!u) return;
+  if(!confirm(`¿Eliminar a ${u.nombre}?\n\nSe borra su cuenta de acceso y su registro. Esta acción no se puede deshacer.`)) return;
+  try{
+    const { data: sess } = await sb.auth.getSession();
+    const token = sess?.session?.access_token;
+    if(!token){ alert('No hay sesión activa. Volvé a iniciar sesión.'); return; }
+    const r = await fetch('/api/eliminar-usuario', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+      body: JSON.stringify({ id }),
+    });
+    const out = await r.json();
+    if(!out.ok) throw new Error(out.error||'No se pudo eliminar');
+    await cargarUsuariosParaSelect();
+    renderUsers();
+  }catch(err){
+    alert('Error al eliminar: '+(err.message||'error'));
+  }
+}
 
 // Abre el alta pre-cargada para convertir una agente en cuenta
 function convertirAgente(id){
