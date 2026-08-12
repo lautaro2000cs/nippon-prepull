@@ -1,31 +1,32 @@
 // ============================================================================
-//  NIPPON CAR — POST /api/crear-usuario
+//  NIPPON CAR — POST /api/crear-usuario   (versión SIN dependencias)
+//  Usa fetch directo a la API de Supabase, así no necesita el paquete
+//  @supabase/supabase-js (tu sync-encuestas.js tampoco lo usa).
+//
 //  Crea un usuario de punta a punta:
-//    1) valida que quien llama sea un ADMIN autenticado (por su token),
-//    2) crea la cuenta en Supabase Auth con una contraseña temporal,
-//    3) crea/actualiza la fila en la tabla 'usuarios' (rol, sucursal, etc.),
-//    4) devuelve la contraseña temporal para entregársela a la persona.
+//    1) valida que quien llama sea ADMIN (por su token),
+//    2) crea la cuenta en Supabase Auth con contraseña temporal,
+//    3) crea/actualiza la fila en 'usuarios',
+//    4) aplica permisos extra por persona,
+//    5) devuelve la contraseña temporal.
 //
-//  Variables de entorno necesarias (ya deberías tener las dos primeras):
+//  Variables de entorno (ya existen por el endpoint de sync):
 //    SUPABASE_URL
-//    SUPABASE_SERVICE_ROLE_KEY   (llave de administrador; NUNCA va al front)
-//
-//  Seguridad: el front manda el token del admin en el header Authorization.
-//  El endpoint verifica ese token contra Supabase y comprueba que su rol sea
-//  'admin' ANTES de crear nada. Sin token de admin válido -> 401/403.
+//    SUPABASE_SERVICE_ROLE_KEY
 // ============================================================================
-
-import { createClient } from "@supabase/supabase-js";
 
 const URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Cliente admin (saltea RLS). Solo se usa en el servidor.
-const admin = createClient(URL, SERVICE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+function sbHeaders(extra = {}) {
+  return {
+    apikey: SERVICE_KEY,
+    Authorization: "Bearer " + SERVICE_KEY,
+    "Content-Type": "application/json",
+    ...extra,
+  };
+}
 
-// Genera una contraseña temporal fuerte y legible
 function tempPass() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
   let s = "";
@@ -49,22 +50,25 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ---- 1) Autorización: ¿quién llama es admin? --------------------------
+    // ---- 1) Autorización: validar token y que sea admin ------------------
     const authHeader = req.headers.authorization || "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
     if (!token) return res.status(401).json({ ok: false, error: "Falta el token de sesión" });
 
-    // valida el token y obtiene el usuario de Auth
-    const { data: userData, error: userErr } = await admin.auth.getUser(token);
-    if (userErr || !userData?.user) {
-      return res.status(401).json({ ok: false, error: "Sesión inválida" });
-    }
-    const callerEmail = (userData.user.email || "").toLowerCase();
+    const uRes = await fetch(`${URL}/auth/v1/user`, {
+      headers: { apikey: SERVICE_KEY, Authorization: "Bearer " + token },
+    });
+    if (!uRes.ok) return res.status(401).json({ ok: false, error: "Sesión inválida" });
+    const authUser = await uRes.json();
+    const callerEmail = (authUser?.email || "").toLowerCase();
+    if (!callerEmail) return res.status(401).json({ ok: false, error: "Sesión inválida" });
 
-    // comprueba que ese email tenga rol admin en la tabla usuarios
-    const { data: perfilCaller } = await admin
-      .from("usuarios").select("rol").ilike("email", callerEmail).maybeSingle();
-    if (!perfilCaller || perfilCaller.rol !== "admin") {
+    const pRes = await fetch(
+      `${URL}/rest/v1/usuarios?select=rol&email=ilike.${encodeURIComponent(callerEmail)}`,
+      { headers: sbHeaders() }
+    );
+    const perfil = (await pRes.json())?.[0];
+    if (!perfil || perfil.rol !== "admin") {
       return res.status(403).json({ ok: false, error: "Solo un administrador puede crear usuarios" });
     }
 
@@ -85,26 +89,26 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "El correo no es válido" });
     }
 
-    // valida que el rol exista en el catálogo
-    const { data: rolRow } = await admin.from("roles").select("id").eq("id", rol).maybeSingle();
-    if (!rolRow) return res.status(400).json({ ok: false, error: `El rol '${rol}' no existe` });
-
-    const username = slugUsername(nombre, email);
-
-    // ---- 3) Crear la cuenta en Auth --------------------------------------
-    const password = tempPass();
-    const { data: created, error: createErr } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { nombre, rol },
-    });
-    if (createErr) {
-      // caso típico: el correo ya existe en Auth
-      return res.status(409).json({ ok: false, error: "No se pudo crear la cuenta: " + createErr.message });
+    const rRes = await fetch(`${URL}/rest/v1/roles?select=id&id=eq.${encodeURIComponent(rol)}`, { headers: sbHeaders() });
+    if (!((await rRes.json())?.length)) {
+      return res.status(400).json({ ok: false, error: `El rol '${rol}' no existe` });
     }
 
-    // ---- 4) Crear/actualizar la fila en 'usuarios' -----------------------
+    const username = slugUsername(nombre, email);
+    const password = tempPass();
+
+    // ---- 3) Crear cuenta en Auth (Admin API) -----------------------------
+    const cRes = await fetch(`${URL}/auth/v1/admin/users`, {
+      method: "POST",
+      headers: sbHeaders(),
+      body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { nombre, rol } }),
+    });
+    if (!cRes.ok) {
+      const t = await cRes.text();
+      return res.status(409).json({ ok: false, error: "No se pudo crear la cuenta (¿el correo ya existe?): " + t });
+    }
+
+    // ---- 4) Crear/actualizar fila en 'usuarios' (upsert por email) -------
     const fila = {
       username, nombre, email, rol,
       sucursal_fija: sucursalFija,
@@ -112,17 +116,24 @@ export default async function handler(req, res) {
       asesor_wise: asesorWise,
       debe_cambiar_password: true,
     };
-    // upsert por email para no duplicar si ya había una fila
-    const { error: upErr } = await admin
-      .from("usuarios").upsert(fila, { onConflict: "email" });
-    if (upErr) {
-      return res.status(500).json({ ok: false, error: "Cuenta creada, pero falló guardar el perfil: " + upErr.message });
+    const upRes = await fetch(`${URL}/rest/v1/usuarios?on_conflict=email`, {
+      method: "POST",
+      headers: sbHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" }),
+      body: JSON.stringify(fila),
+    });
+    if (!upRes.ok) {
+      const t = await upRes.text();
+      return res.status(500).json({ ok: false, error: "Cuenta creada, pero falló guardar el perfil: " + t });
     }
 
-    // ---- 5) Permisos extra por persona (overrides) -----------------------
+    // ---- 5) Permisos extra por persona -----------------------------------
     if (permisosExtra.length) {
       const rows = permisosExtra.map((p) => ({ username, permiso: p, efecto: "grant" }));
-      await admin.from("usuario_permiso").upsert(rows, { onConflict: "username,permiso" });
+      await fetch(`${URL}/rest/v1/usuario_permiso?on_conflict=username,permiso`, {
+        method: "POST",
+        headers: sbHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" }),
+        body: JSON.stringify(rows),
+      });
     }
 
     return res.status(200).json({
