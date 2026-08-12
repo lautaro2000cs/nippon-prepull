@@ -1143,13 +1143,22 @@ tbody td{padding:11px 12px;vertical-align:middle}
     <h3 id="usr-modal-title"><i class="ti ti-user-plus" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Nuevo usuario</h3>
     <div class="mgrid">
       <div><label>Nombre completo</label><input type="text" id="f-usr-nombre" placeholder="Apellido, Nombre"/></div>
-      <div><label>Usuario (para ingresar)</label><input type="text" id="f-usr-username" placeholder="nombre.apellido"/></div>
-      <div><label>Contraseña</label><input type="text" id="f-usr-pass" placeholder="Mínimo 4 caracteres"/></div>
-      <div><label>Sector</label><select id="f-usr-rol" onchange="toggleSucUsr()"><option value="">Seleccionar...</option><option value="admin">Admin</option><option value="citas">Citas</option><option value="repuestos">Repuestos</option><option value="supervisor">Supervisor</option><option value="jefe_servicio">Jefe de Servicio</option></select></div>
+      <div><label>Correo corporativo</label><input type="email" id="f-usr-email" placeholder="correo@nipponcarsrl.com.ar" autocomplete="off"/></div>
+      <div><label>Rol / sector</label><select id="f-usr-rol" onchange="toggleSucUsr();renderExtrasUsr()"><option value="">Seleccionar...</option></select></div>
       <div id="f-usr-suc-wrap"><label>Sucursal fija (opcional)</label><select id="f-usr-suc"><option value="">Sin sucursal fija — ve todas</option><option>Roca</option><option>Perticone</option><option>Aguado</option></select></div>
     </div>
+    <div style="margin-top:14px">
+      <label style="font-size:12px;font-weight:600;color:var(--text-3)">Permisos extra (opcional)</label>
+      <div style="font-size:11.5px;color:var(--text-4);margin:2px 0 8px">Para casos especiales (ej. una responsable de Citas que además ve Encuestas). Los que ya trae el rol aparecen tildados y bloqueados.</div>
+      <div id="f-usr-extra" style="display:flex;flex-direction:column;gap:5px;max-height:200px;overflow:auto;border:1px solid var(--border-1);border-radius:10px;padding:10px"></div>
+    </div>
+    <div id="usr-ok" style="display:none;margin-top:14px;padding:13px 15px;border:1px solid #16a34a;background:#f0fdf4;border-radius:10px">
+      <div style="font-weight:700;color:#166534;margin-bottom:4px"><i class="ti ti-circle-check"></i> Usuario creado</div>
+      <div style="font-size:13px;color:var(--text-2)">Contraseña temporal (entregala a la persona; la cambia al entrar):</div>
+      <div style="font-family:var(--mono);font-size:16px;font-weight:700;background:#fff;border:1px dashed #16a34a;border-radius:8px;padding:8px 12px;margin-top:6px;text-align:center;user-select:all" id="usr-ok-pass"></div>
+    </div>
     <p class="login-err" id="usr-err" style="display:none"></p>
-    <div class="mfooter"><button class="btn-cancel" onclick="closeUserModal()">Cancelar</button><button class="btn-save" onclick="guardarUsuario()">Guardar</button></div>
+    <div class="mfooter"><button class="btn-cancel" onclick="closeUserModal()">Cerrar</button><button class="btn-save" id="usr-save-btn" onclick="guardarUsuario()">Guardar</button></div>
   </div>
 </div>
 
@@ -4039,25 +4048,81 @@ function toggleSucUsr(){
   const rol=document.getElementById('f-usr-rol').value;
   document.getElementById('f-usr-suc-wrap').style.display=rol?'block':'none';
 }
-function openUserModal(id){
+
+// Llena el <select> de roles con el catálogo (RP_ROLES); si no cargó, usa fijos
+function llenarRolesUsr(){
+  const sel=document.getElementById('f-usr-rol');
+  const roles = (RP_ROLES && RP_ROLES.length) ? RP_ROLES
+    : [{id:'admin',label:'Admin'},{id:'supervisor',label:'Supervisor'},{id:'citas',label:'Citas'},{id:'repuestos',label:'Repuestos'},{id:'compras',label:'Compras'},{id:'asesor',label:'Asesor'},{id:'jefe_servicio',label:'Jefe de Servicio'},{id:'seguridad',label:'Seguridad e Higiene'}];
+  const actual = sel.value;
+  sel.innerHTML='<option value="">Seleccionar...</option>'+roles.map(r=>`<option value="${r.id}">${escapeHtml(r.label)}</option>`).join('');
+  if(actual) sel.value=actual;
+}
+
+// Dibuja los permisos extra. Los que ya trae el rol se muestran tildados/bloqueados.
+// checkedExtra = Set de permisos que este usuario tiene como override (grant).
+function renderExtrasUsr(checkedExtra){
+  const cont=document.getElementById('f-usr-extra');
+  if(!cont) return;
+  if(checkedExtra) cont._checked = checkedExtra;         // recordamos entre re-renders
+  const marcados = cont._checked || new Set();
+  const rol=document.getElementById('f-usr-rol').value;
+  if(!RP_PERMISOS || !RP_PERMISOS.length){ cont.innerHTML='<span style="font-size:12px;color:var(--text-4)">Cargá la matriz de permisos para elegir extras.</span>'; return; }
+
+  const MODL={prepull:'Pre Pull',encuestas:'Encuestas',minutas:'Minutas'};
+  const mods=[]; RP_PERMISOS.forEach(p=>{ if(!mods.includes(p.modulo)) mods.push(p.modulo); });
+  let html='';
+  mods.forEach(m=>{
+    html+=`<div style="font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-4);margin:6px 0 2px">${escapeHtml(MODL[m]||m)}</div>`;
+    RP_PERMISOS.filter(p=>p.modulo===m).forEach(p=>{
+      const heredado = rol && RP_ASIGNADOS.has(rol+'|'+p.clave);
+      const checked = heredado || marcados.has(p.clave);
+      html+=`<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:${heredado?'var(--text-4)':'var(--text-1)'};cursor:${heredado?'default':'pointer'}">
+        <input type="checkbox" value="${p.clave}" ${checked?'checked':''} ${heredado?'disabled':''} onchange="onExtraToggle(this)">
+        ${escapeHtml(p.descripcion)} ${heredado?'<span style="font-size:10px;color:var(--text-5)">(del rol)</span>':''}
+      </label>`;
+    });
+  });
+  cont.innerHTML=html;
+}
+function onExtraToggle(el){
+  const cont=document.getElementById('f-usr-extra');
+  if(!cont._checked) cont._checked=new Set();
+  if(el.checked) cont._checked.add(el.value); else cont._checked.delete(el.value);
+}
+
+async function openUserModal(id){
   editUsrId=id||null;
   document.getElementById('usr-err').style.display='none';
+  document.getElementById('usr-ok').style.display='none';
   const esEdicion=!!id;
   document.getElementById('usr-modal-title').innerHTML=`<i class="ti ti-user-plus" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>${esEdicion?'Editar usuario':'Nuevo usuario'}`;
+  llenarRolesUsr();
+  const emailEl=document.getElementById('f-usr-email');
+  const saveBtn=document.getElementById('usr-save-btn');
+  saveBtn.disabled=false; saveBtn.textContent='Guardar';
+
   if(esEdicion){
     const u=usuarios.find(x=>x.id===id);
     if(!u)return;
     document.getElementById('f-usr-nombre').value=u.nombre;
-    document.getElementById('f-usr-username').value=u.username;
-    document.getElementById('f-usr-pass').value=u.password||'';
+    emailEl.value=u.email||'';
+    emailEl.readOnly=true; emailEl.style.opacity='.6';
     document.getElementById('f-usr-rol').value=u.rol;
     document.getElementById('f-usr-suc').value=u.sucursal_fija||'';
+    // traer los overrides actuales de este usuario
+    let extras=new Set();
+    try{
+      const {data}=await sb.from('usuario_permiso').select('permiso').eq('username',u.username).eq('efecto','grant');
+      (data||[]).forEach(x=>extras.add(x.permiso));
+    }catch(e){}
+    renderExtrasUsr(extras);
   }else{
     document.getElementById('f-usr-nombre').value='';
-    document.getElementById('f-usr-username').value='';
-    document.getElementById('f-usr-pass').value='';
+    emailEl.value=''; emailEl.readOnly=false; emailEl.style.opacity='1';
     document.getElementById('f-usr-rol').value='';
     document.getElementById('f-usr-suc').value='';
+    renderExtrasUsr(new Set());
   }
   toggleSucUsr();
   document.getElementById('usrov').classList.add('open');
@@ -4066,32 +4131,62 @@ function closeUserModal(){document.getElementById('usrov').classList.remove('ope
 
 async function guardarUsuario(){
   const nombre=document.getElementById('f-usr-nombre').value.trim();
-  const username=document.getElementById('f-usr-username').value.trim().toLowerCase();
-  const password=document.getElementById('f-usr-pass').value.trim();
+  const email=document.getElementById('f-usr-email').value.trim().toLowerCase();
   const rol=document.getElementById('f-usr-rol').value;
   const sucursal_fija=document.getElementById('f-usr-suc').value||null;
+  const extras=Array.from((document.getElementById('f-usr-extra')._checked)||[]);
   const errEl=document.getElementById('usr-err');
+  const saveBtn=document.getElementById('usr-save-btn');
   errEl.style.display='none';
 
-  if(!nombre||!username||!password||!rol){errEl.textContent='Completá nombre, usuario, contraseña y sector.';errEl.style.display='block';return;}
-  if(password.length<4){errEl.textContent='La contraseña debe tener al menos 4 caracteres.';errEl.style.display='block';return;}
-  // El nombre de usuario debe ser único entre los demás (no contar el propio registro al editar)
-  if(usuarios.some(u=>u.username===username&&u.id!==editUsrId)){errEl.textContent='Ya existe un usuario con ese nombre de usuario.';errEl.style.display='block';return;}
+  if(!nombre||!rol){errEl.textContent='Completá nombre y rol.';errEl.style.display='block';return;}
 
+  // ---- EDICIÓN: actualiza el perfil + reconcilia overrides (sin tocar Auth) ----
+  if(editUsrId){
+    try{
+      saveBtn.disabled=true; saveBtn.textContent='Guardando...';
+      const u=usuarios.find(x=>x.id===editUsrId);
+      const {error}=await sb.from('usuarios').update({nombre,rol,sucursal_fija}).eq('id',editUsrId);
+      if(error)throw error;
+      // reconciliar usuario_permiso: dejar exactamente los 'extras' elegidos
+      await sb.from('usuario_permiso').delete().eq('username',u.username).eq('efecto','grant');
+      if(extras.length){
+        await sb.from('usuario_permiso').insert(extras.map(p=>({username:u.username,permiso:p,efecto:'grant'})));
+      }
+      closeUserModal();
+      await cargarUsuariosParaSelect();
+      renderUsers();
+    }catch(err){
+      errEl.textContent='Error al guardar: '+err.message;errEl.style.display='block';
+    }finally{ saveBtn.disabled=false; saveBtn.textContent='Guardar'; }
+    return;
+  }
+
+  // ---- ALTA: crea la cuenta de acceso vía el endpoint seguro ----
+  if(!email||!email.includes('@')){errEl.textContent='Ingresá un correo corporativo válido.';errEl.style.display='block';return;}
   try{
-    if(editUsrId){
-      const {error}=await sb.from('usuarios').update({nombre,username,password,rol,sucursal_fija}).eq('id',editUsrId);
-      if(error)throw error;
-    }else{
-      const {error}=await sb.from('usuarios').insert([{nombre,username,password,rol,sucursal_fija}]);
-      if(error)throw error;
-    }
-    closeUserModal();
+    saveBtn.disabled=true; saveBtn.textContent='Creando...';
+    const { data: sess } = await sb.auth.getSession();
+    const token = sess?.session?.access_token;
+    if(!token) throw new Error('No hay sesión activa. Volvé a iniciar sesión.');
+
+    const r = await fetch('/api/crear-usuario', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+      body: JSON.stringify({ nombre, email, rol, sucursal_fija, permisos_extra: extras }),
+    });
+    const out = await r.json();
+    if(!out.ok) throw new Error(out.error||'No se pudo crear el usuario');
+
+    // mostrar la contraseña temporal
+    document.getElementById('usr-ok-pass').textContent = out.password_temporal;
+    document.getElementById('usr-ok').style.display='block';
+    saveBtn.style.display='none'; // ya se creó; el admin copia la clave y cierra
     await cargarUsuariosParaSelect();
     renderUsers();
   }catch(err){
-    errEl.textContent='Error al guardar: '+err.message;
-    errEl.style.display='block';
+    errEl.textContent='Error al crear: '+err.message;errEl.style.display='block';
+    saveBtn.disabled=false; saveBtn.textContent='Guardar';
   }
 }
 
