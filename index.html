@@ -1522,6 +1522,13 @@ const MODULOS = {
     desc: 'Crear minutas de reunión con formato Nippon Car y guardar el historial.',
     color: '#0d9488',
     icono: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/>'
+  },
+  admin: {
+    id: 'admin',
+    nombre: 'Administración',
+    desc: 'Usuarios, roles y permisos, target anual y feriados. Solo administradores.',
+    color: '#334155',
+    icono: '<path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'
   }
 };
 
@@ -1555,6 +1562,7 @@ function canFallback(p){
 
 // Qué módulos puede ACCEDER cada rol (para el control al hacer click)
 function puedeAcceder(moduloId){
+  if(moduloId === 'admin') return !!(cu && cu.rol === 'admin'); // solo admin, regla dura
   return can(moduloId + '.ver');
 }
 
@@ -1584,7 +1592,7 @@ function mostrarSelector(){
     // SIEMPRE se muestran los dos módulos; el bloqueo es al hacer click
     const cont = document.getElementById('sel-cards');
     if(!cont){ console.error('[NIPPON] No existe #sel-cards en el DOM'); return; }
-    cont.innerHTML = Object.keys(MODULOS).map(mid => {
+    cont.innerHTML = Object.keys(MODULOS).filter(mid => mid !== 'admin' || (cu && cu.rol === 'admin')).map(mid => {
       const m = MODULOS[mid];
       const acceso = puedeAcceder(mid);
       return `<div class="sel-card${acceso?'':' sel-card-locked'}" onclick="abrirModulo('${m.id}')">
@@ -1642,11 +1650,12 @@ async function showApp(){
   const enPrepull = cu.modulo === 'prepull';
   const enEncuestas = cu.modulo === 'encuestas';
   const enMinutas = cu.modulo === 'minutas';
+  const enAdmin = cu.modulo === 'admin';
 
   document.getElementById('tab-dash').style.display=(enPrepull && can('prepull.dashboard.ver'))?'':'none';
   document.getElementById('tab-turnos').style.display=(enPrepull && can('prepull.turnos.ver'))?'':'none';
   document.getElementById('tab-rep').style.display=(enPrepull && can('prepull.repuestos.ver'))?'':'none';
-  document.getElementById('tab-usr').style.display=(enPrepull && can('prepull.usuarios.ver'))?'':'none';
+  document.getElementById('tab-usr').style.display=(enAdmin && cu.rol==='admin')?'':'none';
   document.getElementById('tab-compras').style.display=(enPrepull && can('prepull.compras.ver'))?'':'none';
   document.getElementById('tab-encuestas').style.display=enEncuestas?'':'none';
   document.getElementById('tab-desest').style.display=(enEncuestas && can('encuestas.desestimaciones.ver'))?'':'none';
@@ -1660,6 +1669,8 @@ async function showApp(){
     startTab = 'encuestas';
   } else if(enMinutas){
     startTab = 'minutas';
+  } else if(enAdmin){
+    startTab = 'usuarios';
   } else {
     startTab = 'dash';
     if(cu.rol==='repuestos') startTab='repuestos';
@@ -1681,13 +1692,15 @@ async function showApp(){
   if(enPrepull){
     buildFilters();
     await cargarTodo();
-    if(can('prepull.usuarios.ver')) renderUsers();
     if(can('prepull.compras.ver')) await cargarPedidos();
     iniciarRealtime();
   } else if(enEncuestas){
     cargarEncuestas();
   } else if(enMinutas){
     cargarMinutas();
+  } else if(enAdmin){
+    await cargarUsuariosParaSelect();
+    renderUsers();
   }
 }
 
@@ -3891,7 +3904,7 @@ function renderDash(){
 }
 
 function renderUsers(){
-  document.getElementById('lista-usuarios').innerHTML=usuarios.map(u=>`
+  const tarjeta = (u) => `
     <div class="user-card">
       <div class="user-card-left">
         <div class="avatar">${u.nombre.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase()}</div>
@@ -3901,7 +3914,21 @@ function renderUsers(){
         </div>
       </div>
       <button class="btn-sm btn-edit" onclick='openUserModal(${JSON.stringify(u.id)})' title="Editar usuario"><i class="ti ti-edit" style="font-size:12px"></i></button>
-    </div>`).join('');
+    </div>`;
+
+  // Cuentas de acceso = tienen correo (entran por login). Agentes = sin correo.
+  const cuentas = usuarios.filter(u => u.email);
+  const agentes = usuarios.filter(u => !u.email);
+
+  let html = `<div class="rp-subhdr" style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-4);margin:2px 0 10px">Cuentas de acceso · ${cuentas.length}</div>`;
+  html += cuentas.map(tarjeta).join('');
+  if(agentes.length){
+    html += `<div class="rp-subhdr" style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-4);margin:22px 0 6px">Agentes de Citas · ${agentes.length}</div>`;
+    html += `<div class="access-note" style="margin-bottom:12px"><i class="ti ti-info-circle" style="font-size:15px;flex-shrink:0"></i><div>No inician sesión: se eligen como "quién agenda" al cargar un turno. El acceso de Citas es la cuenta compartida <strong>turnos@</strong>.</div></div>`;
+    html += agentes.map(tarjeta).join('');
+  }
+  document.getElementById('lista-usuarios').innerHTML = html;
+
   if(cu&&cu.rol==='admin') renderTargetConfig();
   if(can('prepull.usuarios.ver')) cargarRolesPermisos();
   renderFeriados();
