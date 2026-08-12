@@ -155,11 +155,26 @@ export default async function handler(req, res) {
         body: JSON.stringify(fila),
       });
     } else {
-      upRes = await fetch(`${URL}/rest/v1/usuarios?on_conflict=email`, {
-        method: "POST",
-        headers: sbHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" }),
-        body: JSON.stringify(fila),
-      });
+      // ¿ya hay una fila con ese correo? -> PATCH; si no -> INSERT.
+      // (no usamos on_conflict para no depender de un índice único en email)
+      const exRes = await fetch(
+        `${URL}/rest/v1/usuarios?select=id&email=ilike.${encodeURIComponent(email)}`,
+        { headers: sbHeaders() }
+      );
+      const existente = (await exRes.json())?.[0];
+      if (existente) {
+        upRes = await fetch(`${URL}/rest/v1/usuarios?id=eq.${existente.id}`, {
+          method: "PATCH",
+          headers: sbHeaders({ Prefer: "return=minimal" }),
+          body: JSON.stringify(fila),
+        });
+      } else {
+        upRes = await fetch(`${URL}/rest/v1/usuarios`, {
+          method: "POST",
+          headers: sbHeaders({ Prefer: "return=minimal" }),
+          body: JSON.stringify(fila),
+        });
+      }
     }
     if (!upRes.ok) {
       const t = await upRes.text();
