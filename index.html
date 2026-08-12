@@ -466,28 +466,21 @@ tbody td{padding:11px 12px;vertical-align:middle}
       </div>
       <div class="brand-sub">Sistema Pre Pull</div>
       <div class="fg">
-        <label>Correo o usuario</label>
+        <label>Correo corporativo</label>
         <input type="text" id="lu" placeholder="correo@nipponcarsrl.com.ar" autocomplete="username" oninput="onLoginUserInput()">
       </div>
       <div class="fg">
         <label>Contraseña</label>
         <input type="password" id="lp" placeholder="••••••••" autocomplete="current-password">
       </div>
-      <div class="fg" id="sector-wrap">
+      <div class="fg" id="sector-wrap" style="display:none">
         <label>Sector</label>
         <select id="lr">
           <option value="">Seleccioná tu sector</option>
-          <option value="admin">Administración</option>
-          <option value="citas">Citas</option>
-          <option value="repuestos">Repuestos</option>
-          <option value="compras">Compras</option>
-          <option value="supervisor">Supervisor</option>
-          <option value="asesor">Asesor</option>
-          <option value="seguridad">Seguridad e Higiene</option>
         </select>
       </div>
       <button class="btn-in" id="btn-login" onclick="doLogin()">Ingresar</button>
-      <p class="login-err" id="lerr">Usuario, contraseña o sector incorrecto.</p>
+      <p class="login-err" id="lerr">Correo o contraseña incorrecto.</p>
       <div style="text-align:center;margin-top:10px"><a href="#" onclick="olvideContrasena();return false" style="font-size:12px;color:var(--text-4);text-decoration:none">¿Olvidaste tu contraseña?</a></div>
       <div class="conn-status conn-loading" id="conn-status"><i class="ti ti-loader-2" style="font-size:13px;vertical-align:-2px"></i> Conectando con la base de datos...</div>
     </div>
@@ -1289,27 +1282,16 @@ let currentAdjuntos=[]; // adjuntos del turno que se está creando/editando en e
 async function verificarConexion(){
   const el=document.getElementById('conn-status');
   try{
-    const {error}=await sb.from('usuarios').select('id').limit(1);
-    if(error) throw error;
+    // No consultamos tablas protegidas antes de loguear (RLS cerrada).
+    // Un ping liviano a Auth confirma que el proyecto responde.
+    await sb.auth.getSession();
     el.className='conn-status conn-ok';
     el.innerHTML='<i class="ti ti-check" style="font-size:13px;vertical-align:-2px"></i> Conectado a la base de datos';
-    asegurarSupervisorAguado();
   }catch(err){
     el.className='conn-status conn-err';
     el.innerHTML='<i class="ti ti-alert-triangle" style="font-size:13px;vertical-align:-2px"></i> No se pudo conectar. Revisá la configuración.';
     console.error('Error de conexión a Supabase:',err);
   }
-}
-
-// Crea el usuario supervisor de Aguado si todavía no existe (idempotente, silencioso)
-async function asegurarSupervisorAguado(){
-  try{
-    const {data,error}=await sb.from('usuarios').select('id').eq('username','supervisor.aguado').maybeSingle();
-    if(error) return;
-    if(!data){
-      await sb.from('usuarios').insert([{nombre:'Supervisor Aguado',username:'supervisor.aguado',password:'NICaguado++',rol:'supervisor',sucursal_fija:'Aguado'}]);
-    }
-  }catch(e){/* silencioso: si no se puede crear, se puede dar de alta desde el panel de Usuarios */}
 }
 verificarConexion();
 
@@ -1349,15 +1331,15 @@ async function doLogin(){
   const btn=document.getElementById('btn-login');
   const u=document.getElementById('lu').value.trim();
   const p=document.getElementById('lp').value;
-  const r=document.getElementById('lr').value;
 
-  const esEmail = u.includes('@');
-
-  // Validación según el método
-  if(!u || !p || (!esEmail && !r)){
-    document.getElementById('lerr').textContent = esEmail
-      ? 'Completá tu correo y contraseña.'
-      : 'Completá usuario, contraseña y sector.';
+  // Solo se ingresa por correo corporativo (Supabase Auth).
+  if(!u || !p){
+    document.getElementById('lerr').textContent = 'Completá tu correo y contraseña.';
+    document.getElementById('lerr').style.display='block';
+    return;
+  }
+  if(!u.includes('@')){
+    document.getElementById('lerr').textContent = 'Ingresá con tu correo corporativo.';
     document.getElementById('lerr').style.display='block';
     return;
   }
@@ -1367,35 +1349,26 @@ async function doLogin(){
   let forzarCambio = false;
 
   try{
-    if(esEmail){
-      // ---- LOGIN NUEVO: correo + Supabase Auth ----
-      const email = u.toLowerCase();
-      const { data: authData, error: authErr } =
-        await sb.auth.signInWithPassword({ email, password: p });
-      if(authErr) throw new Error('Correo o contraseña incorrectos');
+    // ---- LOGIN por correo + Supabase Auth ----
+    const email = u.toLowerCase();
+    const { data: authData, error: authErr } =
+      await sb.auth.signInWithPassword({ email, password: p });
+    if(authErr) throw new Error('Correo o contraseña incorrectos');
 
-      // buscar el perfil (rol, nombre, etc.) en la tabla usuarios por email
-      const { data: perfil, error: perfErr } =
-        await sb.from('usuarios').select('*').ilike('email', email).maybeSingle();
-      if(perfErr || !perfil){
-        await sb.auth.signOut();
-        throw new Error('Tu correo no está habilitado en el sistema. Avisá al administrador.');
-      }
-      cu = { username:perfil.username, nombre:perfil.nombre, rol:perfil.rol,
-             sucursalFija:perfil.sucursal_fija, asesorWise:perfil.asesor_wise,
-             sucursalesAsignadas:perfil.sucursales_asignadas,
-             email:perfil.email, viaAuth:true };
-      // Si el admin marcó que debe cambiar la contraseña, lo obligamos antes de entrar
-      forzarCambio = !!perfil.debe_cambiar_password;
-    } else {
-      // ---- LOGIN VIEJO: usuario + contraseña de la tabla ----
-      const uname = u.toLowerCase();
-      const {data,error}=await sb.from('usuarios').select('*').eq('username',uname).single();
-      if(error||!data){throw new Error('Usuario no encontrado');}
-      if(data.password!==p){throw new Error('Contraseña incorrecta');}
-      if(data.rol!==r&&data.rol!=='admin'){throw new Error('Sector incorrecto');}
-      cu={username:uname,nombre:data.nombre,rol:data.rol,sucursalFija:data.sucursal_fija,asesorWise:data.asesor_wise,sucursalesAsignadas:data.sucursales_asignadas,email:data.email,viaAuth:false};
+    // buscar el perfil (rol, nombre, etc.) en la tabla usuarios por email
+    const { data: perfil, error: perfErr } =
+      await sb.from('usuarios').select('*').ilike('email', email).maybeSingle();
+    if(perfErr || !perfil){
+      await sb.auth.signOut();
+      throw new Error('Tu correo no está habilitado en el sistema. Avisá al administrador.');
     }
+    cu = { username:perfil.username, nombre:perfil.nombre, rol:perfil.rol,
+           sucursalFija:perfil.sucursal_fija, asesorWise:perfil.asesor_wise,
+           sucursalesAsignadas:perfil.sucursales_asignadas,
+           email:perfil.email, viaAuth:true };
+    // Si el admin marcó que debe cambiar la contraseña, lo obligamos antes de entrar
+    forzarCambio = !!perfil.debe_cambiar_password;
+
     document.getElementById('lerr').style.display='none';
     loginOk = true;
   }catch(err){
@@ -1482,10 +1455,9 @@ async function guardarNuevaPassObligatoria(){
     // 1) Cambiar la contraseña en Supabase Auth
     const { error: e1 } = await sb.auth.updateUser({ password: nueva });
     if(e1) throw e1;
-    // 2) Marcar en la tabla que ya no necesita cambiarla
-    if(cu && cu.email){
-      await sb.from('usuarios').update({ debe_cambiar_password:false }).ilike('email', cu.email);
-    }
+    // 2) Marcar en la tabla que ya no necesita cambiarla.
+    //    Vía RPC porque la escritura directa a 'usuarios' es solo de admin (RLS).
+    await sb.rpc('marcar_password_cambiada');
     // 3) Continuar al selector de módulos
     document.getElementById('s-cambio-pass').classList.remove('active');
     mostrarSelector();
