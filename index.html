@@ -220,6 +220,25 @@ a{color:#c62a27;text-decoration:none}
 .tb-chips-leg{display:flex;flex-wrap:wrap;gap:12px;padding:4px 16px 12px;font-size:11.5px;color:var(--text-3)}
 .tb-chips-leg .lg{display:inline-flex;align-items:center;gap:6px}
 .tb-chips-leg .lg .dot{width:11px;height:3px;border-radius:2px}
+/* ── Encuestas FIR ─────────────────────────────────────── */
+.fir-q{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--border-1)}
+.fir-q span{font-size:13px;color:var(--text-2)}
+.fir-sino{display:inline-flex;gap:6px;flex-shrink:0}
+.fir-sino button{padding:5px 16px;border-radius:8px;border:1px solid var(--border-2);background:#fff;color:var(--text-3);font-weight:700;font-size:12px;cursor:pointer}
+.fir-sino button.si.on{background:#16a34a;border-color:#16a34a;color:#fff}
+.fir-sino button.no.on{background:#dc2626;border-color:#dc2626;color:#fff}
+.fir-table{width:100%;border-collapse:collapse;font-size:12.5px;white-space:nowrap}
+.fir-table thead th{background:#2f3033;color:#fff;font-weight:600;font-size:11px;padding:10px 12px;text-align:left;position:sticky;top:0}
+.fir-table tbody td{padding:9px 12px;border-bottom:1px solid var(--border-1);color:var(--text-2)}
+.fir-table tbody tr:hover{background:#f5f8ff}
+.fir-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.fir-badge.fir{background:#dcfce7;color:#15803d}
+.fir-badge.nofir{background:#fee2e2;color:#b91c1c}
+.fir-badge.pend{background:#fef3c7;color:#92400e}
+.fir-sino-chip{padding:1px 8px;border-radius:6px;font-weight:700;font-size:11px}
+.fir-sino-chip.si{background:#dcfce7;color:#15803d}
+.fir-sino-chip.no{background:#fee2e2;color:#b91c1c}
+.fir-sino-chip.na{color:var(--text-5)}
 /* ── Matriz Roles y permisos (Administración) ─────────── */
 .rp-wrap{background:#fff;border:1px solid var(--border-1);border-radius:14px;overflow:hidden}
 .rp-scroll{overflow-x:auto}
@@ -820,6 +839,9 @@ tbody td{padding:11px 12px;vertical-align:middle}
             <button class="sub-tab" id="subtab-enc-tablero" onclick="swSubTabEnc('tablero',this)" style="display:none">
               <i class="ti ti-layout-dashboard" style="font-size:15px"></i> Tableros
             </button>
+            <button class="sub-tab" id="subtab-enc-fir" onclick="swSubTabEnc('fir',this)" style="display:none">
+              <i class="ti ti-phone-call" style="font-size:15px"></i> Encuestas FIR
+            </button>
           </div>
 
           <!-- RESUMEN POR ASESOR (promedios) -->
@@ -884,6 +906,22 @@ tbody td{padding:11px 12px;vertical-align:middle}
             </div>
             <div class="suc-slicer" id="enc-suc-chips-tablero" style="display:none"></div>
             <div id="tablero-cont"></div>
+          </div>
+
+          <!-- ENCUESTAS FIR (seguimiento telefónico) -->
+          <div class="sub-tc" id="subtc-enc-fir">
+            <div class="sec-hdr">
+              <div class="sec-hdr-left">
+                <div class="sec-eyebrow">Seguimiento telefónico de reparaciones</div>
+                <h2>Encuestas FIR</h2>
+                <div class="tb-sub" id="fir-sub" style="margin-top:4px"></div>
+              </div>
+              <div class="hdr-actions" style="gap:8px">
+                <input type="text" id="fir-buscar" placeholder="Buscar cliente, patente, asesor..." oninput="renderFir()" style="padding:9px 12px;border:1px solid var(--border-2);border-radius:10px;font-size:13px;min-width:220px">
+                <button id="fir-nuevo-btn" onclick="abrirFirModal()" style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:600;font-size:13px;cursor:pointer"><i class="ti ti-plus" style="font-size:15px"></i> Nueva FIR</button>
+              </div>
+            </div>
+            <div id="fir-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
           </div>
         </div>
 
@@ -1136,6 +1174,50 @@ tbody td{padding:11px 12px;vertical-align:middle}
     <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:.85rem" id="adj-modal-subtitle"></div>
     <div id="adj-modal-lista" style="display:flex;flex-direction:column;gap:6px;min-height:40px"></div>
     <div class="mfooter"><button class="btn-cancel" onclick="closeAdjModal()">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="modal-ov" id="firov">
+  <div class="modal">
+    <h3 id="fir-modal-title"><i class="ti ti-phone-call" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Nueva encuesta FIR</h3>
+    <div id="fir-bloqueada-aviso" style="display:none;margin-bottom:12px;padding:10px 13px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;font-size:13px;color:#166534"><i class="ti ti-lock"></i> Esta encuesta ya fue puntuada por el cliente: queda en solo lectura.</div>
+    <div class="mgrid">
+      <div><label>Sucursal</label><input type="text" id="f-fir-sucursal" placeholder="NEUQUEN"/></div>
+      <div><label>Fecha</label><input type="date" id="f-fir-fecha"/></div>
+      <div><label>Ord. Rep</label><input type="text" id="f-fir-orden"/></div>
+      <div><label>Cliente</label><input type="text" id="f-fir-cliente" placeholder="Apellido, Nombre"/></div>
+      <div><label>Teléfono</label><input type="text" id="f-fir-telefono"/></div>
+      <div><label>Dominio (patente)</label><input type="text" id="f-fir-dominio"/></div>
+      <div><label>Km</label><input type="number" id="f-fir-km"/></div>
+      <div><label>Asesor</label><input type="text" id="f-fir-asesor"/></div>
+      <div><label>N° Caso Wise</label><input type="text" id="f-fir-caso"/></div>
+    </div>
+
+    <div style="margin-top:16px;padding:14px;background:#f8fafc;border:1px solid var(--border-1);border-radius:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-4)">Contacto con el cliente</div>
+        <button id="f-fir-contacto-btn" onclick="firToggleContacto()" style="padding:7px 14px;border-radius:8px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-weight:600;font-size:12px;cursor:pointer"><i class="ti ti-phone"></i> Marcar contacto</button>
+      </div>
+      <div id="f-fir-contacto-info" style="display:none;margin-top:12px">
+        <div class="mgrid">
+          <div><label>N° de contacto</label><input type="number" id="f-fir-nrocontacto" min="0" value="1"/></div>
+          <div><label>Fecha de contacto</label><input type="date" id="f-fir-fechacontacto"/></div>
+        </div>
+        <div style="margin-top:10px"><label>Comentario</label><textarea id="f-fir-comentario" rows="2" placeholder="Comentario del llamado…" style="width:100%;padding:9px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit"></textarea></div>
+      </div>
+      <div id="f-fir-contacto-nota" style="margin-top:8px;font-size:12px;color:var(--text-4)">Marcá el contacto para habilitar el comentario y las respuestas.</div>
+    </div>
+
+    <div id="f-fir-preguntas" style="display:none;margin-top:16px">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-4);margin-bottom:8px">Puntuación del cliente (al cargar las 3, la encuesta se bloquea)</div>
+      <div class="fir-q"><span>Q1 · ¿El resultado de la reparación fue correcto?</span><div class="fir-sino" id="f-fir-q1"></div></div>
+      <div class="fir-q"><span>Q2 · ¿Fue en el tiempo prometido?</span><div class="fir-sino" id="f-fir-q2"></div></div>
+      <div class="fir-q"><span>Q3 · ¿El tiempo de reparación fue razonable?</span><div class="fir-sino" id="f-fir-q3"></div></div>
+      <div id="f-fir-resultado" style="margin-top:10px;font-size:13px"></div>
+    </div>
+
+    <p class="login-err" id="fir-err" style="display:none"></p>
+    <div class="mfooter"><button class="btn-cancel" onclick="cerrarFirModal()">Cerrar</button><button class="btn-save" id="fir-save-btn" onclick="guardarFir()">Guardar</button></div>
   </div>
 </div>
 
@@ -2073,6 +2155,12 @@ function ajustarUIEncuestas(){
     const veTableros = can('encuestas.tableros.ver');
     tabTablero.style.display = veTableros ? '' : 'none';
   }
+  // sub-tab FIR: lo cargan las de citas y lo ven supervisor y admin
+  const tabFir = document.getElementById('subtab-enc-fir');
+  if(tabFir){
+    const veFir = cu && (cu.rol === 'admin' || cu.rol === 'supervisor' || can('encuestas.fir.crear'));
+    tabFir.style.display = veFir ? '' : 'none';
+  }
 }
 
 // Filtra por rango de días + texto de búsqueda
@@ -2353,6 +2441,7 @@ function renderEncuestas(){
   renderSucursalChips();
   if(encSubTab === 'resumen') renderEncResumen();
   else if(encSubTab === 'tablero') renderTableros();
+  else if(encSubTab === 'fir') cargarFir();
   else renderEncDetalle();
   // contadores de las sub-tabs
   // conjunto base visible según el rol (jefe de servicio: solo su sucursal)
@@ -2736,6 +2825,223 @@ function renderTableros(){
   cont.innerHTML = award + m1 + m2 + chartGen + chartSuc;
 }
 function redondear2(v){ return v==null ? null : Math.round(v*100)/100; }
+
+// ══════════════════════════════════════════════════════════════════
+//  ENCUESTAS FIR (seguimiento telefónico)
+// ══════════════════════════════════════════════════════════════════
+let fir = [];
+let firEditId = null;
+let firRespuestas = { q1:null, q2:null, q3:null };
+let firContacto = false;
+let firBloqueada = false;
+
+async function cargarFir(){
+  const cont = document.getElementById('fir-cont');
+  try{
+    const { data, error } = await sb.from('fir').select('*').order('fecha', { ascending:false });
+    if(error) throw error;
+    fir = data || [];
+    renderFir();
+  }catch(err){
+    if(cont) cont.innerHTML = `<div class="access-note" style="color:#b91c1c"><i class="ti ti-alert-triangle"></i> No se pudo cargar FIR: ${escapeHtml(err.message||'error')}. ¿Corriste el SQL de FIR?</div>`;
+  }
+}
+
+function firResultadoBadge(r){
+  if(r.es_fir === true)  return '<span class="fir-badge fir"><i class="ti ti-check"></i> FIR</span>';
+  if(r.es_fir === false) return '<span class="fir-badge nofir"><i class="ti ti-x"></i> NO FIR</span>';
+  return '<span class="fir-badge pend">Pendiente</span>';
+}
+function sinoChip(v){
+  if(v === true)  return '<span class="fir-sino-chip si">SÍ</span>';
+  if(v === false) return '<span class="fir-sino-chip no">NO</span>';
+  return '<span class="fir-sino-chip na">—</span>';
+}
+
+function renderFir(){
+  const cont = document.getElementById('fir-cont');
+  const sub = document.getElementById('fir-sub');
+  if(!cont) return;
+
+  // permiso para cargar (las de citas y admin); supervisor solo ve
+  const puedeCargar = cu && (cu.rol === 'admin' || can('encuestas.fir.crear'));
+  const btn = document.getElementById('fir-nuevo-btn');
+  if(btn) btn.style.display = puedeCargar ? '' : 'none';
+
+  let arr = fir.slice();
+  const q = (document.getElementById('fir-buscar')?.value || '').toLowerCase().trim();
+  if(q){
+    arr = arr.filter(r => [r.cliente, r.dominio, r.asesor, r.sucursal, r.caso_wise].some(x => (x||'').toLowerCase().includes(q)));
+  }
+
+  const totalFir = fir.filter(r => r.es_fir === true).length;
+  const totalNo  = fir.filter(r => r.es_fir === false).length;
+  const totalPend= fir.filter(r => r.es_fir === null).length;
+  if(sub) sub.innerHTML = `${fir.length} encuesta(s) · <b style="color:#15803d">${totalFir} FIR</b> · <b style="color:#b91c1c">${totalNo} NO FIR</b> · ${totalPend} pendiente(s)`;
+
+  if(!arr.length){
+    cont.innerHTML = '<div class="access-note"><i class="ti ti-info-circle"></i> No hay encuestas FIR todavía.</div>';
+    return;
+  }
+
+  const fmt = (f) => f ? new Date(f+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—';
+  const rows = arr.map(r => `
+    <tr>
+      <td>${fmt(r.fecha)}</td>
+      <td style="color:var(--text-1);font-weight:600">${escapeHtml(r.cliente||'—')}</td>
+      <td style="font-family:var(--mono)">${escapeHtml(r.dominio||'—')}</td>
+      <td>${escapeHtml(r.sucursal||'—')}</td>
+      <td>${escapeHtml(r.asesor||'—')}</td>
+      <td style="font-family:var(--mono)">${escapeHtml(r.caso_wise||'—')}</td>
+      <td style="text-align:center">${r.contacto ? '<span class="fir-sino-chip si">SÍ</span>' : (r.contacto===false?'<span class="fir-sino-chip no">NO</span>':'<span class="fir-sino-chip na">—</span>')}</td>
+      <td style="text-align:center">${sinoChip(r.q1)}</td>
+      <td style="text-align:center">${sinoChip(r.q2)}</td>
+      <td style="text-align:center">${sinoChip(r.q3)}</td>
+      <td>${firResultadoBadge(r)}</td>
+      <td style="text-align:center">
+        <button class="btn-sm btn-edit" onclick='abrirFirModal(${JSON.stringify(r.id)})' title="${r.puntuada?'Ver (bloqueada)':'Editar'}"><i class="ti ti-${r.puntuada?'eye':'edit'}" style="font-size:12px"></i></button>
+      </td>
+    </tr>`).join('');
+
+  cont.innerHTML = `<div style="overflow-x:auto;background:#fff;border:1px solid var(--border-1);border-radius:14px">
+    <table class="fir-table">
+      <thead><tr>
+        <th>Fecha</th><th>Cliente</th><th>Patente</th><th>Sucursal</th><th>Asesor</th><th>N° Wise</th>
+        <th style="text-align:center">Contacto</th><th style="text-align:center">Q1</th><th style="text-align:center">Q2</th><th style="text-align:center">Q3</th><th>Resultado</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// ---- Modal ----
+function abrirFirModal(id){
+  firEditId = id || null;
+  firRespuestas = { q1:null, q2:null, q3:null };
+  document.getElementById('fir-err').style.display='none';
+  const r = id ? fir.find(x => x.id === id) : null;
+  firBloqueada = !!(r && r.puntuada);
+  const puedeCargar = cu && (cu.rol === 'admin' || can('encuestas.fir.crear'));
+  // solo lectura si está puntuada, o si el usuario no puede cargar (ej. supervisor)
+  const soloLectura = firBloqueada || !puedeCargar;
+
+  document.getElementById('fir-modal-title').innerHTML = `<i class="ti ti-phone-call" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>${id ? (soloLectura?'Encuesta FIR (solo lectura)':'Editar encuesta FIR') : 'Nueva encuesta FIR'}`;
+  document.getElementById('fir-bloqueada-aviso').style.display = firBloqueada ? 'block' : 'none';
+
+  const set = (eid, val) => { const el=document.getElementById(eid); if(el) el.value = val ?? ''; };
+  set('f-fir-sucursal', r?.sucursal); set('f-fir-fecha', r?.fecha); set('f-fir-orden', r?.orden_rep);
+  set('f-fir-cliente', r?.cliente); set('f-fir-telefono', r?.telefono); set('f-fir-dominio', r?.dominio);
+  set('f-fir-km', r?.km); set('f-fir-asesor', r?.asesor); set('f-fir-caso', r?.caso_wise);
+  set('f-fir-nrocontacto', r?.nro_contacto ?? 1); set('f-fir-fechacontacto', r?.fecha_contacto);
+  set('f-fir-comentario', r?.comentario);
+
+  firContacto = !!(r && r.contacto);
+  firRespuestas = { q1: r?.q1 ?? null, q2: r?.q2 ?? null, q3: r?.q3 ?? null };
+  firPintarContacto();
+  firPintarPreguntas();
+
+  // habilitar/deshabilitar todo si es solo lectura
+  document.querySelectorAll('#firov input, #firov textarea, #firov .fir-sino button, #f-fir-contacto-btn').forEach(el => {
+    el.disabled = soloLectura;
+  });
+  document.getElementById('fir-save-btn').style.display = soloLectura ? 'none' : '';
+
+  document.getElementById('firov').classList.add('open');
+}
+function cerrarFirModal(){ document.getElementById('firov').classList.remove('open'); }
+
+function firToggleContacto(){
+  if(firBloqueada) return;
+  firContacto = !firContacto;
+  firPintarContacto();
+}
+function firPintarContacto(){
+  const btn = document.getElementById('f-fir-contacto-btn');
+  const info = document.getElementById('f-fir-contacto-info');
+  const nota = document.getElementById('f-fir-contacto-nota');
+  const preg = document.getElementById('f-fir-preguntas');
+  if(firContacto){
+    btn.innerHTML = '<i class="ti ti-phone-check"></i> Contactado';
+    btn.style.background = '#16a34a'; btn.style.color = '#fff';
+    info.style.display = 'block'; nota.style.display = 'none'; preg.style.display = 'block';
+  }else{
+    btn.innerHTML = '<i class="ti ti-phone"></i> Marcar contacto';
+    btn.style.background = '#f0fdf4'; btn.style.color = '#15803d';
+    info.style.display = 'none'; nota.style.display = 'block'; preg.style.display = 'none';
+  }
+}
+
+function firSetQ(q, val){
+  if(firBloqueada) return;
+  firRespuestas[q] = (firRespuestas[q] === val) ? null : val; // volver a tocar el mismo = destildar
+  firPintarPreguntas();
+}
+function firPintarPreguntas(){
+  ['q1','q2','q3'].forEach(q => {
+    const cont = document.getElementById('f-fir-'+q);
+    if(!cont) return;
+    const v = firRespuestas[q];
+    cont.innerHTML = `
+      <button class="si ${v===true?'on':''}" onclick="firSetQ('${q}',true)">SÍ</button>
+      <button class="no ${v===false?'on':''}" onclick="firSetQ('${q}',false)">NO</button>`;
+  });
+  // resultado en vivo
+  const { q1,q2,q3 } = firRespuestas;
+  const res = document.getElementById('f-fir-resultado');
+  if(q1===null||q2===null||q3===null){
+    res.innerHTML = '<span style="color:var(--text-4)">Faltan respuestas para calcular el FIR.</span>';
+  }else if(q1&&q2&&q3){
+    res.innerHTML = '<span class="fir-badge fir"><i class="ti ti-check"></i> Resultado: FIR</span> <span style="color:var(--text-4);font-size:12px">— al guardar quedará bloqueada</span>';
+  }else{
+    res.innerHTML = '<span class="fir-badge nofir"><i class="ti ti-x"></i> Resultado: NO FIR</span> <span style="color:var(--text-4);font-size:12px">— al guardar quedará bloqueada</span>';
+  }
+}
+
+async function guardarFir(){
+  const errEl = document.getElementById('fir-err'); errEl.style.display='none';
+  const btn = document.getElementById('fir-save-btn');
+  const val = (id) => { const el=document.getElementById(id); return el && el.value.trim() !== '' ? el.value.trim() : null; };
+
+  const cliente = val('f-fir-cliente');
+  if(!cliente){ errEl.textContent='Cargá al menos el nombre del cliente.'; errEl.style.display='block'; return; }
+
+  const payload = {
+    sucursal: val('f-fir-sucursal'),
+    fecha: val('f-fir-fecha'),
+    orden_rep: val('f-fir-orden'),
+    cliente,
+    telefono: val('f-fir-telefono'),
+    dominio: val('f-fir-dominio'),
+    km: val('f-fir-km') ? Number(val('f-fir-km')) : null,
+    asesor: val('f-fir-asesor'),
+    caso_wise: val('f-fir-caso'),
+    contacto: firContacto,
+    nro_contacto: val('f-fir-nrocontacto') ? Number(val('f-fir-nrocontacto')) : null,
+    fecha_contacto: val('f-fir-fechacontacto'),
+    q1: firRespuestas.q1, q2: firRespuestas.q2, q3: firRespuestas.q3,
+    comentario: val('f-fir-comentario'),
+    actualizado_en: new Date().toISOString(),
+  };
+
+  try{
+    btn.disabled=true; btn.textContent='Guardando...';
+    if(firEditId){
+      const { error } = await sb.from('fir').update(payload).eq('id', firEditId);
+      if(error) throw error;
+    }else{
+      payload.creado_por = cu?.nombre || cu?.username || null;
+      const { error } = await sb.from('fir').insert(payload);
+      if(error) throw error;
+    }
+    cerrarFirModal();
+    await cargarFir();
+  }catch(err){
+    errEl.textContent = 'Error al guardar: ' + (err.message||'error');
+    errEl.style.display='block';
+  }finally{
+    btn.disabled=false; btn.textContent='Guardar';
+  }
+}
 
 // --- Vista: promedio por asesor ---
 function renderEncResumen(){
