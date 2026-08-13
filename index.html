@@ -1773,6 +1773,9 @@ async function cargarUsuariosParaSelect(){
 //  MÓDULO ENCUESTAS (Wise CX -> Supabase -> aquí)
 // ============================================================
 let encuestas = [];            // filas crudas desde Supabase
+// Columnas que la web realmente usa. Evitamos traer 'raw' (el volcado completo
+// de Wise por fila), que es lo más pesado y no se muestra en ningún lado.
+const ENC_COLS = "id,wise_id,fecha,fecha_respuesta,asesor,p_amabilidad,p_atencion,p_puntualidad,p_explicacion,p_limpieza,p_turnos,p_espera,p_calidad,p_recomienda,promedio_asesor,comentario,funciono_ok,puntuacion_prom,puntuacion,sucursal,servicio,dominio,empresa,encuesta,anulada,preguntas_desestimadas";
 let encSubTab = 'resumen';
 let encCargadas = false;
 let desestimaciones = [];      // pedidos de desestimación
@@ -1801,7 +1804,7 @@ function actualizarBadgeDesest(){
 async function cargarBandejaDesest(){
   // asegurarnos de tener las encuestas cargadas (para mostrar datos de cada una)
   if(!encCargadas){
-    const { data } = await sb.from('encuestas').select('*').order('fecha',{ascending:false});
+    const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
     encuestas = data || [];
     normalizarSucursales();
     encCargadas = true;
@@ -1992,7 +1995,7 @@ function swSubTabEnc(t, el){
 // Relee encuestas + desestimaciones y re-renderiza (sin recargar la página)
 async function refrescarYRender(){
   try{
-    const { data } = await sb.from('encuestas').select('*').order('fecha',{ascending:false});
+    const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
     if(data){ encuestas = data; normalizarSucursales(); }
     await cargarDesestimaciones();
   }catch(e){ /* si falla, igual renderizamos lo que hay */ }
@@ -2007,7 +2010,7 @@ async function cargarEncuestas(){
   // cambiado (desestimaciones aplicadas, pedidos resueltos) para que el
   // asesor vea la resolución del admin sin tener que apretar F5.
   if(encCargadas){
-    const { data } = await sb.from('encuestas').select('*').order('fecha',{ascending:false});
+    const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
     if(data){ encuestas = data; normalizarSucursales(); }
     await cargarDesestimaciones();
     renderEncuestas();
