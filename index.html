@@ -860,6 +860,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
               </div>
               <div class="hdr-actions">
                 <input type="text" id="enc-buscar" placeholder="Buscar asesor, patente, sucursal..." oninput="renderEncuestas()" style="padding:9px 12px;border:1px solid var(--border-2);border-radius:10px;font-size:13px;min-width:240px">
+                <button onclick="exportarEncuestasExcel()" title="Descargar Excel con el detalle y las desestimaciones" style="display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:10px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-weight:600;font-size:13px;cursor:pointer"><i class="ti ti-file-spreadsheet" style="font-size:15px"></i> Exportar Excel</button>
               </div>
             </div>
             <div class="suc-slicer" id="enc-suc-chips-detalle" style="display:none"></div>
@@ -1554,7 +1555,7 @@ function canFallback(p){
   if(!cu) return false;
   if(cu.rol === 'admin') return true;
   const M = {
-    supervisor:   ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','encuestas.sincronizar','minutas.ver'],
+    supervisor:   ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.sincronizar','minutas.ver'],
     citas:        ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver'],
     repuestos:    ['prepull.ver','prepull.dashboard.ver','prepull.repuestos.ver'],
     compras:      ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar'],
@@ -2778,41 +2779,163 @@ function renderEncResumen(){
 }
 
 // --- Vista: detalle ---
+let encDetSort = { key:'fecha', dir:'desc' };
+let encDetSoloCriticas = false;
+const ENC_UMBRAL_CRITICA = 8; // promedio < 8 = crítica
+
+// Columnas numéricas que se muestran en el detalle
+const ENC_NUM_COLS = [
+  ['p_turnos','Turnos'],['p_espera','Espera'],['p_amabilidad','Amabil.'],
+  ['p_atencion','Atención'],['p_puntualidad','Puntual.'],['p_explicacion','Explic.'],
+  ['p_limpieza','Limpieza'],['p_calidad','Calidad'],['p_recomienda','NPS'],
+];
+
+function sortEncDet(key){
+  if(encDetSort.key === key){ encDetSort.dir = encDetSort.dir === 'asc' ? 'desc' : 'asc'; }
+  else { encDetSort.key = key; encDetSort.dir = 'asc'; } // primer clic: menor a mayor
+  renderEncDetalle();
+}
+function toggleCriticas(){ encDetSoloCriticas = !encDetSoloCriticas; renderEncDetalle(); }
+
 function renderEncDetalle(){
-  const arr = encuestasFiltradas(true); // true = solo las del asesor (si aplica)
+  let arr = encuestasFiltradas(true); // true = solo las del asesor (si aplica)
   const cont = document.getElementById('enc-tabla-detalle');
+
+  // críticas = promedio del asesor por debajo del umbral
+  const criticas = arr.filter(e => { const p = promedioEncuesta(e); return p != null && p < ENC_UMBRAL_CRITICA; });
+
+  // tarjeta de críticas (clickeable, filtra)
+  const card = `<div onclick="toggleCriticas()" style="cursor:pointer;display:inline-flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;margin-bottom:14px;border:1px solid ${encDetSoloCriticas?'#dc2626':'var(--border-1)'};background:${encDetSoloCriticas?'#fef2f2':'#fff'};transition:all .13s">
+    <div style="width:38px;height:38px;border-radius:10px;background:#fee2e2;color:#dc2626;display:flex;align-items:center;justify-content:center;font-size:19px"><i class="ti ti-alert-triangle"></i></div>
+    <div>
+      <div style="font-size:20px;font-weight:800;color:#dc2626;line-height:1">${criticas.length}</div>
+      <div style="font-size:12px;color:var(--text-3)">Encuestas críticas · promedio &lt; ${ENC_UMBRAL_CRITICA}</div>
+    </div>
+    <div style="margin-left:6px;font-size:12px;font-weight:600;color:${encDetSoloCriticas?'#dc2626':'var(--text-4)'}">${encDetSoloCriticas?'✓ Mostrando solo críticas':'Tocá para filtrar'}</div>
+  </div>`;
+
+  if(encDetSoloCriticas) arr = criticas;
+
   if(arr.length === 0){
-    cont.innerHTML = '<div class="access-note"><i class="ti ti-info-circle"></i> Sin resultados.</div>';
+    cont.innerHTML = card + '<div class="access-note"><i class="ti ti-info-circle"></i> Sin resultados.</div>';
     return;
   }
-  let html = `<div style="overflow-x:auto;background:#fff;border:1px solid var(--border-1);border-radius:14px">
+
+  // accesores para ordenar
+  const getters = {
+    fecha:    e => e.fecha ? new Date(e.fecha).getTime() : null,
+    asesor:   e => (e.asesor||'').toLowerCase(),
+    sucursal: e => (e.sucursal||'').toLowerCase(),
+    servicio: e => (e.servicio||'').toLowerCase(),
+    dominio:  e => (e.dominio||'').toLowerCase(),
+    prom:     e => promedioEncuesta(e),
+  };
+  ENC_NUM_COLS.forEach(([k]) => getters[k] = e => (e[k]!=null && !isNaN(Number(e[k]))) ? Number(e[k]) : null);
+
+  const dir = encDetSort.dir;
+  const gk = getters[encDetSort.key] || getters.fecha;
+  arr = arr.slice().sort((a,b) => {
+    const va = gk(a), vb = gk(b);
+    if(va==null && vb==null) return 0;
+    if(va==null) return 1;          // nulos siempre al final
+    if(vb==null) return -1;
+    const r = va < vb ? -1 : va > vb ? 1 : 0;
+    return dir === 'desc' ? -r : r;
+  });
+
+  // encabezado con orden por clic
+  const flecha = k => encDetSort.key===k ? (encDetSort.dir==='asc'?' ▲':' ▼') : '';
+  const th = (k, lbl, alinear) => `<th onclick="sortEncDet('${k}')" style="padding:10px 12px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:${encDetSort.key===k?'var(--accent)':'var(--text-4)'};white-space:nowrap;cursor:pointer;user-select:none;text-align:${alinear||'left'}" title="Ordenar por ${lbl}">${lbl}${flecha(k)}</th>`;
+
+  const numTh = ENC_NUM_COLS.map(([k,l]) => th(k,l,'center')).join('');
+  const totalCols = 1 + 5 + ENC_NUM_COLS.length + 1; // arrow + fijas + numéricas + prom
+
+  let html = card + `<div style="overflow-x:auto;background:#fff;border:1px solid var(--border-1);border-radius:14px">
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead><tr style="text-align:left;border-bottom:1px solid var(--border-1)">
-        <th style="padding:11px 14px;font-size:11px;color:var(--text-4);width:30px"></th>
-        ${['Fecha','Asesor','Prom. asesor','Sucursal','Servicio','Patente'].map(h=>`<th style="padding:11px 14px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-4);white-space:nowrap">${h}</th>`).join('')}
+        <th style="width:30px"></th>
+        ${th('fecha','Fecha')}${th('asesor','Asesor')}${th('sucursal','Sucursal')}${th('servicio','Servicio')}${th('dominio','Patente')}
+        ${numTh}
+        ${th('prom','Prom. AS','center')}
       </tr></thead><tbody>`;
+
   arr.slice(0, 500).forEach((e, i) => {
     const nota = promedioEncuesta(e);
+    const critica = nota != null && nota < ENC_UMBRAL_CRITICA;
     const f = e.fecha ? new Date(e.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—';
     const rid = 'encrow-'+i;
-    // fila principal (clickeable)
-    html += `<tr style="border-bottom:1px solid var(--border-1);cursor:pointer" onclick="toggleEncDetalle('${rid}')">
-      <td style="padding:10px 14px;text-align:center;color:var(--text-4)"><span id="${rid}-arr" style="display:inline-block;transition:transform .15s">▸</span></td>
-      <td style="padding:10px 14px;color:var(--text-3);white-space:nowrap;font-family:var(--mono)">${f}</td>
-      <td style="padding:10px 14px;font-weight:600;color:var(--text-1);white-space:nowrap">${escapeHtml(e.asesor||'—')}</td>
-      <td style="padding:10px 14px;text-align:center;font-family:var(--mono);font-weight:700;font-size:15px;color:${notaColor(nota)}">${nota!=null?nota.toFixed(2):'—'}</td>
-      <td style="padding:10px 14px;color:var(--text-3)">${escapeHtml(e.sucursal||'—')}</td>
-      <td style="padding:10px 14px;color:var(--text-3)">${escapeHtml(e.servicio||'—')}</td>
-      <td style="padding:10px 14px;color:var(--text-3);font-family:var(--mono)">${escapeHtml(e.dominio||'—')}</td>
+    const desest = preguntasDesestimadas(e);
+    const numTds = ENC_NUM_COLS.map(([k]) => {
+      const v = e[k];
+      const n = (v!=null && !isNaN(Number(v))) ? Number(v) : null;
+      const tach = desest.includes(k);
+      return `<td style="padding:9px 12px;text-align:center;font-family:var(--mono);font-weight:600;color:${notaColor(n)};${tach?'text-decoration:line-through;opacity:.5':''}">${n!=null?n:'—'}</td>`;
+    }).join('');
+
+    html += `<tr style="border-bottom:1px solid var(--border-1);cursor:pointer;${critica?'background:#fff5f5':''}" onclick="toggleEncDetalle('${rid}')">
+      <td style="padding:9px 12px;text-align:center;color:var(--text-4)"><span id="${rid}-arr" style="display:inline-block;transition:transform .15s">▸</span></td>
+      <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap;font-family:var(--mono)">${f}</td>
+      <td style="padding:9px 12px;font-weight:600;color:var(--text-1);white-space:nowrap">${escapeHtml(e.asesor||'—')}</td>
+      <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap">${escapeHtml(e.sucursal||'—')}</td>
+      <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap">${escapeHtml(e.servicio||'—')}</td>
+      <td style="padding:9px 12px;color:var(--text-3);font-family:var(--mono);white-space:nowrap">${escapeHtml(e.dominio||'—')}</td>
+      ${numTds}
+      <td style="padding:9px 12px;text-align:center;font-family:var(--mono);font-weight:700;font-size:15px;color:${notaColor(nota)}">${nota!=null?nota.toFixed(2):'—'}${critica?' <i class="ti ti-alert-triangle" style="font-size:12px;color:#dc2626;vertical-align:1px"></i>':''}</td>
     </tr>`;
-    // fila de detalle (oculta por defecto)
     html += `<tr id="${rid}" style="display:none;background:var(--bg-soft,#faf9f7)">
-      <td colspan="7" style="padding:0 14px 16px 44px">${encDetalleHtml(e)}</td>
+      <td colspan="${totalCols}" style="padding:0 14px 16px 44px">${encDetalleHtml(e)}</td>
     </tr>`;
   });
   html += `</tbody></table></div>`;
   if(arr.length > 500) html += `<div class="tb-sub" style="margin-top:10px;text-align:center">Mostrando 500 de ${arr.length}. Afiná con la búsqueda o el rango.</div>`;
   cont.innerHTML = html;
+}
+
+// Exporta a Excel el detalle de encuestas (respeta filtros de fecha/sucursal/rol)
+// con las columnas de desestimación: si se pidió, comentario, decisión y revisor.
+function exportarEncuestasExcel(){
+  const arr = encuestasFiltradas(true);
+  if(!arr.length){ alert('No hay encuestas para exportar con los filtros actuales.'); return; }
+
+  const estadoLbl = { pendiente:'Pendiente', aprobado:'Aprobado', rechazado:'Rechazado', en_revision:'En revisión' };
+  const fmtFecha = (f) => f ? new Date(f).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '';
+
+  const filas = arr.map(e => {
+    const ped = (desestimaciones || []).find(d => d.encuesta_id === e.wise_id);
+    const nota = (k) => (e[k]!=null && !isNaN(Number(e[k]))) ? Number(e[k]) : '';
+    return {
+      'Fecha': fmtFecha(e.fecha),
+      'Asesor': e.asesor || '',
+      'Sucursal': e.sucursal || '',
+      'Servicio': e.servicio || '',
+      'Patente': e.dominio || '',
+      'Fac. turnos': nota('p_turnos'),
+      'Tiempo espera': nota('p_espera'),
+      'Amabilidad': nota('p_amabilidad'),
+      'Atención': nota('p_atencion'),
+      'Puntualidad': nota('p_puntualidad'),
+      'Explicación': nota('p_explicacion'),
+      'Limpieza': nota('p_limpieza'),
+      'Calidad': nota('p_calidad'),
+      'NPS': nota('p_recomienda'),
+      'Prom. asesor': promedioEncuesta(e)!=null ? Number(promedioEncuesta(e).toFixed(2)) : '',
+      'Anulada': estaAnulada(e) ? 'Sí' : 'No',
+      'Pidió desestimación': ped ? 'Sí' : 'No',
+      'Solicitante': ped ? (ped.solicitante_nombre || '') : '',
+      'Comentario del pedido': ped ? (ped.motivo || '') : '',
+      'Resultado': ped ? (estadoLbl[ped.estado] || ped.estado || '') : '',
+      'Comentario del revisor': ped ? (ped.decision_admin || '') : '',
+      'Resuelto por': ped ? (ped.resuelto_por || '') : '',
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(filas);
+  // anchos de columna cómodos
+  ws['!cols'] = Object.keys(filas[0]).map(k => ({ wch: ['Comentario del pedido','Comentario del revisor','Servicio'].includes(k) ? 40 : (k==='Asesor'||k==='Solicitante'?22:12) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Encuestas');
+  const hoy = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `encuestas_desestimaciones_${hoy}.xlsx`);
 }
 
 // arma el bloque de detalle de una encuesta (las 9 preguntas + comentario)
