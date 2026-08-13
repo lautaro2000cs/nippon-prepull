@@ -1280,12 +1280,18 @@ function esDiaHabil(d){return !esFinDeSemana(d) && !esFeriado(d)}
 // Si el turno cae en fin de semana o feriado, devuelve null para que se trate aparte (alerta).
 function diffHabil(s){
   const target=parseD(s);
+  if(!target || isNaN(target.getTime())) return null;   // fecha inválida: no colgar la app
   if(!esDiaHabil(target))return null;
   const dirAdelante=target>=TODAY;
-  let cursor=new Date(TODAY),cont=0;
-  while(toStr(cursor)!==toStr(target)){
+  // Leemos los feriados UNA sola vez (antes se hacía JSON.parse de localStorage en cada vuelta)
+  const feriadosSet=new Set(getFeriados().map(f=>f.fecha));
+  const habil=(d)=>{const dia=d.getDay();return dia!==0&&dia!==6&&!feriadosSet.has(toStr(d));};
+  let cursor=new Date(TODAY),cont=0,guard=0;
+  const tStr=toStr(target);
+  while(toStr(cursor)!==tStr){
+    if(++guard>1200){return dirAdelante?999:-999;}      // tope de seguridad: jamás bucle infinito
     cursor=new Date(cursor.getTime()+(dirAdelante?86400000:-86400000));
-    if(esDiaHabil(cursor))cont+=dirAdelante?1:-1;
+    if(habil(cursor))cont+=dirAdelante?1:-1;
   }
   return cont;
 }
