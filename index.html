@@ -1390,7 +1390,10 @@ function getGroup(s){
 }
 // Un turno queda como Vencido/Histórico cuando su fecha ya pasó y nadie tomó acción
 // (no fue reprogramado y no se marcó No Show). Es un estado calculado, no se guarda en la base.
-function esHistorico(t){return diff(t.fecha)<0 && !t.reprogramado && !t.no_show;}
+function esHistorico(t){return diff(t.fecha)<0 && !t.reprogramado && !noShowVigente(t);}
+// Un no-show sigue el apartado/etiqueta No-Shows solo hasta 5 días después del turno.
+// Pasado eso, deja de aparecer ahí (cae al histórico) pero NO pierde que es no-show.
+function noShowVigente(t){ return !!t.no_show && diff(t.fecha) >= -5; }
 
 let cu=null, turnos=[], usuarios=[];
 let editId=null,isReprMode=false,nsId=null,vId=null,repId=null;
@@ -1643,10 +1646,10 @@ function canFallback(p){
   if(!cu) return false;
   if(cu.rol === 'admin') return true;
   const M = {
-    supervisor:   ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.sincronizar','minutas.ver'],
-    citas:        ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver'],
-    repuestos:    ['prepull.ver','prepull.dashboard.ver','prepull.repuestos.ver'],
-    compras:      ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar'],
+    supervisor:   ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.sincronizar','minutas.ver'],
+    citas:        ['prepull.ver','prepull.turnos.ver'],
+    repuestos:    ['prepull.ver','prepull.repuestos.ver'],
+    compras:      ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar'],
     asesor:       ['encuestas.ver'],
     jefe_servicio:['encuestas.ver','encuestas.tableros.ver'],
     seguridad:    ['minutas.ver'],
@@ -1770,7 +1773,7 @@ async function showApp(){
   } else if(enAdmin){
     startTab = 'usuarios';
   } else {
-    startTab = 'dash';
+    startTab = can('prepull.dashboard.ver') ? 'dash' : 'turnos';
     if(cu.rol==='repuestos') startTab='repuestos';
     if(cu.rol==='compras') startTab='compras';
     if(cu.rol==='supervisor') startTab='turnos';
@@ -4186,7 +4189,7 @@ function renderTurnos(){
     if(tiposFilt&&!tiposFilt.includes(t.tipo)) return false;
     if(q&&!((t.cliente||'').toLowerCase().includes(q)||(t.dominio||'').toLowerCase().includes(q)||(t.preor||'').toLowerCase().includes(q)||(t.modelo||'').toLowerCase().includes(q))) return false;
     if(metricaActiva==='today'&&diff(t.fecha)!==0) return false;
-    if(metricaActiva==='noshow'&&!t.no_show) return false;
+    if(metricaActiva==='noshow'&&!noShowVigente(t)) return false;
     if(metricaActiva==='repuesto'&&t.estado!=='pendiente') return false;
     if(metricaActiva==='vale'&&!t.vale) return false;
     return true;
@@ -4252,7 +4255,7 @@ function renderRepuestos(){
     if(tiposFilt&&!tiposFilt.includes(t.tipo)) return false;
     if(qr&&!(t.dominio||'').toLowerCase().includes(qr)) return false;
     if(metricaActivaRep==='today'&&diff(t.fecha)!==0) return false;
-    if(metricaActivaRep==='noshow'&&!t.no_show) return false;
+    if(metricaActivaRep==='noshow'&&!noShowVigente(t)) return false;
     if(metricaActivaRep==='repuesto'&&t.estado!=='pendiente') return false;
     if(metricaActivaRep==='vale'&&!t.vale) return false;
     return true;
@@ -4260,7 +4263,7 @@ function renderRepuestos(){
   if(typeof renderMetricasRep==='function') renderMetricasRep();
   renderGroups('grupos-repuestos',items,gi=>`<table><thead><tr>
     <th style="width:7%">Pre-Or</th><th style="width:11%">Cliente</th><th style="width:6%">Dominio</th><th style="width:7%">Modelo</th>
-    <th style="width:7%">Sucursal</th><th style="width:8%">Fecha del turno</th><th style="width:8%">Tipo</th><th style="width:5%">Prior.</th>
+    <th style="width:7%">Sucursal</th><th style="width:8%">Fecha del turno</th><th style="width:7%">Cargó</th><th style="width:8%">Tipo</th><th style="width:5%">Prior.</th>
     <th style="width:6%">Vale</th><th style="width:6%">No Show</th><th style="width:9%">Comentario Citas</th><th style="width:9%">Comentario Repuestos</th><th style="width:6%">Estado</th><th style="width:16%">Acciones</th>
   </tr></thead><tbody>${gi.map(t=>{
     const cR=cu&&(cu.rol==='repuestos'||cu.rol==='admin');
@@ -4277,7 +4280,7 @@ function renderRepuestos(){
     }else{
       acc=`<div class="act-group">${estPill(t.estado)}</div>`;
     }
-    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${valePill(t.vale)}</td><td>${nsBadge}</td><td>${obsCitaTag}</td><td>${obsTag}</td><td>${estPill(t.estado)}</td><td>${acc}</td></tr>`;
+    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${t.quien?`<span class="obs-badge" style="background:#E6F1FB;color:#0C447C"><i class="ti ti-user" style="font-size:10px"></i> ${escapeHtml(t.quien)}</span>`:'—'}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${valePill(t.vale)}</td><td>${nsBadge}</td><td>${obsCitaTag}</td><td>${obsTag}</td><td>${estPill(t.estado)}</td><td>${acc}</td></tr>`;
   }).join('')}</tbody></table>`,horizFilt);
   actualizarContadoresRep();
 }
@@ -4324,7 +4327,7 @@ function renderRepHistorico(){
 
 function renderNoShow(){
   const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-ns')?document.getElementById('fil-suc-ns').value:'');
-  const items=turnos.filter(t=>t.no_show&&(!f||t.sucursal===f));
+  const items=turnos.filter(t=>noShowVigente(t)&&(!f||t.sucursal===f));
   const cont=document.getElementById('tabla-noshow');
   if(!items.length){cont.innerHTML='<div class="empty"><i class="ti ti-user-check"></i>No hay clientes marcados como No Show</div>';return;}
   const cC=cu&&(cu.rol==='citas'||cu.rol==='admin');
@@ -4344,7 +4347,7 @@ function renderHistorico(){
       <button class="btn-sm btn-repr" onclick="openRepr('${t.id}')"><i class="ti ti-calendar-event" style="font-size:12px"></i> Reprogramar</button>
       <button class="btn-sm btn-noshow" onclick="openNsModal('${t.id}')"><i class="ti ti-square-check" style="font-size:12px"></i> No Show</button>
     </div>`:`<span style="font-size:11px;color:var(--color-text-secondary)">Solo Citas resuelve</span>`;
-    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${fmtD(t.fecha)}</td><td>${t.sucursal}</td><td>${tipoDot(t.tipo)}</td><td><span class="pill p-vencido"><i class="ti ti-clock-x" style="font-size:11px"></i> Vencido</span></td><td>${acc}</td></tr>`;
+    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${fmtD(t.fecha)}</td><td>${t.sucursal}</td><td>${tipoDot(t.tipo)}</td><td>${t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i> No show</span>':'<span class="pill p-vencido"><i class="ti ti-clock-x" style="font-size:11px"></i> Vencido</span>'}</td><td>${acc}</td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
 
@@ -4391,7 +4394,7 @@ function renderDash(){
   const base=turnos.filter(t=>!f||t.sucursal===f);
   const hoy=base.filter(t=>diff(t.fecha)===0);
   const pend=base.filter(t=>t.estado==='pendiente');
-  const noShows=base.filter(t=>t.no_show);
+  const noShows=base.filter(t=>noShowVigente(t));
   const enBO=base.filter(t=>t.estado==='bo');
   const total=base.length;
   const diasSem=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
@@ -4843,7 +4846,7 @@ function descargarReporteExcel(){
 
   const detalleRows=items.map(t=>({
     'Pre-Or':t.preor,'Cliente':t.cliente,'Dominio':t.dominio,'Modelo':t.modelo||'',
-    'Fecha':fmtD(t.fecha),'Sucursal':t.sucursal,'Tipo':t.tipo||'','Prioridad':t.prioridad||'',
+    'Fecha':fmtD(t.fecha),'Sucursal':t.sucursal,'Cargó (Citas)':t.quien||'','Tipo':t.tipo||'','Prioridad':t.prioridad||'',
     'Estado repuesto':({pendiente:'Pendiente',arribo:'Arribó',faltante:'Faltante',bo:'B/O'})[t.estado]||t.estado,
     'No Show':t.no_show?'Sí':'No','Vale':t.vale?'Sí':'No','Reprogramado':t.reprogramado?'Sí':'No',
     'Observaciones Citas':t.obs||'','Observaciones Repuestos':t.obs_rep||''
