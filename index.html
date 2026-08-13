@@ -239,6 +239,28 @@ a{color:#c62a27;text-decoration:none}
 .fir-sino-chip.si{background:#dcfce7;color:#15803d}
 .fir-sino-chip.no{background:#fee2e2;color:#b91c1c}
 .fir-sino-chip.na{color:var(--text-5)}
+/* ── Procedimientos ────────────────────────────────────── */
+.proc-cat-hd{display:flex;align-items:center;gap:9px;margin:22px 0 12px}
+.proc-cat-hd .ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px}
+.proc-cat-hd h3{margin:0;font-size:15px;font-weight:700;color:var(--text-1)}
+.proc-cat-hd .cnt{font-size:12px;color:var(--text-4);font-family:var(--mono)}
+.proc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.proc-card{background:#fff;border:1px solid var(--border-1);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;transition:box-shadow .15s,border-color .15s}
+.proc-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.06);border-color:var(--border-2)}
+.proc-card .pc-top{display:flex;align-items:flex-start;gap:10px}
+.proc-card .pc-ic{width:38px;height:38px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;color:#fff}
+.proc-card .pc-title{font-size:14.5px;font-weight:700;color:var(--text-1);line-height:1.25}
+.proc-card .pc-desc{font-size:12.5px;color:var(--text-3);line-height:1.4;flex:1}
+.proc-card .pc-meta{font-size:11px;color:var(--text-4);display:flex;flex-wrap:wrap;gap:4px 10px}
+.proc-card .pc-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.proc-vpill{font-size:10.5px;font-weight:700;padding:1px 8px;border-radius:20px;background:#eef2ff;color:#4f46e5}
+.proc-borrador{font-size:10.5px;font-weight:700;padding:1px 8px;border-radius:20px;background:#fef3c7;color:#92400e}
+.pc-btn{font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer;border:1px solid var(--border-2);background:#fff;color:var(--text-2);font-weight:600;display:inline-flex;align-items:center;gap:5px}
+.pc-btn.prim{background:var(--accent);border:none;color:#fff}
+.pc-btn.ok{background:#16a34a;border:none;color:#fff}
+.proc-ver-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-1);font-size:13px}
+.proc-cat-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border-1)}
+.proc-cat-row .dot{width:14px;height:14px;border-radius:4px;flex-shrink:0}
 /* ── Matriz Roles y permisos (Administración) ─────────── */
 .rp-wrap{background:#fff;border:1px solid var(--border-1);border-radius:14px;overflow:hidden}
 .rp-scroll{overflow-x:auto}
@@ -621,6 +643,10 @@ tbody td{padding:11px 12px;vertical-align:middle}
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg>
           Minutas
         </button>
+        <button class="nav-item" id="tab-proc" style="display:none" onclick="swTab('proc',this)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4a2 2 0 0 1 2-2h5l2 3h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>
+          Procedimientos
+        </button>
       </nav>
 
       <div class="sidebar-divider"></div>
@@ -963,6 +989,23 @@ tbody td{padding:11px 12px;vertical-align:middle}
           <div id="minutas-cont"></div>
         </div>
 
+        <!-- PROCEDIMIENTOS -->
+        <div class="tc" id="tc-proc">
+          <div class="sec-hdr">
+            <div class="sec-hdr-left">
+              <div class="sec-eyebrow">Documentación interna</div>
+              <h2>Procedimientos</h2>
+              <div class="tb-sub" id="proc-sub" style="margin-top:4px"></div>
+            </div>
+            <div class="hdr-actions" style="gap:8px;flex-wrap:wrap">
+              <input type="text" id="proc-buscar" placeholder="Buscar por título…" oninput="renderProc()" style="padding:9px 12px;border:1px solid var(--border-2);border-radius:10px;font-size:13px;min-width:200px">
+              <button id="proc-cats-btn" onclick="abrirCatsModal()" style="display:none;align-items:center;gap:6px;padding:9px 14px;border-radius:10px;border:1px solid var(--border-2);background:#fff;color:var(--text-2);font-weight:600;font-size:13px;cursor:pointer"><i class="ti ti-folders" style="font-size:15px"></i> Categorías</button>
+              <button id="proc-nuevo-btn" onclick="abrirProcModal()" style="display:none;align-items:center;gap:6px;padding:9px 16px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:600;font-size:13px;cursor:pointer"><i class="ti ti-upload" style="font-size:15px"></i> Subir procedimiento</button>
+            </div>
+          </div>
+          <div id="proc-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
+        </div>
+
       </div><!-- /main-inner -->
     </main>
 
@@ -1174,6 +1217,41 @@ tbody td{padding:11px 12px;vertical-align:middle}
     <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:.85rem" id="adj-modal-subtitle"></div>
     <div id="adj-modal-lista" style="display:flex;flex-direction:column;gap:6px;min-height:40px"></div>
     <div class="mfooter"><button class="btn-cancel" onclick="closeAdjModal()">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="modal-ov" id="procov">
+  <div class="modal">
+    <h3 id="proc-modal-title"><i class="ti ti-upload" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Subir procedimiento</h3>
+    <div class="mgrid">
+      <div><label>Título</label><input type="text" id="f-proc-titulo" placeholder="Ej: Procedimiento de recepción"/></div>
+      <div><label>Categoría</label><select id="f-proc-categoria"></select></div>
+    </div>
+    <div style="margin-top:12px"><label>Descripción</label><textarea id="f-proc-descripcion" rows="2" placeholder="Breve descripción…" style="width:100%;padding:9px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit"></textarea></div>
+    <div style="margin-top:12px"><label>Archivo</label><input type="file" id="f-proc-file" style="font-size:13px"><div style="font-size:11.5px;color:var(--text-4);margin-top:4px">PDF, Word, imágenes, etc. Se sube como borrador; después lo confirmás para dejarlo definitivo.</div></div>
+    <p class="login-err" id="proc-err" style="display:none"></p>
+    <div class="mfooter"><button class="btn-cancel" onclick="cerrarProcModal()">Cancelar</button><button class="btn-save" id="proc-save-btn" onclick="guardarProc()">Subir borrador</button></div>
+  </div>
+</div>
+
+<div class="modal-ov" id="procverov">
+  <div class="modal">
+    <h3 id="procver-title"><i class="ti ti-versions" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Versiones</h3>
+    <div id="procver-cont"></div>
+    <div class="mfooter"><button class="btn-cancel" onclick="document.getElementById('procverov').classList.remove('open')">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="modal-ov" id="proccatov">
+  <div class="modal">
+    <h3><i class="ti ti-folders" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Categorías</h3>
+    <div id="proccat-list" style="margin-bottom:14px"></div>
+    <div style="display:flex;gap:8px;align-items:flex-end;border-top:1px solid var(--border-1);padding-top:12px">
+      <div style="flex:1"><label style="font-size:12px;color:var(--text-3)">Nueva categoría</label><input type="text" id="f-cat-nombre" placeholder="Nombre" style="width:100%;padding:8px 10px;border:1px solid var(--border-2);border-radius:8px;font-size:13px"></div>
+      <input type="color" id="f-cat-color" value="#0d9488" style="width:42px;height:38px;border:1px solid var(--border-2);border-radius:8px;padding:2px;cursor:pointer">
+      <button onclick="crearCategoria()" style="padding:9px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-weight:600;font-size:13px;cursor:pointer">Agregar</button>
+    </div>
+    <div class="mfooter"><button class="btn-cancel" onclick="document.getElementById('proccatov').classList.remove('open')">Cerrar</button></div>
   </div>
 </div>
 
@@ -1624,6 +1702,13 @@ const MODULOS = {
     color: '#0d9488',
     icono: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/>'
   },
+  procedimientos: {
+    id: 'procedimientos',
+    nombre: 'Procedimientos',
+    desc: 'Documentación interna: procedimientos por categoría, con versiones.',
+    color: '#0d9488',
+    icono: '<path d="M4 4a2 2 0 0 1 2-2h5l2 3h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>'
+  },
   admin: {
     id: 'admin',
     nombre: 'Administración',
@@ -1646,13 +1731,13 @@ function canFallback(p){
   if(!cu) return false;
   if(cu.rol === 'admin') return true;
   const M = {
-    supervisor:   ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.sincronizar','minutas.ver'],
-    citas:        ['prepull.ver','prepull.turnos.ver'],
-    repuestos:    ['prepull.ver','prepull.repuestos.ver'],
-    compras:      ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar'],
-    asesor:       ['encuestas.ver'],
-    jefe_servicio:['encuestas.ver','encuestas.tableros.ver'],
-    seguridad:    ['minutas.ver'],
+    supervisor:   ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.sincronizar','minutas.ver','procedimientos.ver','procedimientos.subir'],
+    citas:        ['prepull.ver','prepull.turnos.ver','procedimientos.ver','encuestas.fir.crear','encuestas.desestimacion.pedir'],
+    repuestos:    ['prepull.ver','prepull.repuestos.ver','procedimientos.ver'],
+    compras:      ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar','procedimientos.ver'],
+    asesor:       ['encuestas.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
+    jefe_servicio:['encuestas.ver','encuestas.tableros.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
+    seguridad:    ['minutas.ver','procedimientos.ver','procedimientos.subir'],
   };
   const perms = new Set(M[cu.rol] || []);
   // overrides por usuario (mismos que en usuario_permiso)
@@ -1664,6 +1749,7 @@ function canFallback(p){
 // Qué módulos puede ACCEDER cada rol (para el control al hacer click)
 function puedeAcceder(moduloId){
   if(moduloId === 'admin') return !!(cu && cu.rol === 'admin'); // solo admin, regla dura
+  if(moduloId === 'procedimientos') return can('procedimientos.ver');
   return can(moduloId + '.ver');
 }
 
@@ -1752,6 +1838,7 @@ async function showApp(){
   const enEncuestas = cu.modulo === 'encuestas';
   const enMinutas = cu.modulo === 'minutas';
   const enAdmin = cu.modulo === 'admin';
+  const enProc = cu.modulo === 'procedimientos';
 
   document.getElementById('tab-dash').style.display=(enPrepull && can('prepull.dashboard.ver'))?'':'none';
   document.getElementById('tab-turnos').style.display=(enPrepull && can('prepull.turnos.ver'))?'':'none';
@@ -1762,6 +1849,8 @@ async function showApp(){
   document.getElementById('tab-desest').style.display=(enEncuestas && can('encuestas.desestimaciones.ver'))?'':'none';
   const tabMin = document.getElementById('tab-minutas');
   if(tabMin) tabMin.style.display=enMinutas?'':'none';
+  const tabProc = document.getElementById('tab-proc');
+  if(tabProc) tabProc.style.display=enProc?'':'none';
   // (dentro del módulo minutas, admin/supervisor/seguridad ya tienen acceso)
 
   // Elegir pestaña inicial según el módulo
@@ -1770,6 +1859,8 @@ async function showApp(){
     startTab = 'encuestas';
   } else if(enMinutas){
     startTab = 'minutas';
+  } else if(enProc){
+    startTab = 'proc';
   } else if(enAdmin){
     startTab = 'usuarios';
   } else {
@@ -1802,6 +1893,8 @@ async function showApp(){
     cargarEncuestas();
   } else if(enMinutas){
     cargarMinutas();
+  } else if(enProc){
+    cargarProcedimientos();
   } else if(enAdmin){
     await cargarUsuariosParaSelect();
     renderUsers();
@@ -3044,6 +3137,270 @@ async function guardarFir(){
   }finally{
     btn.disabled=false; btn.textContent='Guardar';
   }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  PROCEDIMIENTOS (documentación con versiones + Storage privado)
+// ══════════════════════════════════════════════════════════════════
+let procDocs = [];
+let procVers = [];
+let procCats = [];
+
+function puedeSubirProc(){ return cu && (cu.rol==='admin' || can('procedimientos.subir')); }
+function esDuenoProc(d){ return cu && (cu.rol==='admin' || d.subido_por_username === cu.username); }
+
+async function cargarProcedimientos(){
+  const cont = document.getElementById('proc-cont');
+  try{
+    const [c1,c2,c3] = await Promise.all([
+      sb.from('procedimiento_categorias').select('*').order('orden'),
+      sb.from('procedimientos').select('*').order('actualizado_en',{ascending:false}),
+      sb.from('procedimiento_versiones').select('*').order('version',{ascending:false}),
+    ]);
+    if(c1.error||c2.error||c3.error) throw (c1.error||c2.error||c3.error);
+    procCats = c1.data||[]; procDocs = c2.data||[]; procVers = c3.data||[];
+    renderProc();
+  }catch(err){
+    if(cont) cont.innerHTML = `<div class="access-note" style="color:#b91c1c"><i class="ti ti-alert-triangle"></i> No se pudo cargar: ${escapeHtml(err.message||'error')}. ¿Corriste el SQL de Procedimientos y creaste el bucket?</div>`;
+  }
+}
+
+// última versión (confirmada si hay; si no, el borrador más nuevo) de un doc
+function versionVigente(docId){
+  const vs = procVers.filter(v => v.procedimiento_id === docId);
+  const conf = vs.filter(v => v.estado==='confirmada');
+  if(conf.length) return conf.sort((a,b)=>b.version-a.version)[0];
+  return vs.sort((a,b)=>b.version-a.version)[0] || null;
+}
+function catDe(nombre){ return procCats.find(c => c.nombre === nombre) || {color:'#64748b', icono:'folder'}; }
+
+function renderProc(){
+  const cont = document.getElementById('proc-cont');
+  const sub = document.getElementById('proc-sub');
+  if(!cont) return;
+  const puede = puedeSubirProc();
+  const b1=document.getElementById('proc-nuevo-btn'); if(b1) b1.style.display = puede ? 'inline-flex' : 'none';
+  const b2=document.getElementById('proc-cats-btn'); if(b2) b2.style.display = (cu&&cu.rol==='admin') ? 'inline-flex' : 'none';
+
+  if(sub) sub.textContent = `${procDocs.length} documento(s) en ${procCats.length} categoría(s).`;
+
+  const q = (document.getElementById('proc-buscar')?.value||'').toLowerCase().trim();
+  let docs = procDocs.slice();
+  if(q) docs = docs.filter(d => (d.titulo||'').toLowerCase().includes(q) || (d.descripcion||'').toLowerCase().includes(q));
+
+  if(!docs.length){
+    cont.innerHTML = '<div class="access-note"><i class="ti ti-info-circle"></i> No hay procedimientos todavía.</div>';
+    return;
+  }
+
+  // agrupar por categoría (en el orden de procCats, y al final las que no matcheen)
+  const orden = procCats.map(c=>c.nombre);
+  const grupos = {};
+  docs.forEach(d => { (grupos[d.categoria] = grupos[d.categoria]||[]).push(d); });
+  const cats = Object.keys(grupos).sort((a,b)=>{
+    const ia=orden.indexOf(a), ib=orden.indexOf(b);
+    return (ia<0?999:ia)-(ib<0?999:ib);
+  });
+
+  cont.innerHTML = cats.map(cat => {
+    const c = catDe(cat);
+    const cards = grupos[cat].map(d => {
+      const v = versionVigente(d.id);
+      const esBorrador = v && v.estado==='borrador';
+      const meta = `Subió ${escapeHtml(d.subido_por_nombre||d.subido_por_username||'—')} · ${d.actualizado_en?new Date(d.actualizado_en).toLocaleDateString('es-AR'):''}`;
+      let acciones = '';
+      if(v){
+        acciones += `<button class="pc-btn prim" onclick="descargarProc('${d.id}')"><i class="ti ti-download"></i> Descargar</button>`;
+        acciones += `<button class="pc-btn" onclick="abrirVersiones('${d.id}')"><i class="ti ti-versions"></i> Versiones</button>`;
+      }
+      if(esBorrador && esDuenoProc(d)){
+        acciones += `<button class="pc-btn ok" onclick="confirmarVersion('${v.id}','${d.id}')"><i class="ti ti-check"></i> Confirmar</button>`;
+      }
+      if(!esBorrador && esDuenoProc(d)){
+        acciones += `<button class="pc-btn" onclick="nuevaVersion('${d.id}')"><i class="ti ti-upload"></i> Nueva versión</button>`;
+      }
+      return `<div class="proc-card">
+        <div class="pc-top">
+          <div class="pc-ic" style="background:${c.color}"><i class="ti ti-file-text"></i></div>
+          <div style="flex:1;min-width:0">
+            <div class="pc-title">${escapeHtml(d.titulo)}</div>
+            <div style="margin-top:3px">${esBorrador?'<span class="proc-borrador">Borrador v'+(v?v.version:1)+'</span>':'<span class="proc-vpill">v'+(v?v.version:1)+'</span>'}</div>
+          </div>
+        </div>
+        <div class="pc-desc">${escapeHtml(d.descripcion||'')}</div>
+        <div class="pc-meta">${meta}</div>
+        <div class="pc-actions">${acciones}</div>
+      </div>`;
+    }).join('');
+    return `<div class="proc-cat-hd">
+        <div class="ic" style="background:${c.color}"><i class="ti ti-${c.icono||'folder'}"></i></div>
+        <h3>${escapeHtml(cat)}</h3><span class="cnt">${grupos[cat].length}</span>
+      </div>
+      <div class="proc-grid">${cards}</div>`;
+  }).join('');
+}
+
+// ---- Descargar (link firmado del bucket privado) ----
+async function descargarProc(docId){
+  const v = versionVigente(docId);
+  if(!v){ alert('Sin archivo.'); return; }
+  try{
+    const { data, error } = await sb.storage.from('procedimientos').createSignedUrl(v.archivo_path, 120);
+    if(error) throw error;
+    window.open(data.signedUrl, '_blank');
+  }catch(err){ alert('No se pudo descargar: '+(err.message||'error')); }
+}
+
+// ---- Subir documento nuevo ----
+let procNuevaVersionDe = null; // si estamos subiendo una versión nueva de un doc existente
+function abrirProcModal(){
+  procNuevaVersionDe = null;
+  document.getElementById('proc-modal-title').innerHTML = '<i class="ti ti-upload" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Subir procedimiento';
+  document.getElementById('proc-err').style.display='none';
+  document.getElementById('f-proc-titulo').value='';
+  document.getElementById('f-proc-descripcion').value='';
+  document.getElementById('f-proc-file').value='';
+  document.getElementById('f-proc-titulo').disabled=false;
+  document.getElementById('f-proc-categoria').disabled=false;
+  llenarCategoriasSelect();
+  document.getElementById('procov').classList.add('open');
+}
+function cerrarProcModal(){ document.getElementById('procov').classList.remove('open'); }
+function llenarCategoriasSelect(sel){
+  const el = document.getElementById('f-proc-categoria');
+  el.innerHTML = procCats.map(c=>`<option value="${escapeHtml(c.nombre)}">${escapeHtml(c.nombre)}</option>`).join('');
+  if(sel) el.value = sel;
+}
+
+function nuevaVersion(docId){
+  const d = procDocs.find(x=>x.id===docId); if(!d) return;
+  procNuevaVersionDe = docId;
+  document.getElementById('proc-modal-title').innerHTML = '<i class="ti ti-upload" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Nueva versión · '+escapeHtml(d.titulo);
+  document.getElementById('proc-err').style.display='none';
+  document.getElementById('f-proc-titulo').value=d.titulo; document.getElementById('f-proc-titulo').disabled=true;
+  document.getElementById('f-proc-descripcion').value=d.descripcion||'';
+  document.getElementById('f-proc-file').value='';
+  llenarCategoriasSelect(d.categoria); document.getElementById('f-proc-categoria').disabled=true;
+  document.getElementById('procov').classList.add('open');
+}
+
+async function guardarProc(){
+  const err = document.getElementById('proc-err'); err.style.display='none';
+  const btn = document.getElementById('proc-save-btn');
+  const titulo = document.getElementById('f-proc-titulo').value.trim();
+  const categoria = document.getElementById('f-proc-categoria').value;
+  const descripcion = document.getElementById('f-proc-descripcion').value.trim();
+  const file = document.getElementById('f-proc-file').files[0];
+  if(!titulo || !categoria){ err.textContent='Completá título y categoría.'; err.style.display='block'; return; }
+  if(!file){ err.textContent='Elegí un archivo.'; err.style.display='block'; return; }
+
+  try{
+    btn.disabled=true; btn.textContent='Subiendo...';
+    let docId, version;
+    if(procNuevaVersionDe){
+      docId = procNuevaVersionDe;
+      const vs = procVers.filter(v=>v.procedimiento_id===docId);
+      version = (vs.length ? Math.max(...vs.map(v=>v.version)) : 0) + 1;
+    }else{
+      // crear el documento lógico
+      const { data, error } = await sb.from('procedimientos').insert({
+        titulo, categoria, descripcion,
+        subido_por_username: cu.username, subido_por_nombre: cu.nombre,
+        version_actual: 1,
+      }).select('id').single();
+      if(error) throw error;
+      docId = data.id; version = 1;
+    }
+    // subir el archivo al bucket privado
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path = `${docId}/v${version}/${Date.now()}_${safe}`;
+    const up = await sb.storage.from('procedimientos').upload(path, file, { upsert:false });
+    if(up.error) throw up.error;
+    // registrar la versión (borrador)
+    const { error: e3 } = await sb.from('procedimiento_versiones').insert({
+      procedimiento_id: docId, version, archivo_path: path, archivo_nombre: file.name,
+      archivo_tipo: file.type, tamano_bytes: file.size, estado: 'borrador',
+      subido_por_username: cu.username, subido_por_nombre: cu.nombre,
+    });
+    if(e3) throw e3;
+    cerrarProcModal();
+    await cargarProcedimientos();
+  }catch(ex){
+    err.textContent = 'Error: ' + (ex.message||'error'); err.style.display='block';
+  }finally{
+    btn.disabled=false; btn.textContent='Subir borrador';
+  }
+}
+
+// ---- Confirmar una versión (la congela) ----
+async function confirmarVersion(verId, docId){
+  if(!confirm('Al confirmar, esta versión queda definitiva y NO se podrá editar ni borrar (ni por el admin). ¿Confirmar?')) return;
+  try{
+    const v = procVers.find(x=>x.id===verId);
+    const { error } = await sb.from('procedimiento_versiones').update({
+      estado:'confirmada', confirmada_en:new Date().toISOString()
+    }).eq('id', verId);
+    if(error) throw error;
+    // actualizar la versión vigente del documento
+    await sb.from('procedimientos').update({ version_actual: v.version, actualizado_en:new Date().toISOString() }).eq('id', docId);
+    await cargarProcedimientos();
+  }catch(err){ alert('No se pudo confirmar: '+(err.message||'error')); }
+}
+
+// ---- Ver versiones (historial) ----
+async function abrirVersiones(docId){
+  const d = procDocs.find(x=>x.id===docId); if(!d) return;
+  document.getElementById('procver-title').innerHTML = '<i class="ti ti-versions" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Versiones · '+escapeHtml(d.titulo);
+  const vs = procVers.filter(v=>v.procedimiento_id===docId).sort((a,b)=>b.version-a.version);
+  document.getElementById('procver-cont').innerHTML = vs.map(v=>`
+    <div class="proc-ver-row">
+      <div>
+        <b>v${v.version}</b> ${v.estado==='confirmada'?'<span class="proc-vpill">Confirmada</span>':'<span class="proc-borrador">Borrador</span>'}
+        <div style="font-size:11.5px;color:var(--text-4)">${escapeHtml(v.archivo_nombre||'')} · ${escapeHtml(v.subido_por_nombre||'')} · ${v.creado_en?new Date(v.creado_en).toLocaleDateString('es-AR'):''}</div>
+      </div>
+      <button class="pc-btn" onclick="descargarVersion('${v.id}')"><i class="ti ti-download"></i></button>
+    </div>`).join('') || '<div style="color:var(--text-4)">Sin versiones.</div>';
+  document.getElementById('procverov').classList.add('open');
+}
+async function descargarVersion(verId){
+  const v = procVers.find(x=>x.id===verId); if(!v) return;
+  try{
+    const { data, error } = await sb.storage.from('procedimientos').createSignedUrl(v.archivo_path, 120);
+    if(error) throw error; window.open(data.signedUrl,'_blank');
+  }catch(err){ alert('No se pudo descargar: '+(err.message||'error')); }
+}
+
+// ---- Categorías (solo admin) ----
+function abrirCatsModal(){ renderCatsList(); document.getElementById('proccatov').classList.add('open'); }
+function renderCatsList(){
+  const cont = document.getElementById('proccat-list');
+  cont.innerHTML = procCats.map(c=>`
+    <div class="proc-cat-row">
+      <span class="dot" style="background:${c.color}"></span>
+      <span style="flex:1;font-size:13px;color:var(--text-1)">${escapeHtml(c.nombre)}</span>
+      <button class="pc-btn" onclick="borrarCategoria('${c.id}','${escapeHtml(c.nombre)}')" title="Borrar (solo si está vacía)"><i class="ti ti-trash" style="font-size:12px"></i></button>
+    </div>`).join('') || '<div style="color:var(--text-4);font-size:13px">Sin categorías.</div>';
+}
+async function crearCategoria(){
+  const nombre = document.getElementById('f-cat-nombre').value.trim();
+  const color = document.getElementById('f-cat-color').value;
+  if(!nombre) return;
+  try{
+    const { error } = await sb.from('procedimiento_categorias').insert({ nombre, color, orden: (procCats.length+1)*10 });
+    if(error) throw error;
+    document.getElementById('f-cat-nombre').value='';
+    await cargarProcedimientos(); renderCatsList();
+  }catch(err){ alert('No se pudo crear: '+(err.message||'error')); }
+}
+async function borrarCategoria(id, nombre){
+  const usada = procDocs.some(d=>d.categoria===nombre);
+  if(usada){ alert('No se puede borrar: hay procedimientos en esta categoría. Movelos o borralos primero.'); return; }
+  if(!confirm(`¿Borrar la categoría "${nombre}"?`)) return;
+  try{
+    const { error } = await sb.from('procedimiento_categorias').delete().eq('id', id);
+    if(error) throw error;
+    await cargarProcedimientos(); renderCatsList();
+  }catch(err){ alert('No se pudo borrar: '+(err.message||'error')); }
 }
 
 // --- Vista: promedio por asesor ---
