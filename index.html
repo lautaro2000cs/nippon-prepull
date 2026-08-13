@@ -3778,11 +3778,18 @@ function generarPdfMinuta(m){
   const col1 = 45, col3 = 40;
   doc.line(margin+col1, y, margin+col1, y+headH);
   doc.line(margin+contentW-col3, y, margin+contentW-col3, y+headH);
-  // logo (lo tomamos del topbar de la app)
+  // logo (lo tomamos del topbar de la app) — respetando su proporción para que no se estire
   try{
     const logoImg = document.querySelector('.tb-left img');
     if(logoImg && logoImg.src.startsWith('data:image')){
-      doc.addImage(logoImg.src, 'PNG', margin+3, y+4, col1-8, headH-8, undefined, 'FAST');
+      const maxW = col1-8, maxH = headH-8;
+      let ratio = 3; // proporción por defecto si no se puede leer la real
+      try{ const p = doc.getImageProperties(logoImg.src); if(p && p.width && p.height) ratio = p.width/p.height; }catch(e){}
+      let w = maxW, h = w/ratio;
+      if(h > maxH){ h = maxH; w = h*ratio; }
+      const lx = margin+3 + (maxW - w)/2;   // centrado horizontal en la celda
+      const ly = y + (headH - h)/2;          // centrado vertical
+      doc.addImage(logoImg.src, 'PNG', lx, ly, w, h, undefined, 'FAST');
     } else {
       doc.setFont('helvetica','bold'); doc.setFontSize(11);
       doc.text('NIPPON CAR', margin+6, y+headH/2+1);
