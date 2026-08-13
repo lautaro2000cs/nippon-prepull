@@ -1839,8 +1839,8 @@ function renderDesest(){
 function tarjetaDesest(d){
   const e = encuestas.find(x => x.wise_id === d.encuesta_id);
   const fecha = d.creado_en ? new Date(d.creado_en).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '';
-  const colores = { pendiente:'#d97706', aprobado:'#16a34a', rechazado:'#dc2626' };
-  const etiquetas = { pendiente:'Pendiente', aprobado:'Aprobado', rechazado:'Rechazado' };
+  const colores = { pendiente:'#d97706', aprobado:'#16a34a', rechazado:'#dc2626', en_revision:'#2563eb' };
+  const etiquetas = { pendiente:'Pendiente', aprobado:'Aprobado', rechazado:'Rechazado', en_revision:'En revisión' };
   const col = colores[d.estado] || '#6b7280';
   const evUrl = urlEvidencia(d.evidencia_path);
   const did = 'desest-'+d.id;
@@ -1876,8 +1876,11 @@ function tarjetaDesest(d){
         ${evUrl ? `<div style="margin-top:8px"><a href="${evUrl}" target="_blank" style="font-size:12px;color:#4f46e5;font-weight:600;text-decoration:none">📎 Ver evidencia adjunta</a></div>` : '<div style="margin-top:6px;font-size:12px;color:var(--text-4)">Sin evidencia adjunta</div>'}
       </div>
 
+      ${d.descargo ? `<div style="margin:10px 0;padding:10px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#2563eb;font-weight:700;margin-bottom:3px">Descargo del solicitante</div><div style="font-size:13px;color:var(--text-2)">${escapeHtml(d.descargo)}${d.descargo_por?` <span style="color:var(--text-4)">— ${escapeHtml(d.descargo_por)}</span>`:''}</div></div>` : ''}
+
       ${d.estado === 'pendiente' && e ? bloqueResolver(d, e, did) : ''}
-      ${d.estado !== 'pendiente' ? `<div style="margin-top:8px;padding:10px 13px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;font-size:13px;color:var(--text-2)"><b>Resolución:</b> ${escapeHtml(d.decision_admin||'—')}${d.resuelto_por?` <span style="color:var(--text-4)">— por ${escapeHtml(d.resuelto_por)}</span>`:''}</div>` : ''}
+      ${d.estado === 'en_revision' ? `<div style="margin-top:8px;padding:10px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;font-size:13px;color:var(--text-2)"><b>En revisión:</b> ${escapeHtml(d.decision_admin||'Se pidió descargo al solicitante.')} <span style="color:var(--text-4)">— esperando descargo</span></div>` : ''}
+      ${(d.estado === 'aprobado' || d.estado === 'rechazado') ? `<div style="margin-top:8px;padding:10px 13px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;font-size:13px;color:var(--text-2)"><b>Resolución:</b> ${escapeHtml(d.decision_admin||'—')}${d.resuelto_por?` <span style="color:var(--text-4)">— por ${escapeHtml(d.resuelto_por)}</span>`:''}</div>` : ''}
     </div>
   `;
 }
@@ -1902,6 +1905,7 @@ function bloqueResolver(d, e, did){
         <button onclick="resolverDesest(${d.id},'aprobar_preguntas','${did}')" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:none;background:#4f46e5;color:#fff;font-weight:600">Aplicar preguntas marcadas</button>
         <button onclick="resolverDesest(${d.id},'anular','${did}')" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid #dc2626;background:#fef2f2;color:#dc2626;font-weight:600">Anular encuesta completa</button>
         <button onclick="resolverDesest(${d.id},'rechazar','${did}')" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid var(--border-2);background:#fff;color:var(--text-3)">Rechazar pedido</button>
+        ${!d.revision_abierta ? `<button onclick="resolverDesest(${d.id},'revision','${did}')" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid #2563eb;background:#eff6ff;color:#2563eb;font-weight:600" title="Deja la ventana abierta para que el solicitante cargue un descargo">Dejar en revisión (pedir descargo)</button>` : ''}
       </div>
     </div>
   `;
@@ -1948,17 +1952,23 @@ async function resolverDesest(id, accion, did){
     } else if(accion === 'rechazar'){
       nuevoEstado = 'rechazado';
       decision = nota || 'Pedido rechazado.';
+    } else if(accion === 'revision'){
+      nuevoEstado = 'en_revision';
+      decision = nota || 'Se solicita descargo / evidencia adicional al solicitante.';
     }
 
     // actualizar el pedido
-    const { error: e2 } = await sb.from('desestimaciones').update({
+    const updatePayload = {
       estado: nuevoEstado,
       decision_admin: decision,
       preguntas_afectadas: preguntasAfectadas,
       encuesta_eliminada: encuestaEliminada,
       resuelto_por: cu.nombre,
       resuelto_en: new Date().toISOString(),
-    }).eq('id', id);
+    };
+    // al abrir la revisión, marcamos la ventana (una sola vez por pedido)
+    if(accion === 'revision'){ updatePayload.revision_abierta = true; updatePayload.resuelto_por = null; updatePayload.resuelto_en = null; }
+    const { error: e2 } = await sb.from('desestimaciones').update(updatePayload).eq('id', id);
     if(e2) throw e2;
 
     await cargarDesestimaciones();
@@ -2065,6 +2075,27 @@ function esAsesor(){
 // ¿el usuario actual es jefe de servicio? (ve las encuestas de su/s sucursal/es)
 function esJefeServicio(){
   return cu && cu.rol === 'jefe_servicio';
+}
+
+// Sucursales asignadas del usuario, normalizadas (de sucursales_asignadas, separadas por coma)
+function misSucursalesNorm(){
+  const raw = (cu && cu.sucursalesAsignadas) || '';
+  return String(raw).split(',').map(s => normSucursal(s)).filter(Boolean);
+}
+
+// ¿puede el usuario pedir desestimación sobre ESTA encuesta?
+//  - necesita el permiso 'encuestas.desestimacion.pedir'
+//  - asesor: solo las suyas · jefe/supervisor: las de sus sucursales · admin: todas
+function puedePedirDesest(e){
+  if(!cu) return false;
+  if(cu.rol === 'admin') return true;
+  if(!can('encuestas.desestimacion.pedir')) return false;
+  if(cu.rol === 'asesor') return normAsesor(e.asesor) === normAsesor(cu.asesorWise);
+  if(cu.rol === 'jefe_servicio' || cu.rol === 'supervisor'){
+    const mias = misSucursalesNorm();
+    return mias.length > 0 && mias.includes(normSucursal(e.sucursal));
+  }
+  return false;
 }
 
 // normaliza el nombre de una sucursal para comparar tolerando errores de Wise
@@ -2986,31 +3017,40 @@ function encDetalleHtml(e){
   `;
 }
 
-// Bloque del asesor: pedir desestimación + ver estado de su pedido
+// Bloque del solicitante: pedir desestimación, ver estado, y cargar descargo
 function pedidoAsesorHtml(e){
-  if(!esAsesor() && !esJefeServicio()) return '';
   const wid = e.wise_id;
-  // ¿ya hay un pedido para esta encuesta?
   const pedido = (desestimaciones || []).find(d => d.encuesta_id === wid);
+  const puedePedir = puedePedirDesest(e);
 
   if(pedido){
-    // mostrar estado + decisión del admin
-    const colores = { pendiente:'#d97706', aprobado:'#16a34a', rechazado:'#dc2626' };
-    const etiquetas = { pendiente:'Pendiente de revisión', aprobado:'Aprobado', rechazado:'Rechazado' };
+    const colores = { pendiente:'#d97706', aprobado:'#16a34a', rechazado:'#dc2626', en_revision:'#2563eb' };
+    const etiquetas = { pendiente:'Pendiente de revisión', aprobado:'Aprobado', rechazado:'Rechazado', en_revision:'En revisión — descargo pendiente' };
     const col = colores[pedido.estado] || '#6b7280';
+    const fid = 'desc-'+encodeURIComponent(wid).replace(/[^a-z0-9]/gi,'');
+    // ¿corresponde mostrar el formulario de descargo?
+    const puedeDescargar = pedido.estado === 'en_revision' && pedido.revision_abierta && !pedido.descargo && puedePedir;
     return `
       <div style="margin-top:16px;padding:14px;background:#f8fafc;border:1px solid var(--border-1);border-radius:10px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-4);font-weight:700">Tu pedido de desestimación</span>
+          <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-4);font-weight:700">Pedido de desestimación</span>
           <span style="font-size:11px;padding:2px 9px;border-radius:20px;background:${col}22;color:${col};font-weight:700">${etiquetas[pedido.estado]||pedido.estado}</span>
         </div>
-        <div style="font-size:13px;color:var(--text-2);margin-bottom:6px"><b>Motivo:</b> ${escapeHtml(pedido.motivo)}</div>
+        <div style="font-size:13px;color:var(--text-2);margin-bottom:6px"><b>Solicitante:</b> ${escapeHtml(pedido.solicitante_nombre||pedido.solicitante_username||'—')} · <b>Motivo:</b> ${escapeHtml(pedido.motivo)}</div>
         ${pedido.decision_admin ? `<div style="font-size:13px;color:var(--text-2);padding:8px 11px;background:#fff;border-radius:8px;border:1px solid var(--border-1)"><b>Respuesta del admin:</b> ${escapeHtml(pedido.decision_admin)}</div>` : ''}
+        ${pedido.descargo ? `<div style="margin-top:8px;font-size:13px;color:var(--text-2);padding:8px 11px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe"><b>Descargo:</b> ${escapeHtml(pedido.descargo)}${pedido.descargo_por?` <span style="color:var(--text-4)">— ${escapeHtml(pedido.descargo_por)}</span>`:''}</div>` : ''}
+        ${puedeDescargar ? `
+          <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border-2)">
+            <label style="font-size:12px;color:var(--text-3);display:block;margin-bottom:4px">El admin dejó la revisión abierta. Cargá tu descargo o evidencia:</label>
+            <textarea id="${fid}-txt" rows="3" placeholder="Escribí tu descargo…" style="width:100%;padding:9px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
+            <button onclick="enviarDescargo(${pedido.id},'${fid}')" style="margin-top:8px;font-size:12px;padding:7px 16px;border-radius:8px;cursor:pointer;border:none;background:#2563eb;color:#fff;font-weight:600">Enviar descargo</button>
+          </div>` : ''}
       </div>
     `;
   }
 
-  // formulario para pedir (colapsado en un botón que lo despliega)
+  // sin pedido: mostrar el formulario solo si el usuario puede pedir sobre esta encuesta
+  if(!puedePedir) return '';
   const fid = 'ped-'+encodeURIComponent(wid).replace(/[^a-z0-9]/gi,'');
   return `
     <div style="margin-top:16px;padding:14px;background:#f8fafc;border:1px dashed var(--border-2);border-radius:10px">
@@ -3031,6 +3071,20 @@ function pedidoAsesorHtml(e){
       </div>
     </div>
   `;
+}
+
+// Envía el descargo del solicitante (RPC seguro; vuelve el pedido a 'pendiente')
+async function enviarDescargo(id, fid){
+  const txt = (document.getElementById(fid+'-txt')?.value || '').trim();
+  if(!txt){ alert('Escribí tu descargo.'); return; }
+  try{
+    const { error } = await sb.rpc('cargar_descargo', { p_id: id, p_texto: txt });
+    if(error) throw error;
+    await cargarDesestimaciones();
+    renderEncuestas();
+  }catch(err){
+    alert('No se pudo enviar el descargo: ' + (err.message||'error'));
+  }
 }
 
 function togglePedidoForm(fid){
