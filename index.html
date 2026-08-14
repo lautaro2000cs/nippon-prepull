@@ -4646,18 +4646,19 @@ function renderGroupsCockpit(cid, items, horizFilt){
       <div class="cards-list">${gi.map(renderTurnoCard).join('')}</div>
     </div>`;
   });
-  // Pasados colapsados
+  // Pasados colapsados (pero abiertos si hay un filtro de métrica activo)
   if(!horizFilt||horizFilt.includes('pas')){
     const pasados=grouped.get('pas')||[];
     if(pasados.length){
       const pid=cid+'-pas-body';
+      const abierto = !!metricaActiva; // si estás filtrando, mostralos directamente
       html+=`<div class="pas-group">
         <div class="pas-toggle" onclick="togglePasados('${pid}',this)">
           <span class="day-lbl">Pasados sin acción</span>
           <span class="day-count" style="font-family:'JetBrains Mono',monospace">${pasados.length}</span>
           <span class="pas-toggle-icon" id="${pid}-chevron"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg> Ver</span>
         </div>
-        <div class="pas-body" id="${pid}"><div class="cards-list">${pasados.map(renderTurnoCard).join('')}</div></div>
+        <div class="pas-body ${abierto?'open':''}" id="${pid}"${abierto?' style="display:block"':''}><div class="cards-list">${pasados.map(renderTurnoCard).join('')}</div></div>
       </div>`;
     }
   }
@@ -6451,13 +6452,13 @@ function setMetrica(key){metricaActiva=metricaActiva===key?null:key;document.que
 
 function limpiarFiltroMetrica(){metricaActiva=null;document.querySelectorAll(".metric-card").forEach(c=>c.classList.remove("act"));const hint=document.getElementById("filter-hint");if(hint)hint.style.display="none";renderTurnos();}
 
-function renderMetricas(){const cont=document.getElementById("metricas-row");if(!cont)return;const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-t')?document.getElementById('fil-suc-t').value:'');const base=turnos.filter(t=>!f||t.sucursal===f);const hoy=base.filter(t=>diff(t.fecha)===0);const noshow=base.filter(t=>t.no_show);const rep=base.filter(t=>t.estado==="pendiente");const vale=base.filter(t=>t.vale);const cards=[{key:"today",cls:"metric-today",lbl:"Turnos hoy",val:hoy.length,tag:hoy.length===1?"turno":"turnos"},{key:"noshow",cls:"metric-noshow",lbl:"No-shows",val:noshow.length,tag:"sin presentarse"},{key:"repuesto",cls:"metric-rep",lbl:"Repuestos pend.",val:rep.length,tag:"pendientes"},{key:"vale",cls:"metric-vale",lbl:"Vale listo",val:vale.length,tag:"con vale"}];cont.innerHTML=cards.map(c=>`<div class="metric-card ${c.cls}${metricaActiva===c.key?" act":""}" data-key="${c.key}" onclick="setMetrica('${c.key}')"><div class="metric-lbl">${c.lbl}</div><div class="metric-val">${c.val}</div><div class="metric-tag">${c.tag}</div></div>`).join("");}
+function renderMetricas(){const cont=document.getElementById("metricas-row");if(!cont)return;const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-t')?document.getElementById('fil-suc-t').value:'');const base=turnos.filter(t=>!f||t.sucursal===f);const hoy=base.filter(t=>diff(t.fecha)===0);const noshow=base.filter(t=>noShowVigente(t));const rep=base.filter(t=>t.estado==="pendiente");const vale=base.filter(t=>t.vale);const cards=[{key:"today",cls:"metric-today",lbl:"Turnos hoy",val:hoy.length,tag:hoy.length===1?"turno":"turnos"},{key:"noshow",cls:"metric-noshow",lbl:"No-shows",val:noshow.length,tag:"sin presentarse"},{key:"repuesto",cls:"metric-rep",lbl:"Repuestos pend.",val:rep.length,tag:"pendientes"},{key:"vale",cls:"metric-vale",lbl:"Vale listo",val:vale.length,tag:"con vale"}];cont.innerHTML=cards.map(c=>`<div class="metric-card ${c.cls}${metricaActiva===c.key?" act":""}" data-key="${c.key}" onclick="setMetrica('${c.key}')"><div class="metric-lbl">${c.lbl}</div><div class="metric-val">${c.val}</div><div class="metric-tag">${c.tag}</div></div>`).join("");}
 
 function setMetricaRep(key){metricaActivaRep=metricaActivaRep===key?null:key;document.querySelectorAll("#metricas-row-rep .metric-card").forEach(c=>c.classList.toggle("act",c.dataset.key===metricaActivaRep));const hint=document.getElementById("filter-hint-rep");const hintTxt=document.getElementById("filter-hint-txt-rep");if(metricaActivaRep&&hint){hint.style.display="flex";const labels={today:"Filtrando: Turnos de hoy",noshow:"Filtrando: No shows",repuesto:"Filtrando: Repuestos pendientes",vale:"Filtrando: Vale listo"};if(hintTxt)hintTxt.textContent=labels[metricaActivaRep]||"";}else if(hint)hint.style.display="none";renderRepuestos();}
 
 function limpiarFiltroMetricaRep(){metricaActivaRep=null;document.querySelectorAll("#metricas-row-rep .metric-card").forEach(c=>c.classList.remove("act"));const hint=document.getElementById("filter-hint-rep");if(hint)hint.style.display="none";renderRepuestos();}
 
-function renderMetricasRep(){const cont=document.getElementById("metricas-row-rep");if(!cont)return;const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-r')?document.getElementById('fil-suc-r').value:'');const base=turnos.filter(t=>!f||t.sucursal===f);const hoy=base.filter(t=>diff(t.fecha)===0);const noshow=base.filter(t=>t.no_show);const rep=base.filter(t=>t.estado==="pendiente");const vale=base.filter(t=>t.vale);const cards=[{key:"today",cls:"metric-today",lbl:"Turnos hoy",val:hoy.length,tag:hoy.length===1?"turno":"turnos"},{key:"noshow",cls:"metric-noshow",lbl:"No-shows",val:noshow.length,tag:"sin presentarse"},{key:"repuesto",cls:"metric-rep",lbl:"Repuestos pend.",val:rep.length,tag:"pendientes"},{key:"vale",cls:"metric-vale",lbl:"Vale listo",val:vale.length,tag:"con vale"}];cont.innerHTML=cards.map(c=>`<div class="metric-card ${c.cls}${metricaActivaRep===c.key?" act":""}" data-key="${c.key}" onclick="setMetricaRep('${c.key}')"><div class="metric-lbl">${c.lbl}</div><div class="metric-val">${c.val}</div><div class="metric-tag">${c.tag}</div></div>`).join("");}
+function renderMetricasRep(){const cont=document.getElementById("metricas-row-rep");if(!cont)return;const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-r')?document.getElementById('fil-suc-r').value:'');const base=turnos.filter(t=>!f||t.sucursal===f);const hoy=base.filter(t=>diff(t.fecha)===0);const noshow=base.filter(t=>noShowVigente(t));const rep=base.filter(t=>t.estado==="pendiente");const vale=base.filter(t=>t.vale);const cards=[{key:"today",cls:"metric-today",lbl:"Turnos hoy",val:hoy.length,tag:hoy.length===1?"turno":"turnos"},{key:"noshow",cls:"metric-noshow",lbl:"No-shows",val:noshow.length,tag:"sin presentarse"},{key:"repuesto",cls:"metric-rep",lbl:"Repuestos pend.",val:rep.length,tag:"pendientes"},{key:"vale",cls:"metric-vale",lbl:"Vale listo",val:vale.length,tag:"con vale"}];cont.innerHTML=cards.map(c=>`<div class="metric-card ${c.cls}${metricaActivaRep===c.key?" act":""}" data-key="${c.key}" onclick="setMetricaRep('${c.key}')"><div class="metric-lbl">${c.lbl}</div><div class="metric-val">${c.val}</div><div class="metric-tag">${c.tag}</div></div>`).join("");}
 
 function actualizarContadoresSubTabs(){const activos=turnos.filter(t=>!esHistorico(t)&&!t.no_show);const ns=turnos.filter(t=>t.no_show);const hist=turnos.filter(esHistorico);const el1=document.getElementById("cnt-lista");const el2=document.getElementById("cnt-noshow");const el3=document.getElementById("cnt-hist");if(el1)el1.textContent=activos.length;if(el2)el2.textContent=ns.length;if(el3)el3.textContent=hist.length;}
 
