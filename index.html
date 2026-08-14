@@ -239,23 +239,33 @@ a{color:#c62a27;text-decoration:none}
 .fir-sino-chip.si{background:#dcfce7;color:#15803d}
 .fir-sino-chip.no{background:#fee2e2;color:#b91c1c}
 .fir-sino-chip.na{color:var(--text-5)}
-/* ── Procedimientos ────────────────────────────────────── */
-.proc-cat-hd{display:flex;align-items:center;gap:9px;margin:22px 0 12px}
-.proc-cat-hd .ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px}
-.proc-cat-hd h3{margin:0;font-size:15px;font-weight:700;color:var(--text-1)}
-.proc-cat-hd .cnt{font-size:12px;color:var(--text-4);font-family:var(--mono)}
-.proc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
-.proc-card{background:#fff;border:1px solid var(--border-1);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;transition:box-shadow .15s,border-color .15s}
-.proc-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.06);border-color:var(--border-2)}
-.proc-card .pc-top{display:flex;align-items:flex-start;gap:10px}
-.proc-card .pc-ic{width:38px;height:38px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;color:#fff}
-.proc-card .pc-title{font-size:14.5px;font-weight:700;color:var(--text-1);line-height:1.25}
-.proc-card .pc-desc{font-size:12.5px;color:var(--text-3);line-height:1.4;flex:1}
-.proc-card .pc-meta{font-size:11px;color:var(--text-4);display:flex;flex-wrap:wrap;gap:4px 10px}
-.proc-card .pc-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
-.proc-vpill{font-size:10.5px;font-weight:700;padding:1px 8px;border-radius:20px;background:#eef2ff;color:#4f46e5}
-.proc-borrador{font-size:10.5px;font-weight:700;padding:1px 8px;border-radius:20px;background:#fef3c7;color:#92400e}
-.pc-btn{font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer;border:1px solid var(--border-2);background:#fff;color:var(--text-2);font-weight:600;display:inline-flex;align-items:center;gap:5px}
+/* ── Procedimientos (filas plegables) ─────────────────────── */
+.proc-cat{margin-bottom:18px}
+.proc-cat-hd{display:flex;align-items:center;gap:9px;margin:0 0 8px;user-select:none}
+.proc-cat-hd .ic{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0}
+.proc-cat-hd h3{margin:0;font-size:14.5px;font-weight:700;color:var(--text-1)}
+.proc-cat-hd .cnt{font-size:11px;color:var(--text-4);font-family:var(--mono);background:var(--bg-soft,#f4f4f5);padding:1px 8px;border-radius:20px}
+.proc-cat-chev{color:var(--text-4);font-size:16px;transition:transform .18s}
+.proc-cat-chev.closed{transform:rotate(-90deg)}
+.proc-rows{display:flex;flex-direction:column;gap:7px}
+.proc-row{background:#fff;border:1px solid var(--border-1);border-radius:11px;overflow:hidden;transition:border-color .14s,box-shadow .14s}
+.proc-row:hover{border-color:var(--border-2)}
+.proc-row.open{border-color:var(--accent);box-shadow:0 3px 14px rgba(0,0,0,.05)}
+.proc-row-head{display:flex;align-items:center;gap:11px;padding:12px 14px;cursor:pointer}
+.prh-ic{width:32px;height:32px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px}
+.prh-title{flex:1;min-width:0;font-size:14px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prh-chev{color:var(--text-4);font-size:17px;transition:transform .18s;flex-shrink:0}
+.proc-row.open .prh-chev{transform:rotate(180deg)}
+.proc-row-detail{padding:2px 16px 16px 57px;animation:prdIn .16s ease}
+@keyframes prdIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+.prd-desc{font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:10px}
+.prd-meta{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--text-4);margin-bottom:12px}
+.prd-meta span{display:inline-flex;align-items:center;gap:5px}
+.prd-actions{display:flex;gap:7px;flex-wrap:wrap}
+.proc-vpill{font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:20px;background:#eef2ff;color:#4f46e5;flex-shrink:0}
+.proc-borrador{font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:20px;background:#fef3c7;color:#92400e;flex-shrink:0}
+.pc-btn{font-size:12px;padding:7px 13px;border-radius:8px;cursor:pointer;border:1px solid var(--border-2);background:#fff;color:var(--text-2);font-weight:600;display:inline-flex;align-items:center;gap:5px}
+.pc-btn:hover{background:var(--bg-soft,#f8f8f8)}
 .pc-btn.prim{background:var(--accent);border:none;color:#fff}
 .pc-btn.ok{background:#16a34a;border:none;color:#fff}
 .proc-ver-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-1);font-size:13px}
@@ -3193,7 +3203,6 @@ function renderProc(){
     return;
   }
 
-  // agrupar por categoría (en el orden de procCats, y al final las que no matcheen)
   const orden = procCats.map(c=>c.nombre);
   const grupos = {};
   docs.forEach(d => { (grupos[d.categoria] = grupos[d.categoria]||[]).push(d); });
@@ -3202,43 +3211,64 @@ function renderProc(){
     return (ia<0?999:ia)-(ib<0?999:ib);
   });
 
-  cont.innerHTML = cats.map(cat => {
+  cont.innerHTML = cats.map((cat, ci) => {
     const c = catDe(cat);
-    const cards = grupos[cat].map(d => {
+    const abiertaCat = procCatAbierta[cat] !== false; // por defecto abiertas
+    const filas = grupos[cat].map(d => {
       const v = versionVigente(d.id);
       const esBorrador = v && v.estado==='borrador';
-      const meta = `Subió ${escapeHtml(d.subido_por_nombre||d.subido_por_username||'—')} · ${d.actualizado_en?new Date(d.actualizado_en).toLocaleDateString('es-AR'):''}`;
+      const abierto = procDocAbierto === d.id;
+      const fecha = d.actualizado_en ? new Date(d.actualizado_en).toLocaleDateString('es-AR') : '';
+      const estadoPill = esBorrador
+        ? '<span class="proc-borrador">Borrador v'+(v?v.version:1)+'</span>'
+        : '<span class="proc-vpill">v'+(v?v.version:1)+'</span>';
+
       let acciones = '';
       if(v){
-        acciones += `<button class="pc-btn prim" onclick="descargarProc('${d.id}')"><i class="ti ti-download"></i> Descargar</button>`;
-        acciones += `<button class="pc-btn" onclick="abrirVersiones('${d.id}')"><i class="ti ti-versions"></i> Versiones</button>`;
+        acciones += `<button class="pc-btn prim" onclick="event.stopPropagation();descargarProc('${d.id}')"><i class="ti ti-download"></i> Descargar</button>`;
+        acciones += `<button class="pc-btn" onclick="event.stopPropagation();abrirVersiones('${d.id}')"><i class="ti ti-versions"></i> Versiones</button>`;
       }
-      if(esBorrador && esDuenoProc(d)){
-        acciones += `<button class="pc-btn ok" onclick="confirmarVersion('${v.id}','${d.id}')"><i class="ti ti-check"></i> Confirmar</button>`;
-      }
-      if(!esBorrador && esDuenoProc(d)){
-        acciones += `<button class="pc-btn" onclick="nuevaVersion('${d.id}')"><i class="ti ti-upload"></i> Nueva versión</button>`;
-      }
-      return `<div class="proc-card">
-        <div class="pc-top">
-          <div class="pc-ic" style="background:${c.color}"><i class="ti ti-file-text"></i></div>
-          <div style="flex:1;min-width:0">
-            <div class="pc-title">${escapeHtml(d.titulo)}</div>
-            <div style="margin-top:3px">${esBorrador?'<span class="proc-borrador">Borrador v'+(v?v.version:1)+'</span>':'<span class="proc-vpill">v'+(v?v.version:1)+'</span>'}</div>
+      if(esBorrador && esDuenoProc(d)) acciones += `<button class="pc-btn ok" onclick="event.stopPropagation();confirmarVersion('${v.id}','${d.id}')"><i class="ti ti-check"></i> Confirmar</button>`;
+      if(!esBorrador && esDuenoProc(d)) acciones += `<button class="pc-btn" onclick="event.stopPropagation();nuevaVersion('${d.id}')"><i class="ti ti-upload"></i> Nueva versión</button>`;
+
+      const detalle = `
+        <div class="proc-row-detail">
+          ${d.descripcion ? `<div class="prd-desc">${escapeHtml(d.descripcion)}</div>` : '<div class="prd-desc" style="color:var(--text-5)">Sin descripción.</div>'}
+          <div class="prd-meta">
+            <span><i class="ti ti-folder" style="font-size:13px"></i> ${escapeHtml(d.categoria)}</span>
+            <span><i class="ti ti-user" style="font-size:13px"></i> ${escapeHtml(d.subido_por_nombre||d.subido_por_username||'—')}</span>
+            <span><i class="ti ti-calendar" style="font-size:13px"></i> ${fecha}</span>
+            ${v && v.archivo_nombre ? `<span><i class="ti ti-paperclip" style="font-size:13px"></i> ${escapeHtml(v.archivo_nombre)}</span>` : ''}
           </div>
+          <div class="prd-actions">${acciones}</div>
+        </div>`;
+
+      return `<div class="proc-row ${abierto?'open':''}">
+        <div class="proc-row-head" onclick="toggleProcRow('${d.id}')">
+          <span class="prh-ic" style="background:${c.color}"><i class="ti ti-file-text"></i></span>
+          <span class="prh-title">${escapeHtml(d.titulo)}</span>
+          ${estadoPill}
+          <i class="ti ti-chevron-down prh-chev"></i>
         </div>
-        <div class="pc-desc">${escapeHtml(d.descripcion||'')}</div>
-        <div class="pc-meta">${meta}</div>
-        <div class="pc-actions">${acciones}</div>
+        ${abierto ? detalle : ''}
       </div>`;
     }).join('');
-    return `<div class="proc-cat-hd">
+
+    return `<div class="proc-cat">
+      <div class="proc-cat-hd" onclick="toggleProcCat('${cat.replace(/'/g,"\\'")}')" style="cursor:pointer">
         <div class="ic" style="background:${c.color}"><i class="ti ti-${c.icono||'folder'}"></i></div>
         <h3>${escapeHtml(cat)}</h3><span class="cnt">${grupos[cat].length}</span>
+        <i class="ti ti-chevron-down proc-cat-chev ${abiertaCat?'':'closed'}" style="margin-left:auto"></i>
       </div>
-      <div class="proc-grid">${cards}</div>`;
+      <div class="proc-rows" style="${abiertaCat?'':'display:none'}">${filas}</div>
+    </div>`;
   }).join('');
 }
+
+let procDocAbierto = null;              // documento expandido (uno a la vez)
+let procCatAbierta = {};                // categorías plegadas/desplegadas
+function toggleProcRow(id){ procDocAbierto = (procDocAbierto === id) ? null : id; renderProc(); }
+function toggleProcCat(cat){ procCatAbierta[cat] = !(procCatAbierta[cat] !== false); renderProc(); }
 
 // ---- Descargar (link firmado del bucket privado) ----
 async function descargarProc(docId){
