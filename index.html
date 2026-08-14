@@ -1317,6 +1317,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
       <div><label>Correo corporativo</label><input type="email" id="f-usr-email" placeholder="correo@nipponcarsrl.com.ar" autocomplete="off"/></div>
       <div><label>Rol / sector</label><select id="f-usr-rol" onchange="toggleSucUsr();renderExtrasUsr()"><option value="">Seleccionar...</option></select></div>
       <div id="f-usr-suc-wrap"><label>Sucursal fija (opcional)</label><select id="f-usr-suc"><option value="">Sin sucursal fija — ve todas</option><option>Roca</option><option>Perticone</option><option>Aguado</option></select></div>
+      <div id="f-usr-asesor-wrap" style="display:none"><label>Nombre del asesor en Wise</label><select id="f-usr-asesorwise"><option value="">Seleccionar asesor…</option></select><div style="font-size:11px;color:var(--text-4);margin-top:3px">Vincula al asesor con sus encuestas (para pedir desestimación de las suyas).</div></div>
     </div>
     <div style="margin-top:14px">
       <label style="font-size:12px;font-weight:600;color:var(--text-3)">Permisos extra (opcional)</label>
@@ -4952,6 +4953,31 @@ let convertUsrId=null;  // id de una agente que estamos convirtiendo en cuenta
 function toggleSucUsr(){
   const rol=document.getElementById('f-usr-rol').value;
   document.getElementById('f-usr-suc-wrap').style.display=rol?'block':'none';
+  // El vínculo con encuestas por nombre (asesor_wise) solo aplica al rol asesor
+  const aw=document.getElementById('f-usr-asesor-wrap');
+  if(aw){
+    if(rol==='asesor'){ aw.style.display='block'; llenarAsesoresWise(); }
+    else aw.style.display='none';
+  }
+}
+
+// Llena el selector con los asesores REALES que aparecen en las encuestas
+async function llenarAsesoresWise(sel){
+  const el=document.getElementById('f-usr-asesorwise');
+  if(!el) return;
+  const actual = sel ?? el.value;
+  let nombres = [...new Set((encuestas||[]).map(e=>e.asesor).filter(Boolean))];
+  if(!nombres.length){
+    // en el módulo Administración las encuestas no están cargadas: las traemos
+    try{
+      const { data } = await sb.from('encuestas').select('asesor');
+      nombres = [...new Set((data||[]).map(e=>e.asesor).filter(Boolean))];
+    }catch(e){}
+  }
+  nombres.sort((a,b)=>a.localeCompare(b));
+  el.innerHTML='<option value="">Seleccionar asesor…</option>'+nombres.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  if(actual && !nombres.includes(actual)) el.innerHTML+=`<option value="${escapeHtml(actual)}" selected>${escapeHtml(actual)} (actual)</option>`;
+  if(actual) el.value=actual;
 }
 
 // Sugerir correo con el formato de la empresa: inicial del nombre + apellido
@@ -5064,6 +5090,7 @@ async function openUserModal(id){
     emailEl.readOnly=true; emailEl.style.opacity='.6';
     document.getElementById('f-usr-rol').value=u.rol;
     document.getElementById('f-usr-suc').value=u.sucursal_fija||'';
+    if(u.rol==='asesor'){ await llenarAsesoresWise(u.asesor_wise||''); }
     // traer los overrides actuales de este usuario
     let extras=new Set();
     try{
@@ -5088,19 +5115,21 @@ async function guardarUsuario(){
   const email=document.getElementById('f-usr-email').value.trim().toLowerCase();
   const rol=document.getElementById('f-usr-rol').value;
   const sucursal_fija=document.getElementById('f-usr-suc').value||null;
+  const asesor_wise=(rol==='asesor')?(document.getElementById('f-usr-asesorwise').value||null):null;
   const extras=Array.from((document.getElementById('f-usr-extra')._checked)||[]);
   const errEl=document.getElementById('usr-err');
   const saveBtn=document.getElementById('usr-save-btn');
   errEl.style.display='none';
 
   if(!nombre||!rol){errEl.textContent='Completá nombre y rol.';errEl.style.display='block';return;}
+  if(rol==='asesor' && !asesor_wise){errEl.textContent='Elegí el nombre del asesor en Wise (para vincularlo a sus encuestas).';errEl.style.display='block';return;}
 
   // ---- EDICIÓN: actualiza el perfil + reconcilia overrides (sin tocar Auth) ----
   if(editUsrId){
     try{
       saveBtn.disabled=true; saveBtn.textContent='Guardando...';
       const u=usuarios.find(x=>x.id===editUsrId);
-      const {error}=await sb.from('usuarios').update({nombre,rol,sucursal_fija}).eq('id',editUsrId);
+      const {error}=await sb.from('usuarios').update({nombre,rol,sucursal_fija,asesor_wise}).eq('id',editUsrId);
       if(error)throw error;
       // reconciliar usuario_permiso: dejar exactamente los 'extras' elegidos
       await sb.from('usuario_permiso').delete().eq('username',u.username).eq('efecto','grant');
@@ -5127,7 +5156,7 @@ async function guardarUsuario(){
     const r = await fetch('/api/crear-usuario', {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
-      body: JSON.stringify({ nombre, email, rol, sucursal_fija, permisos_extra: extras, reusar_id: convertUsrId }),
+      body: JSON.stringify({ nombre, email, rol, sucursal_fija, asesor_wise, permisos_extra: extras, reusar_id: convertUsrId }),
     });
     const out = await r.json();
     if(!out.ok) throw new Error(out.error||'No se pudo crear el usuario');
