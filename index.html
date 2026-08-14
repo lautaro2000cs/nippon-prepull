@@ -1093,8 +1093,8 @@ tbody td{padding:11px 12px;vertical-align:middle}
         <option value="">Seleccionar...</option>
       </select>
     </div>
-    <div class="drawer-field full"><label class="drawer-label">Observaciones <span style="font-weight:400;color:var(--text-4)">(opcional)</span></label>
-      <textarea class="drawer-input" id="dr-obs" placeholder="Notas del turno..." style="resize:vertical;min-height:60px"></textarea>
+    <div class="drawer-field full"><label class="drawer-label">Comentario <span style="font-weight:400;color:var(--text-4)">(opcional · queda registrado con fecha)</span></label>
+      <textarea class="drawer-input" id="dr-obs" placeholder="Comentario del turno..." style="resize:vertical;min-height:60px"></textarea>
     </div>
     <!-- Adjuntos -->
     <div class="drawer-field full">
@@ -1133,7 +1133,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
       <div><label>Prioridad</label><select id="f-pri"><option value="">Seleccionar...</option><option>Alta</option><option>Mediana</option><option>Baja</option></select></div>
       <div><label>Cargado por</label><select id="f-quien"><option value="">Seleccionar...</option></select></div>
       <div class="full" id="f-repr-wrap" style="display:none"><label>Motivo de reprogramación</label><input type="text" id="f-repr-mot" placeholder="Ej: cliente no disponible"/></div>
-      <div class="full"><label>Observaciones</label><textarea id="f-obs" placeholder="Notas del turno..."></textarea></div>
+      <div class="full"><label>Agregar comentario <span style="font-weight:400;color:var(--text-4)">(queda con fecha; no edita los anteriores)</span></label><textarea id="f-obs" placeholder="Nuevo comentario..."></textarea></div>
       <div class="full" id="f-adj-wrap" style="display:none">
         <label>Archivos adjuntos (fotos, presupuestos, etc.)</label>
         <input type="file" id="f-adj-input" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onchange="subirAdjuntos()">
@@ -1181,7 +1181,10 @@ tbody td{padding:11px 12px;vertical-align:middle}
         </button>
       </div>
     </div>
-    <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Observación <span>(opcional)</span></label>
+    <div>
+      <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Comentarios registrados</label>
+      <div id="rep-coment-hist" style="display:flex;flex-direction:column;gap:6px;max-height:130px;overflow:auto;margin-bottom:8px"></div>
+      <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Agregar comentario <span>(queda con tu nombre y fecha; no se edita)</span></label>
       <textarea id="rep-obs" placeholder="Ej: separado en estantería A3..."></textarea>
     </div>
     <div class="mfooter"><button class="btn-cancel" onclick="closeRepModal()">Cancelar</button><button class="btn-save" onclick="guardarRep()">Confirmar</button></div>
@@ -1214,9 +1217,14 @@ tbody td{padding:11px 12px;vertical-align:middle}
 
 <div class="modal-ov" id="obsov">
   <div class="modal sm">
-    <h3 id="obs-modal-title"><i class="ti ti-message-2" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Observación</h3>
+    <h3 id="obs-modal-title"><i class="ti ti-message-2" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Comentarios</h3>
     <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:.85rem" id="obs-modal-subtitle"></div>
-    <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px 14px;font-size:13px;color:var(--color-text-primary);line-height:1.6;white-space:pre-wrap;min-height:50px" id="obs-modal-texto"></div>
+    <div id="obs-modal-lista" style="display:flex;flex-direction:column;gap:8px;max-height:280px;overflow:auto;margin-bottom:12px"></div>
+    <div id="obs-modal-add" style="display:none;border-top:1px solid var(--border-1);padding-top:12px">
+      <label style="font-size:12px;color:var(--text-3)">Agregar comentario (queda registrado con tu nombre y fecha; no se puede editar)</label>
+      <textarea id="obs-modal-nuevo" rows="2" placeholder="Escribí un comentario…" style="width:100%;padding:9px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;margin-top:5px"></textarea>
+      <button onclick="enviarComentario()" style="margin-top:8px;font-size:12px;padding:7px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-weight:600;cursor:pointer">Agregar</button>
+    </div>
     <div class="mfooter"><button class="btn-cancel" onclick="closeObsModal()">Cerrar</button></div>
   </div>
 </div>
@@ -1939,6 +1947,7 @@ function doLogout(){detenerRealtime();sb.auth.signOut().catch(()=>{});cu=null;fi
 // ============================================
 async function cargarTodo(){
   await Promise.all([cargarTurnos(), cargarUsuariosParaSelect()]);
+  await cargarComentariosTurnos();
   renderDash();renderTurnos();renderRepuestos();renderNoShow();renderHistorico();
   if(typeof renderRepHistorico==='function') renderRepHistorico();
   if(typeof renderMetricas==='function') renderMetricas();
@@ -4503,7 +4512,7 @@ function renderTurnoCard(t){
   const adjT=(Array.isArray(t.adjuntos)&&t.adjuntos.length)?`<span class="obs-badge" onclick='verAdjuntos(${JSON.stringify(t.id)})' title="Adjuntos" style="font-size:11px"><i class="ti ti-paperclip" style="font-size:11px"></i> ${t.adjuntos.length}</span>`:'';
   const expId=`exp-${t.id}`;
   const chevId=`chev-${t.id}`;
-  const obsRep=t.obs_rep?t.obs_rep:'<span style="color:var(--text-4);font-style:italic">Sin comentarios registrados.</span>';
+  const obsRep=(()=>{const l=comentariosDe(t.id,'repuestos');return l.length?l.map(c=>`<div style="margin-bottom:5px"><div>${escapeHtml(c.texto)}</div><div style="font-size:10.5px;color:var(--text-4)">${escapeHtml(c.autor_nombre||'—')} · ${new Date(c.creado_en).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div>`).join(''):'<span style="color:var(--text-4);font-style:italic">Sin comentarios registrados.</span>';})();
   return`<div class="t-card">
   <div class="t-bar ${barCls}"></div>
   <div class="t-row" onclick="toggleCardExpand('${t.id}')">
@@ -4665,8 +4674,9 @@ function renderRepuestos(){
     const cSup=cu&&cu.rol==='supervisor';
     const adjTag=(Array.isArray(t.adjuntos)&&t.adjuntos.length)?`<span class="obs-badge" style="margin-left:4px" onclick='verAdjuntos(${JSON.stringify(t.id)})' title="Ver archivos adjuntos"><i class="ti ti-paperclip" style="font-size:11px"></i> ${t.adjuntos.length}</span>`:'';
     const nsBadge=t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i></span>':'—';
-    const obsTag=t.obs_rep?`<span class="obs-badge" onclick="${cR?`openRepModal('${t.id}')`:`verObs('${t.id}','rep')`}" title="${t.obs_rep}"><i class="ti ti-message" style="font-size:11px"></i></span>`:'—';
-    const obsCitaTag=t.obs?`<span class="obs-badge" style="background:#E6F1FB;color:#0C447C" onclick="verObs('${t.id}','cita')"><i class="ti ti-notes" style="font-size:11px"></i> Ver</span>`:'—';
+    const nRep=comentariosDe(t.id,'repuestos').length, nCit=comentariosDe(t.id,'citas').length;
+    const obsTag=`<span class="obs-badge" onclick="verObs('${t.id}','rep')" title="Comentarios de Repuestos"><i class="ti ti-message" style="font-size:11px"></i> ${nRep||'+'}</span>`;
+    const obsCitaTag=`<span class="obs-badge" style="background:#E6F1FB;color:#0C447C" onclick="verObs('${t.id}','cita')" title="Comentarios de Citas"><i class="ti ti-notes" style="font-size:11px"></i> ${nCit||'+'}</span>`;
     let acc;
     if(cR){
       acc=`<div class="act-group"><button class="btn-sm btn-rep-mark" onclick="openRepModal('${t.id}')"><i class="ti ti-edit" style="font-size:12px"></i> ${t.estado==='pendiente'?'Marcar':'Editar'}</button></div>`;
@@ -4714,7 +4724,7 @@ function renderRepHistorico(){
     <th style="width:7%">Vale</th><th style="width:7%">No Show</th><th style="width:11%">Comentario Repuestos</th><th style="width:8%">Estado</th>
   </tr></thead><tbody>${items.map(t=>{
     const nsBadge=t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i></span>':'—';
-    const obsTag=t.obs_rep?`<span class="obs-badge" onclick="verObs('${t.id}','rep')" title="${t.obs_rep}"><i class="ti ti-message" style="font-size:11px"></i></span>`:'—';
+    const obsTag=`<span class="obs-badge" onclick="verObs('${t.id}','rep')" title="Comentarios de Repuestos"><i class="ti ti-message" style="font-size:11px"></i> ${comentariosDe(t.id,'repuestos').length||'+'}</span>`;
     return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${valePill(t.vale)}</td><td>${nsBadge}</td><td>${obsTag}</td><td>${estPill(t.estado)}</td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
@@ -4774,14 +4784,23 @@ function setRepVale(v){
   if(si) si.style.cssText=`flex:1;padding:9px;border-radius:9px;border:1.5px solid ${v?'#1f7a48':'var(--border-2)'};background:${v?'#e6f4ec':'none'};color:${v?'#1f7a48':'inherit'};font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s`;
   if(no) no.style.cssText=`flex:1;padding:9px;border-radius:9px;border:1.5px solid ${!v?'var(--accent-h)':'var(--border-2)'};background:${!v?'var(--accent-tint)':'none'};color:${!v?'var(--accent-h)':'inherit'};font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s`;
 }
-function openRepModal(id){repId=id;const t=findTurno(id);document.getElementById('rep-subtitle').textContent=`${t.preor} · ${t.cliente} · ${t.sucursal}`;document.getElementById('rep-estado').value=t.estado==='pendiente'?'arribo':t.estado;document.getElementById('rep-obs').value=t.obs_rep||'';repValeActual=!!t.vale;setRepVale(repValeActual);document.getElementById('repmov').classList.add('open');}
+function openRepModal(id){repId=id;const t=findTurno(id);document.getElementById('rep-subtitle').textContent=`${t.preor} · ${t.cliente} · ${t.sucursal}`;document.getElementById('rep-estado').value=t.estado==='pendiente'?'arribo':t.estado;document.getElementById('rep-obs').value='';repValeActual=!!t.vale;setRepVale(repValeActual);renderRepHistComent(id);document.getElementById('repmov').classList.add('open');}
+function renderRepHistComent(id){
+  const cont=document.getElementById('rep-coment-hist'); if(!cont) return;
+  const list=comentariosDe(id,'repuestos');
+  cont.innerHTML = list.length ? list.map(c=>`<div style="background:var(--surface-sub,#f6f7f9);border:1px solid var(--border-1);border-radius:8px;padding:7px 9px"><div style="font-size:12.5px;color:var(--text-1);white-space:pre-wrap">${escapeHtml(c.texto)}</div><div style="font-size:10.5px;color:var(--text-4);margin-top:3px">${escapeHtml(c.autor_nombre||'—')} · ${new Date(c.creado_en).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div>`).join('') : '<div style="font-size:12px;color:var(--text-4);font-style:italic">Sin comentarios.</div>';
+}
 function closeRepModal(){document.getElementById('repmov').classList.remove('open');}
 async function guardarRep(){
   const estado=document.getElementById('rep-estado').value;
-  const obs_rep=document.getElementById('rep-obs').value.trim();
-  const {error}=await sb.from('turnos').update({estado,obs_rep,vale:repValeActual}).eq('id',repId);
+  const nuevoComent=document.getElementById('rep-obs').value.trim();
+  const {error}=await sb.from('turnos').update({estado,vale:repValeActual}).eq('id',repId);
   if(error){alert('Error al guardar: '+error.message);return;}
-  closeRepModal();await cargarTurnos();renderTurnos();renderRepuestos();renderDash();
+  if(nuevoComent){
+    try{ await agregarComentario(repId,'repuestos',nuevoComent); }
+    catch(e){ alert('Estado guardado, pero el comentario falló: '+(e.message||'error')); }
+  }
+  closeRepModal();await cargarTurnos();await cargarComentariosTurnos();renderTurnos();renderRepuestos();renderDash();
 }
 
 function renderDash(){
@@ -5272,7 +5291,8 @@ function descargarReporteExcel(){
     'Fecha':fmtD(t.fecha),'Sucursal':t.sucursal,'Cargó (Citas)':t.quien||'','Tipo':t.tipo||'','Prioridad':t.prioridad||'',
     'Estado repuesto':({pendiente:'Pendiente',arribo:'Arribó',faltante:'Faltante',bo:'B/O'})[t.estado]||t.estado,
     'No Show':t.no_show?'Sí':'No','Vale':t.vale?'Sí':'No','Reprogramado':t.reprogramado?'Sí':'No',
-    'Observaciones Citas':t.obs||'','Observaciones Repuestos':t.obs_rep||''
+    'Observaciones Citas':comentariosDe(t.id,'citas').map(c=>`[${new Date(c.creado_en).toLocaleDateString('es-AR')} ${escapeHtml(c.autor_nombre||'')}] ${c.texto}`).join(' | '),
+    'Observaciones Repuestos':comentariosDe(t.id,'repuestos').map(c=>`[${new Date(c.creado_en).toLocaleDateString('es-AR')} ${escapeHtml(c.autor_nombre||'')}] ${c.texto}`).join(' | ')
   }));
   const wsDetalle=XLSX.utils.json_to_sheet(detalleRows);
   XLSX.utils.book_append_sheet(wb,wsDetalle,'Detalle de turnos');
@@ -6152,7 +6172,7 @@ function openModal(id){
   document.getElementById('repr-box').style.display='none';
   document.getElementById('f-repr-wrap').style.display='none';
   document.getElementById('f-adj-wrap').style.display=(cu&&(cu.rol==='citas'||cu.rol==='admin'))?'block':'none';
-  if(iE){const t=findTurno(id);document.getElementById('f-preor').value=t.preor;document.getElementById('f-fecha').value=t.fecha;document.getElementById('f-cliente').value=t.cliente;document.getElementById('f-dominio').value=t.dominio;document.getElementById('f-modelo').value=t.modelo||'';document.getElementById('f-suc').value=t.sucursal;document.getElementById('f-tipo').value=t.tipo||'';document.getElementById('f-pri').value=t.prioridad;document.getElementById('f-quien').value=t.quien;document.getElementById('f-obs').value=t.obs;currentAdjuntos=Array.isArray(t.adjuntos)?JSON.parse(JSON.stringify(t.adjuntos)):[];}
+  if(iE){const t=findTurno(id);document.getElementById('f-preor').value=t.preor;document.getElementById('f-fecha').value=t.fecha;document.getElementById('f-cliente').value=t.cliente;document.getElementById('f-dominio').value=t.dominio;document.getElementById('f-modelo').value=t.modelo||'';document.getElementById('f-suc').value=t.sucursal;document.getElementById('f-tipo').value=t.tipo||'';document.getElementById('f-pri').value=t.prioridad;document.getElementById('f-quien').value=t.quien;document.getElementById('f-obs').value='';currentAdjuntos=Array.isArray(t.adjuntos)?JSON.parse(JSON.stringify(t.adjuntos)):[];}
   else{['f-preor','f-fecha','f-cliente','f-dominio','f-obs','f-repr-mot'].forEach(id=>document.getElementById(id).value='');['f-modelo','f-suc','f-tipo','f-pri','f-quien'].forEach(id=>document.getElementById(id).value='');currentAdjuntos=[];}
   renderAdjuntosForm();
   document.getElementById('mov').classList.add('open');
@@ -6163,7 +6183,7 @@ function openRepr(id){
   document.getElementById('modal-title').innerHTML=`<i class="ti ti-calendar-event" style="font-size:16px;vertical-align:-3px;margin-right:6px"></i>Reprogramar turno`;
   document.getElementById('repr-box').style.display='block';document.getElementById('f-repr-wrap').style.display='block';
   document.getElementById('f-adj-wrap').style.display='none';
-  document.getElementById('f-preor').value=t.preor;document.getElementById('f-fecha').value=t.fecha;document.getElementById('f-cliente').value=t.cliente;document.getElementById('f-dominio').value=t.dominio;document.getElementById('f-modelo').value=t.modelo||'';document.getElementById('f-suc').value=t.sucursal;document.getElementById('f-tipo').value=t.tipo||'';document.getElementById('f-pri').value=t.prioridad;document.getElementById('f-quien').value=t.quien;document.getElementById('f-obs').value=t.obs;document.getElementById('f-repr-mot').value='';
+  document.getElementById('f-preor').value=t.preor;document.getElementById('f-fecha').value=t.fecha;document.getElementById('f-cliente').value=t.cliente;document.getElementById('f-dominio').value=t.dominio;document.getElementById('f-modelo').value=t.modelo||'';document.getElementById('f-suc').value=t.sucursal;document.getElementById('f-tipo').value=t.tipo||'';document.getElementById('f-pri').value=t.prioridad;document.getElementById('f-quien').value=t.quien;document.getElementById('f-obs').value='';document.getElementById('f-repr-mot').value='';
   currentAdjuntos=Array.isArray(t.adjuntos)?JSON.parse(JSON.stringify(t.adjuntos)):[]; // se conservan tal cual, no se editan acá
   document.getElementById('mov').classList.add('open');
 }
@@ -6177,23 +6197,27 @@ async function guardar(){
   btn.disabled=true;btn.textContent='Guardando...';
 
   try{
+    let turnoIdParaComentario=editId;
     if(isReprMode){
       if(!reprMot){alert('Ingresá el motivo de la reprogramación.');btn.disabled=false;btn.textContent='Guardar';return;}
-      const {error}=await sb.from('turnos').update({fecha,sucursal:suc,modelo,tipo,prioridad:pri,obs,reprogramado:true,motivo_repr:reprMot,no_show:false}).eq('id',editId);
+      const {error}=await sb.from('turnos').update({fecha,sucursal:suc,modelo,tipo,prioridad:pri,reprogramado:true,motivo_repr:reprMot,no_show:false}).eq('id',editId);
       if(error) throw error;
       closeModal();showAlert('Turno reprogramado',`El turno de ${cliente} (${preor}) fue reprogramado al ${fmtD(fecha)} en ${suc}. Motivo: ${reprMot}.`);
     } else if(editId!==null){
-      const {error}=await sb.from('turnos').update({preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad:pri,quien,obs,adjuntos:currentAdjuntos}).eq('id',editId);
+      const {error}=await sb.from('turnos').update({preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad:pri,quien,adjuntos:currentAdjuntos}).eq('id',editId);
       if(error) throw error;
       closeModal();
     } else {
       const d=diff(fecha);
-      const {error}=await sb.from('turnos').insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad:pri,quien,obs,estado:'pendiente',reprogramado:false,motivo_repr:'',no_show:false,vale:false,obs_rep:'',adjuntos:currentAdjuntos}]);
+      const {data:ins,error}=await sb.from('turnos').insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad:pri,quien,estado:'pendiente',reprogramado:false,motivo_repr:'',no_show:false,vale:false,adjuntos:currentAdjuntos}]).select('id').single();
       if(error) throw error;
+      turnoIdParaComentario = ins?.id;
       if(d===1||d===2)showAlert('Turno urgente',`El turno de ${cliente} (${preor}) está agendado para ${d===1?'mañana':'en 2 días'}. Avisá a repuestos de inmediato.`);
       closeModal();
     }
-    await cargarTurnos();renderTurnos();renderRepuestos();renderNoShow();renderDash();
+    // el comentario de Citas se registra como historial (no se pisa)
+    if(obs && turnoIdParaComentario){ try{ await agregarComentario(turnoIdParaComentario,'citas',obs); }catch(e){} }
+    await cargarTurnos();await cargarComentariosTurnos();renderTurnos();renderRepuestos();renderNoShow();renderDash();
   }catch(err){
     alert('Error al guardar el turno: '+err.message);
   }finally{
@@ -6203,7 +6227,84 @@ async function guardar(){
 function showAlert(t,m){document.getElementById('alert-title').textContent=t;document.getElementById('alert-msg').textContent=m;document.getElementById('aov').classList.add('open');}
 function closeAlert(){document.getElementById('aov').classList.remove('open');}
 
-function verObs(id,tipo){
+// ── Historial de comentarios de turnos (Citas / Repuestos) ────────────
+let TCOM = {};              // turno_id -> [ {sector,texto,autor_nombre,creado_en,id} ] (desc)
+let obsCtx = null;          // { turnoId, sector } del modal abierto
+
+async function cargarComentariosTurnos(){
+  try{
+    const ids = (turnos||[]).map(t=>t.id);
+    if(!ids.length){ TCOM = {}; return; }
+    const { data, error } = await sb.from('turno_comentarios').select('*').order('creado_en',{ascending:false});
+    if(error) throw error;
+    TCOM = {};
+    (data||[]).forEach(c=>{ (TCOM[c.turno_id] = TCOM[c.turno_id]||[]).push(c); });
+  }catch(e){ /* si aún no corrió el SQL, TCOM queda vacío */ }
+}
+function comentariosDe(turnoId, sector){
+  return (TCOM[turnoId]||[]).filter(c=>c.sector===sector);
+}
+function tieneComentarios(turnoId, sector){ return comentariosDe(turnoId, sector).length>0; }
+
+async function agregarComentario(turnoId, sector, texto){
+  const t = (texto||'').trim();
+  if(!t) return;
+  const { error } = await sb.from('turno_comentarios').insert({
+    turno_id: turnoId, sector, texto: t,
+    autor_username: cu?.username || null, autor_nombre: cu?.nombre || null,
+  });
+  if(error) throw error;
+}
+
+function verObs(id, tipo){
+  const t=findTurno(id); if(!t) return;
+  const sector = tipo==='rep' ? 'repuestos' : 'citas';
+  obsCtx = { turnoId:id, sector };
+  document.getElementById('obs-modal-title').innerHTML=`<i class="ti ti-message-2" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Comentarios de ${sector==='repuestos'?'Repuestos':'Citas'}`;
+  document.getElementById('obs-modal-subtitle').textContent=`${t.preor} · ${t.cliente}`;
+  renderObsLista();
+  // permitir agregar desde acá (cualquiera logueado puede sumar; no editar/borrar)
+  document.getElementById('obs-modal-add').style.display='block';
+  document.getElementById('obs-modal-nuevo').value='';
+  document.getElementById('obsov').classList.add('open');
+}
+function renderObsLista(){
+  const cont = document.getElementById('obs-modal-lista');
+  const list = comentariosDe(obsCtx.turnoId, obsCtx.sector);
+  const esAdmin = cu && cu.rol==='admin';
+  if(!list.length){ cont.innerHTML='<div style="font-size:13px;color:var(--text-4);font-style:italic">Sin comentarios registrados.</div>'; return; }
+  cont.innerHTML = list.map(c=>`
+    <div style="background:var(--surface-sub,#f6f7f9);border:1px solid var(--border-1);border-radius:9px;padding:9px 11px">
+      <div style="font-size:13px;color:var(--text-1);line-height:1.45;white-space:pre-wrap">${escapeHtml(c.texto)}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:5px">
+        <div style="font-size:11px;color:var(--text-4)"><i class="ti ti-user" style="font-size:11px"></i> ${escapeHtml(c.autor_nombre||'—')} · ${new Date(c.creado_en).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+        ${esAdmin?`<button onclick="borrarComentario('${c.id}')" title="Borrar (solo admin)" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:13px"><i class="ti ti-trash"></i></button>`:''}
+      </div>
+    </div>`).join('');
+}
+async function enviarComentario(){
+  if(!obsCtx) return;
+  const txt = document.getElementById('obs-modal-nuevo').value;
+  if(!txt.trim()) return;
+  try{
+    await agregarComentario(obsCtx.turnoId, obsCtx.sector, txt);
+    await cargarComentariosTurnos();
+    document.getElementById('obs-modal-nuevo').value='';
+    renderObsLista();
+    renderRepuestos(); renderTurnos && renderTurnos();
+  }catch(err){ alert('No se pudo agregar: '+(err.message||'error')); }
+}
+async function borrarComentario(cid){
+  if(!confirm('¿Borrar este comentario? (solo el admin puede)')) return;
+  try{
+    const { error } = await sb.from('turno_comentarios').delete().eq('id', cid);
+    if(error) throw error;
+    await cargarComentariosTurnos();
+    renderObsLista(); renderRepuestos();
+  }catch(err){ alert('No se pudo borrar: '+(err.message||'error')); }
+}
+
+function verObsViejo(id,tipo){
   const t=findTurno(id);
   if(!t) return;
   const esRep=tipo==='rep';
@@ -6291,7 +6392,7 @@ function setDrawerPri(val,btn){
   document.getElementById("dr-pri-seg").dataset.val=val;
 }
 
-async function crearTurnoDrawer(){const errEl=document.getElementById("drawer-err");errEl.style.display="none";const preor=document.getElementById("dr-preor").value.trim();const fecha=document.getElementById("dr-fecha").value;const cliente=document.getElementById("dr-cliente").value.trim();const dominio=document.getElementById("dr-dominio").value.trim();const modelo=document.getElementById("dr-modelo").value;const suc=document.getElementById("dr-suc").value;const tipo=document.getElementById("dr-tipo").value;const prioridad=document.getElementById("dr-pri-seg").dataset.val||"Mediana";const quien=document.getElementById("dr-quien").value;const obs=document.getElementById("dr-obs").value.trim();if(!cliente||!dominio){errEl.textContent="Completá al menos Cliente y Dominio.";errEl.style.display="block";return;}try{const{error}=await sb.from("turnos").insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad,quien,obs,estado:"pendiente",reprogramado:false,motivo_repr:"",no_show:false,vale:false,obs_rep:"",adjuntos:drawerAdjuntos}]);if(error)throw error;closeDrawer();showToast("Turno creado correctamente");}catch(err){errEl.textContent="Error: "+err.message;errEl.style.display="block";}}
+async function crearTurnoDrawer(){const errEl=document.getElementById("drawer-err");errEl.style.display="none";const preor=document.getElementById("dr-preor").value.trim();const fecha=document.getElementById("dr-fecha").value;const cliente=document.getElementById("dr-cliente").value.trim();const dominio=document.getElementById("dr-dominio").value.trim();const modelo=document.getElementById("dr-modelo").value;const suc=document.getElementById("dr-suc").value;const tipo=document.getElementById("dr-tipo").value;const prioridad=document.getElementById("dr-pri-seg").dataset.val||"Mediana";const quien=document.getElementById("dr-quien").value;const obs=document.getElementById("dr-obs").value.trim();if(!cliente||!dominio){errEl.textContent="Completá al menos Cliente y Dominio.";errEl.style.display="block";return;}try{const{data:ins,error}=await sb.from("turnos").insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad,quien,estado:"pendiente",reprogramado:false,motivo_repr:"",no_show:false,vale:false,adjuntos:drawerAdjuntos}]).select('id').single();if(error)throw error;if(obs&&ins?.id){try{await agregarComentario(ins.id,'citas',obs);}catch(e){}}closeDrawer();showToast("Turno creado correctamente");}catch(err){errEl.textContent="Error: "+err.message;errEl.style.display="block";}}
 
 async function subirAdjuntosDrawer(){
   const input=document.getElementById("dr-adj-input");
