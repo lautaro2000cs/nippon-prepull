@@ -271,6 +271,24 @@ a{color:#c62a27;text-decoration:none}
 .proc-ver-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-1);font-size:13px}
 .proc-cat-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border-1)}
 .proc-cat-row .dot{width:14px;height:14px;border-radius:4px;flex-shrink:0}
+/* tarjetas de categoría */
+.proc-cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.proc-cat-card{background:#fff;border:1px solid var(--border-1);border-radius:14px;padding:18px;cursor:pointer;transition:box-shadow .15s,border-color .15s,transform .1s}
+.proc-cat-card:hover{box-shadow:0 6px 20px rgba(0,0,0,.07);border-color:var(--border-2);transform:translateY(-2px)}
+.proc-cat-card .pcc-ic{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:21px;margin-bottom:12px}
+.proc-cat-card .pcc-name{font-size:15px;font-weight:700;color:var(--text-1)}
+.proc-cat-card .pcc-count{font-size:12.5px;color:var(--text-4);margin-top:2px}
+.proc-cat-card .pcc-go{font-size:12.5px;color:var(--accent);font-weight:600;margin-top:12px;display:inline-flex;align-items:center;gap:4px}
+/* tabla de documentos */
+.proc-doc-table{width:100%;border-collapse:collapse;font-size:13px}
+.proc-doc-table thead th{background:#2f3033;color:#fff;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:11px 14px;text-align:left}
+.proc-doc-table tbody td{padding:12px 14px;border-bottom:1px solid var(--border-1);vertical-align:middle}
+.proc-doc-table tbody tr:hover{background:#f5f8ff}
+.pdoc-t{font-weight:600;color:var(--text-1)}
+.pdoc-d{font-size:12px;color:var(--text-4);margin-top:2px}
+.pdoc-cat{font-size:11px;color:var(--accent);margin-top:3px}
+.proc-estado-vig{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#15803d}
+.proc-estado-vig .dotv{width:8px;height:8px;border-radius:50%;background:#16a34a}
 /* ── Matriz Roles y permisos (Administración) ─────────── */
 .rp-wrap{background:#fff;border:1px solid var(--border-1);border-radius:14px;overflow:hidden}
 .rp-scroll{overflow-x:auto}
@@ -1870,6 +1888,9 @@ async function showApp(){
   if(tabMin) tabMin.style.display=enMinutas?'':'none';
   const tabProc = document.getElementById('tab-proc');
   if(tabProc) tabProc.style.display=enProc?'':'none';
+  // el botón flotante "+" es de Pre Pull (crear turno): ocultarlo en otros módulos
+  const fab = document.getElementById('fab-nuevo');
+  if(fab && !enPrepull) fab.style.display='none';
   // (dentro del módulo minutas, admin/supervisor/seguridad ya tienen acceso)
 
   // Elegir pestaña inicial según el módulo
@@ -2324,6 +2345,8 @@ function normSucursal(s){
 // "Neuquén Capital" se integra a NEUQUEN; "San Martín de los Andes" a S.T.M.
 const SUCURSAL_CANON = {
   'neuquencapital':      'NEUQUEN',
+  'sucursalneuquen':     'NEUQUEN',
+  'cipolletti':          'NEUQUEN',
   'sanmartindelosandes': 'S.T.M.',
 };
 // Devuelve la etiqueta canónica de una sucursal (o la original si no hay fusión)
@@ -3194,6 +3217,8 @@ function versionVigente(docId){
 }
 function catDe(nombre){ return procCats.find(c => c.nombre === nombre) || {color:'#64748b', icono:'folder'}; }
 
+let procCatVista = null;   // categoría abierta (null = vista de tarjetas de categoría)
+
 function renderProc(){
   const cont = document.getElementById('proc-cont');
   const sub = document.getElementById('proc-sub');
@@ -3202,83 +3227,83 @@ function renderProc(){
   const b1=document.getElementById('proc-nuevo-btn'); if(b1) b1.style.display = puede ? 'inline-flex' : 'none';
   const b2=document.getElementById('proc-cats-btn'); if(b2) b2.style.display = (cu&&cu.rol==='admin') ? 'inline-flex' : 'none';
 
-  if(sub) sub.textContent = `${procDocs.length} documento(s) en ${procCats.length} categoría(s).`;
+  // resumen: documentos · categorías · vigentes · última actualización
+  const vigentes = procDocs.filter(d=>{ const v=versionVigente(d.id); return v && v.estado==='confirmada'; }).length;
+  const ultAct = procDocs.reduce((mx,d)=> d.actualizado_en && d.actualizado_en>mx ? d.actualizado_en : mx, '');
+  if(sub) sub.innerHTML = `<b>${procDocs.length}</b> documento(s) · <b>${procCats.length}</b> categoría(s) · <b style="color:#15803d">${vigentes} vigente(s)</b>${ultAct?` · última actualización ${new Date(ultAct).toLocaleDateString('es-AR')}`:''}`;
 
   const q = (document.getElementById('proc-buscar')?.value||'').toLowerCase().trim();
-  let docs = procDocs.slice();
-  if(q) docs = docs.filter(d => (d.titulo||'').toLowerCase().includes(q) || (d.descripcion||'').toLowerCase().includes(q));
 
-  if(!docs.length){
-    cont.innerHTML = '<div class="access-note"><i class="ti ti-info-circle"></i> No hay procedimientos todavía.</div>';
+  // ---- Si hay búsqueda activa, mostramos todos los resultados en tabla plana ----
+  if(q){
+    const docs = procDocs.filter(d => (d.titulo||'').toLowerCase().includes(q) || (d.descripcion||'').toLowerCase().includes(q));
+    cont.innerHTML = `<div class="proc-back" style="margin-bottom:10px;color:var(--text-4);font-size:13px">Resultados de la búsqueda · ${docs.length}</div>` + tablaDocsHtml(docs, true);
     return;
   }
 
-  const orden = procCats.map(c=>c.nombre);
-  const grupos = {};
-  docs.forEach(d => { (grupos[d.categoria] = grupos[d.categoria]||[]).push(d); });
-  const cats = Object.keys(grupos).sort((a,b)=>{
-    const ia=orden.indexOf(a), ib=orden.indexOf(b);
-    return (ia<0?999:ia)-(ib<0?999:ib);
-  });
-
-  cont.innerHTML = cats.map((cat, ci) => {
-    const c = catDe(cat);
-    const abiertaCat = procCatAbierta[cat] !== false; // por defecto abiertas
-    const filas = grupos[cat].map(d => {
-      const v = versionVigente(d.id);
-      const esBorrador = v && v.estado==='borrador';
-      const abierto = procDocAbierto === d.id;
-      const fecha = d.actualizado_en ? new Date(d.actualizado_en).toLocaleDateString('es-AR') : '';
-      const estadoPill = esBorrador
-        ? '<span class="proc-borrador">Borrador v'+(v?v.version:1)+'</span>'
-        : '<span class="proc-vpill">v'+(v?v.version:1)+'</span>';
-
-      let acciones = '';
-      if(v){
-        acciones += `<button class="pc-btn prim" onclick="event.stopPropagation();descargarProc('${d.id}')"><i class="ti ti-download"></i> Descargar</button>`;
-        acciones += `<button class="pc-btn" onclick="event.stopPropagation();abrirVersiones('${d.id}')"><i class="ti ti-versions"></i> Versiones</button>`;
-      }
-      if(esBorrador && esDuenoProc(d)) acciones += `<button class="pc-btn ok" onclick="event.stopPropagation();confirmarVersion('${v.id}','${d.id}')"><i class="ti ti-check"></i> Confirmar</button>`;
-      if(!esBorrador && esDuenoProc(d)) acciones += `<button class="pc-btn" onclick="event.stopPropagation();nuevaVersion('${d.id}')"><i class="ti ti-upload"></i> Nueva versión</button>`;
-
-      const detalle = `
-        <div class="proc-row-detail">
-          ${d.descripcion ? `<div class="prd-desc">${escapeHtml(d.descripcion)}</div>` : '<div class="prd-desc" style="color:var(--text-5)">Sin descripción.</div>'}
-          <div class="prd-meta">
-            <span><i class="ti ti-folder" style="font-size:13px"></i> ${escapeHtml(d.categoria)}</span>
-            <span><i class="ti ti-user" style="font-size:13px"></i> ${escapeHtml(d.subido_por_nombre||d.subido_por_username||'—')}</span>
-            <span><i class="ti ti-calendar" style="font-size:13px"></i> ${fecha}</span>
-            ${v && v.archivo_nombre ? `<span><i class="ti ti-paperclip" style="font-size:13px"></i> ${escapeHtml(v.archivo_nombre)}</span>` : ''}
-          </div>
-          <div class="prd-actions">${acciones}</div>
-        </div>`;
-
-      return `<div class="proc-row ${abierto?'open':''}">
-        <div class="proc-row-head" onclick="toggleProcRow('${d.id}')">
-          <span class="prh-ic" style="background:${c.color}"><i class="ti ti-file-text"></i></span>
-          <span class="prh-title">${escapeHtml(d.titulo)}</span>
-          ${estadoPill}
-          <i class="ti ti-chevron-down prh-chev"></i>
-        </div>
-        ${abierto ? detalle : ''}
-      </div>`;
-    }).join('');
-
-    return `<div class="proc-cat">
-      <div class="proc-cat-hd" onclick="toggleProcCat('${cat.replace(/'/g,"\\'")}')" style="cursor:pointer">
+  // ---- Vista DENTRO de una categoría (tabla de documentos) ----
+  if(procCatVista){
+    const c = catDe(procCatVista);
+    const docs = procDocs.filter(d => d.categoria === procCatVista);
+    cont.innerHTML = `
+      <div class="proc-back" onclick="procVolver()" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-3);font-size:13px;font-weight:600;margin-bottom:14px"><i class="ti ti-arrow-left"></i> Volver a categorías</div>
+      <div class="proc-cat-hd" style="cursor:default;margin-bottom:14px">
         <div class="ic" style="background:${c.color}"><i class="ti ti-${c.icono||'folder'}"></i></div>
-        <h3>${escapeHtml(cat)}</h3><span class="cnt">${grupos[cat].length}</span>
-        <i class="ti ti-chevron-down proc-cat-chev ${abiertaCat?'':'closed'}" style="margin-left:auto"></i>
+        <h3>${escapeHtml(procCatVista)}</h3><span class="cnt">${docs.length}</span>
       </div>
-      <div class="proc-rows" style="${abiertaCat?'':'display:none'}">${filas}</div>
-    </div>`;
-  }).join('');
+      ${tablaDocsHtml(docs, false)}`;
+    return;
+  }
+
+  // ---- Vista de TARJETAS de categoría ----
+  if(!procCats.length){
+    cont.innerHTML = '<div class="access-note"><i class="ti ti-info-circle"></i> No hay categorías todavía.</div>';
+    return;
+  }
+  const conteo = {};
+  procDocs.forEach(d => { conteo[d.categoria] = (conteo[d.categoria]||0)+1; });
+  cont.innerHTML = `<div class="proc-cat-grid">` + procCats.map(c => `
+    <div class="proc-cat-card" onclick="procAbrirCat('${c.nombre.replace(/'/g,"\\'")}')">
+      <div class="pcc-ic" style="background:${c.color}"><i class="ti ti-${c.icono||'folder'}"></i></div>
+      <div class="pcc-name">${escapeHtml(c.nombre)}</div>
+      <div class="pcc-count">${conteo[c.nombre]||0} documento(s)</div>
+      <div class="pcc-go">Ver documentos <i class="ti ti-arrow-right"></i></div>
+    </div>`).join('') + `</div>`;
 }
 
-let procDocAbierto = null;              // documento expandido (uno a la vez)
-let procCatAbierta = {};                // categorías plegadas/desplegadas
-function toggleProcRow(id){ procDocAbierto = (procDocAbierto === id) ? null : id; renderProc(); }
-function toggleProcCat(cat){ procCatAbierta[cat] = !(procCatAbierta[cat] !== false); renderProc(); }
+function tablaDocsHtml(docs, mostrarCategoria){
+  if(!docs.length) return '<div class="access-note"><i class="ti ti-info-circle"></i> No hay documentos en esta categoría.</div>';
+  const rows = docs.map(d => {
+    const v = versionVigente(d.id);
+    const esBorrador = v && v.estado==='borrador';
+    const estado = esBorrador
+      ? '<span class="proc-borrador">Borrador</span>'
+      : '<span class="proc-estado-vig"><span class="dotv"></span> Vigente</span>';
+    const fecha = d.actualizado_en ? new Date(d.actualizado_en).toLocaleDateString('es-AR') : '—';
+    let acc = '';
+    if(v){
+      acc += `<button class="pc-btn" onclick="event.stopPropagation();descargarProc('${d.id}')" title="Descargar"><i class="ti ti-download"></i></button>`;
+      acc += `<button class="pc-btn" onclick="event.stopPropagation();abrirVersiones('${d.id}')" title="Versiones"><i class="ti ti-versions"></i></button>`;
+    }
+    if(esBorrador && esDuenoProc(d)) acc += `<button class="pc-btn ok" onclick="event.stopPropagation();confirmarVersion('${v.id}','${d.id}')" title="Confirmar"><i class="ti ti-check"></i></button>`;
+    if(!esBorrador && esDuenoProc(d)) acc += `<button class="pc-btn" onclick="event.stopPropagation();nuevaVersion('${d.id}')" title="Nueva versión"><i class="ti ti-upload"></i></button>`;
+    return `<tr>
+      <td><div class="pdoc-t">${escapeHtml(d.titulo)}</div>${d.descripcion?`<div class="pdoc-d">${escapeHtml(d.descripcion)}</div>`:''}${mostrarCategoria?`<div class="pdoc-cat">${escapeHtml(d.categoria)}</div>`:''}</td>
+      <td style="text-align:center"><span class="proc-vpill">v${v?v.version:1}</span></td>
+      <td style="white-space:nowrap;color:var(--text-3)">${fecha}</td>
+      <td>${estado}</td>
+      <td style="white-space:nowrap"><div style="display:flex;gap:5px;justify-content:flex-end">${acc}</div></td>
+    </tr>`;
+  }).join('');
+  return `<div style="overflow-x:auto;background:#fff;border:1px solid var(--border-1);border-radius:14px">
+    <table class="proc-doc-table">
+      <thead><tr><th>Documento</th><th style="text-align:center">Versión</th><th>Actualizado</th><th>Estado</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function procAbrirCat(cat){ procCatVista = cat; renderProc(); }
+function procVolver(){ procCatVista = null; renderProc(); }
 
 // ---- Descargar (link firmado del bucket privado) ----
 async function descargarProc(docId){
