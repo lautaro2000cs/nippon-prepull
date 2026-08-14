@@ -1506,9 +1506,9 @@ function getGroup(s){
 // Un turno queda como Vencido/Histórico cuando su fecha ya pasó y nadie tomó acción
 // (no fue reprogramado y no se marcó No Show). Es un estado calculado, no se guarda en la base.
 function esHistorico(t){return diff(t.fecha)<0 && !t.reprogramado && !noShowVigente(t);}
-// Un no-show sigue el apartado/etiqueta No-Shows solo hasta 5 días después del turno.
+// Un no-show sigue en el apartado/etiqueta No-Shows solo hasta 3 días después del turno.
 // Pasado eso, deja de aparecer ahí (cae al histórico) pero NO pierde que es no-show.
-function noShowVigente(t){ return !!t.no_show && diff(t.fecha) >= -5; }
+function noShowVigente(t){ return !!t.no_show && diff(t.fecha) >= -3; }
 
 let cu=null, turnos=[], usuarios=[];
 let editId=null,isReprMode=false,nsId=null,vId=null,repId=null;
@@ -1770,7 +1770,7 @@ function canFallback(p){
   const M = {
     supervisor:   ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.sincronizar','minutas.ver','procedimientos.ver','procedimientos.subir'],
     citas:        ['prepull.ver','prepull.turnos.ver','procedimientos.ver','encuestas.fir.crear','encuestas.desestimacion.pedir'],
-    repuestos:    ['prepull.ver','prepull.repuestos.ver','procedimientos.ver'],
+    repuestos:    ['prepull.ver','prepull.repuestos.ver','prepull.repuestos.marcar','procedimientos.ver'],
     compras:      ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar','procedimientos.ver'],
     asesor:       ['encuestas.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
     jefe_servicio:['encuestas.ver','encuestas.tableros.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
@@ -4695,7 +4695,7 @@ function renderRepuestos(){
     <th style="width:7%">Sucursal</th><th style="width:8%">Fecha del turno</th><th style="width:7%">Cargó</th><th style="width:8%">Tipo</th><th style="width:5%">Prior.</th>
     <th style="width:6%">Vale</th><th style="width:6%">No Show</th><th style="width:9%">Comentario Citas</th><th style="width:9%">Comentario Repuestos</th><th style="width:6%">Estado</th><th style="width:16%">Acciones</th>
   </tr></thead><tbody>${gi.map(t=>{
-    const cR=cu&&(cu.rol==='repuestos'||cu.rol==='admin');
+    const cR=can('prepull.repuestos.marcar');
     const cSup=cu&&cu.rol==='supervisor';
     const adjTag=(Array.isArray(t.adjuntos)&&t.adjuntos.length)?`<span class="obs-badge" style="margin-left:4px" onclick='verAdjuntos(${JSON.stringify(t.id)})' title="Ver archivos adjuntos"><i class="ti ti-paperclip" style="font-size:11px"></i> ${t.adjuntos.length}</span>`:'';
     const nsBadge=t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i></span>':'—';
