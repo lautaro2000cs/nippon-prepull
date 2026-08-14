@@ -4467,6 +4467,8 @@ function buildFilters(){
   if(fd){
     fd.innerHTML=(cu.sucursalFija?`<div class="filter-locked"><i class="ti ti-lock" style="font-size:13px"></i> ${cu.sucursalFija} (fijo)</div>`
       :`<select class="filter-sel" id="fil-suc-d" onchange="renderDash()"><option value="">Todas las sucursales</option>${SUCURSALES.map(s=>`<option>${s}</option>`).join('')}</select>`)
+      +`<div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-3)">Desde <input type="date" id="dash-desde" onchange="renderDash()" style="padding:7px 9px;border:1px solid var(--border-2);border-radius:8px;font-size:12px"> Hasta <input type="date" id="dash-hasta" onchange="renderDash()" style="padding:7px 9px;border:1px solid var(--border-2);border-radius:8px;font-size:12px"></div>`
+      +`<select class="filter-sel" id="dash-mesrap" onchange="dashMesRapido(this.value)"><option value="">Mes rápido…</option><option value="thismonth">Este mes</option><option value="lastmonth">Mes pasado</option><option value="last7">Últimos 7 días</option><option value="all">Todo el histórico</option></select>`
       +`<button class="btn-add" onclick="abrirModalReporte()"><i class="ti ti-download"></i> Descargar reporte</button>`;
   }
   const fc=document.getElementById('fil-compras-wrap');
@@ -4831,23 +4833,51 @@ async function guardarRep(){
 
 function renderDash(){
   const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-d')?document.getElementById('fil-suc-d').value:'');
-  const base=turnos.filter(t=>!f||t.sucursal===f);
-  const hoy=base.filter(t=>diff(t.fecha)===0);
+  const desde=document.getElementById('dash-desde')?document.getElementById('dash-desde').value:'';
+  const hasta=document.getElementById('dash-hasta')?document.getElementById('dash-hasta').value:'';
+  const hayRango = !!(desde || hasta);
+  const enRango = (t)=>{
+    if(!t.fecha) return false;
+    if(desde && t.fecha < desde) return false;
+    if(hasta && t.fecha > hasta) return false;
+    return true;
+  };
+  // base para las tarjetas de período (Total, Pendientes, B/O, No Shows)
+  const base=turnos.filter(t=>(!f||t.sucursal===f) && (!hayRango || enRango(t)));
+  // "Hoy" SIEMPRE es hoy real, sin importar el rango
+  const hoy=turnos.filter(t=>(!f||t.sucursal===f) && diff(t.fecha)===0);
   const pend=base.filter(t=>t.estado==='pendiente');
-  const noShows=base.filter(t=>noShowVigente(t));
+  // No Shows: si hay rango (histórico) contamos TODOS los del período; si no, la vista operativa de 3 días
+  const noShows=base.filter(t=> hayRango ? !!t.no_show : noShowVigente(t));
   const enBO=base.filter(t=>t.estado==='bo');
   const total=base.length;
   const diasSem=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   document.getElementById('dash-fecha').textContent=`${diasSem[TODAY.getDay()]} ${TODAY.getDate()} de ${meses[TODAY.getMonth()]} de ${TODAY.getFullYear()}`;
-  document.getElementById('dash-resumen').textContent=`${hoy.length} turnos para hoy`;
+  document.getElementById('dash-resumen').textContent = hayRango
+    ? `${total} turnos en el período seleccionado`
+    : `${hoy.length} turnos para hoy`;
+  const lblTotal = hayRango ? 'del período' : 'turnos';
   document.getElementById('dash-stats').innerHTML=`
-    <div class="dash-stat"><div class="ds-lbl"><i class="ti ti-calendar"></i>Total</div><div class="ds-val">${total}</div><div class="ds-sub">turnos</div></div>
+    <div class="dash-stat"><div class="ds-lbl"><i class="ti ti-calendar"></i>Total</div><div class="ds-val">${total}</div><div class="ds-sub">${lblTotal}</div></div>
     <div class="dash-stat"><div class="ds-lbl"><i class="ti ti-calendar-event"></i>Hoy</div><div class="ds-val">${hoy.length}</div><div class="ds-sub">del día</div></div>
     <div class="dash-stat"><div class="ds-lbl"><i class="ti ti-package"></i>Pendientes</div><div class="ds-val" style="color:#854F0B">${pend.length}</div><div class="ds-sub">repuestos</div></div>
     <div class="dash-stat" style="border-color:#5B21B6"><div class="ds-lbl"><i class="ti ti-alert-triangle"></i>B/O</div><div class="ds-val" style="color:#5B21B6">${enBO.length}</div><div class="ds-sub">pedidos a fábrica</div></div>
-    <div class="dash-stat"><div class="ds-lbl"><i class="ti ti-user-x"></i>No Shows</div><div class="ds-val" style="color:#8A5A0B">${noShows.length}</div><div class="ds-sub">sin presentarse</div></div>
+    <div class="dash-stat"><div class="ds-lbl"><i class="ti ti-user-x"></i>No Shows</div><div class="ds-val" style="color:#8A5A0B">${noShows.length}</div><div class="ds-sub">${hayRango?'en el período':'sin presentarse'}</div></div>
   `;
+}
+
+// Atajos de rango para el Dashboard
+function dashMesRapido(v){
+  const dd=document.getElementById('dash-desde'), hh=document.getElementById('dash-hasta');
+  if(!dd||!hh) return;
+  const fmt=(d)=>d.toISOString().slice(0,10);
+  const hoy=new Date();
+  if(v==='thismonth'){ dd.value=fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1)); hh.value=fmt(hoy); }
+  else if(v==='lastmonth'){ dd.value=fmt(new Date(hoy.getFullYear(),hoy.getMonth()-1,1)); hh.value=fmt(new Date(hoy.getFullYear(),hoy.getMonth(),0)); }
+  else if(v==='last7'){ const d=new Date(hoy); d.setDate(d.getDate()-7); dd.value=fmt(d); hh.value=fmt(hoy); }
+  else if(v==='all'){ dd.value=''; hh.value=''; }
+  renderDash();
 }
 
 function renderUsers(){
@@ -5221,8 +5251,19 @@ async function guardarUsuario(){
 
 // --- Reportes del Dashboard ---
 function abrirModalReporte(){
-  document.getElementById('f-rep-rango').value='todo';
-  cambioRangoRep();
+  // si el Dashboard tiene un rango activo, el reporte arranca con ese mismo rango
+  const dd=document.getElementById('dash-desde')?document.getElementById('dash-desde').value:'';
+  const hh=document.getElementById('dash-hasta')?document.getElementById('dash-hasta').value:'';
+  if(dd || hh){
+    document.getElementById('f-rep-rango').value='custom';
+    cambioRangoRep();
+    if(dd) document.getElementById('f-rep-desde').value=dd;
+    if(hh) document.getElementById('f-rep-hasta').value=hh;
+    actualizarPreviewRep();
+  }else{
+    document.getElementById('f-rep-rango').value='todo';
+    cambioRangoRep();
+  }
   document.getElementById('repov').classList.add('open');
 }
 function closeRepModalReporte(){document.getElementById('repov').classList.remove('open');}
