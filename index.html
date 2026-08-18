@@ -1087,7 +1087,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
       <div><label class="drawer-label">Sucursal</label>
         <select class="drawer-input" id="dr-suc">
           <option value="">Seleccionar...</option>
-          <option>Roca</option><option>Perticone</option><option>Aguado</option>
+          <option>Roca</option><option>Perticone</option><option>Aguado</option><option>Añelo</option>
         </select>
       </div>
       <div><label class="drawer-label">Tipo de turno</label>
@@ -1144,7 +1144,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
       <div><label>Modelo del vehículo</label>
         <select id="f-modelo"><option value="">Seleccionar...</option><option>Corolla</option><option>Corolla Cross</option><option>Yaris</option><option>Yaris Cross</option><option>Hilux</option><option>SW4</option><option>Etios</option><option>Hiace</option><option>Rav4</option><option>Innova</option><option>Otros</option></select>
       </div>
-      <div><label>Sucursal</label><select id="f-suc"><option value="">Seleccionar...</option><option>Roca</option><option>Perticone</option><option>Aguado</option></select></div>
+      <div><label>Sucursal</label><select id="f-suc"><option value="">Seleccionar...</option><option>Roca</option><option>Perticone</option><option>Aguado</option><option>Añelo</option></select></div>
       <div><label>Tipo de turno</label>
         <select id="f-tipo"><option value="">Seleccionar...</option><option>Campaña</option><option>Pedido especial</option><option>Reparación</option><option>Servicio</option><option>Cristales</option><option>Siniestros</option><option>Accesorios</option></select>
       </div>
@@ -1342,7 +1342,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
       <div><label>Nombre completo</label><input type="text" id="f-usr-nombre" placeholder="Apellido, Nombre"/></div>
       <div><label>Correo corporativo</label><input type="email" id="f-usr-email" placeholder="correo@nipponcarsrl.com.ar" autocomplete="off"/></div>
       <div><label>Rol / sector</label><select id="f-usr-rol" onchange="toggleSucUsr();renderExtrasUsr()"><option value="">Seleccionar...</option></select></div>
-      <div id="f-usr-suc-wrap"><label>Sucursal fija (opcional)</label><select id="f-usr-suc"><option value="">Sin sucursal fija — ve todas</option><option>Roca</option><option>Perticone</option><option>Aguado</option></select></div>
+      <div id="f-usr-suc-wrap"><label>Sucursal fija (opcional)</label><select id="f-usr-suc"><option value="">Sin sucursal fija — ve todas</option><option>Roca</option><option>Perticone</option><option>Aguado</option><option>Añelo</option></select></div>
       <div id="f-usr-asesor-wrap" style="display:none"><label>Nombre del asesor en Wise</label><select id="f-usr-asesorwise"><option value="">Seleccionar asesor…</option></select><div style="font-size:11px;color:var(--text-4);margin-top:3px">Vincula al asesor con sus encuestas (para pedir desestimación de las suyas).</div></div>
     </div>
     <div style="margin-top:14px">
@@ -1494,7 +1494,7 @@ function diffHabil(s){
 }
 function esTurnoFueraDeSemana(s){return esFinDeSemana(parseD(s));}
 
-const SUCURSALES=['Roca','Perticone','Aguado'];
+const SUCURSALES=['Roca','Perticone','Aguado','Añelo'];
 const TIPOS={'Campaña':'#E91E8C','Pedido especial':'#7C3AED','Reparación':'#16A34A','Servicio':'#DC2626','Cristales':'#0EA5E9','Siniestros':'#C19A1B','Accesorios':'#059669'};
 function tipoDot(t){if(!t)return'<span style="font-size:11px;color:var(--color-text-secondary)">—</span>';return`<div class="tipo-cell"><div class="tipo-dot" style="background:${TIPOS[t]||'#888'}"></div><span style="font-size:11px;color:var(--color-text-secondary)">${t}</span></div>`;}
 const DAY_GROUPS=[{key:'finde',lbl:'⚠ Fin de semana / feriado — revisar',cls:'dh-nx',test:(d,s)=>esTurnoFueraDeSemana(s)||esFeriado(parseD(s))},{key:'hoy',lbl:'Hoy',cls:'dh-today',test:d=>d===0},{key:'n1',lbl:'N-1 — Próximo día hábil',cls:'dh-n1',test:d=>d===1},{key:'n2',lbl:'N-2 — En 2 días hábiles',cls:'dh-n2',test:d=>d===2},{key:'n3',lbl:'N-3 — En 3 días hábiles',cls:'dh-n3',test:d=>d===3},{key:'nx',lbl:'N-X — Más de 3 días hábiles',cls:'dh-nx',test:d=>d>3},{key:'pas',lbl:'Pasados',cls:'dh-nx',test:d=>d<0}];
