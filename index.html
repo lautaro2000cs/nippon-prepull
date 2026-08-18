@@ -2324,8 +2324,9 @@ function puedePedirDesest(e){
   if(!cu) return false;
   if(cu.rol === 'admin') return true;
   if(!can('encuestas.desestimacion.pedir')) return false;
+  if(cu.rol === 'supervisor') return true; // el supervisor puede pedir sobre cualquier encuesta
   if(cu.rol === 'asesor') return normAsesor(e.asesor) === normAsesor(cu.asesorWise);
-  if(cu.rol === 'jefe_servicio' || cu.rol === 'supervisor'){
+  if(cu.rol === 'jefe_servicio'){
     const mias = misSucursalesNorm();
     return mias.length > 0 && mias.includes(normSucursal(e.sucursal));
   }
@@ -2347,6 +2348,8 @@ const SUCURSAL_CANON = {
   'neuquencapital':      'NEUQUEN',
   'sucursalneuquen':     'NEUQUEN',
   'cipolletti':          'NEUQUEN',
+  'generalroca':         'ROCA',
+  'sucursalroca':        'ROCA',
   'sanmartindelosandes': 'S.T.M.',
 };
 // Devuelve la etiqueta canónica de una sucursal (o la original si no hay fusión)
