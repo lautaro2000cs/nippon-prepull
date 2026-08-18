@@ -13,6 +13,7 @@
 //  visitando /api/sync-encuestas?key=TU_SECRETO
 // ============================================================
 
+const crypto = require("crypto");
 const WISE_BASE = "https://api.wcx.cloud/core/v1";
 const REPORT_ID = process.env.WISE_REPORT_ID || "138189"; // reporte "Respuestas de Encuestas"
 
@@ -337,31 +338,6 @@ function extraerFunciono(fila) {
   return null;
 }
 
-// Detecta la columna del ID ÚNICO de la respuesta, evitando falsos positivos
-// como "apellido" o "unidad" que contienen "id" solo como substring.
-// Trata "id" como palabra suelta (por tokens) y reconoce nombres de id conocidos.
-function detectarIdColumna(fila) {
-  const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const claves = Object.keys(fila);
-  // "id" como token independiente (o "#", "folio", "caso"...) => id válido
-  const tokensId = ["id", "#", "folio", "ticket", "caso", "case"];
-  for (const k of claves) {
-    const tokens = norm(k).split(/[^a-z0-9#]+/).filter(Boolean);
-    if (tokens.some((t) => tokensId.includes(t))) return k;
-  }
-  // nombres compactos conocidos (sin separadores): "idrespuesta", "surveyid"...
-  const compactos = [
-    "idrespuesta", "responseid", "idcaso", "casoid", "idencuesta", "surveyid",
-    "idinteraccion", "interactionid", "idconversacion", "conversationid",
-    "idticket", "idcontacto", "nrocaso", "numerocaso",
-  ];
-  for (const k of claves) {
-    const compact = norm(k).replace(/[^a-z0-9]/g, "");
-    if (compactos.some((c) => compact.includes(c))) return k;
-  }
-  return null;
-}
-
 // convierte una fila cruda de Wise en el registro que guardamos en Supabase
 function mapearFila(fila, idx) {
   const kAsesor   = buscarClave(fila, ["agente", "asesor", "usuario", "user"]);
@@ -370,7 +346,7 @@ function mapearFila(fila, idx) {
   const kDominio  = buscarClave(fila, ["dominio", "patente", "domain"]);
   const kEmpresa  = buscarClave(fila, ["empresa", "telefono", "phone", "cliente", "nombre"]);
   const kEncuesta = buscarClave(fila, ["encuesta", "survey"]);
-  const kId       = detectarIdColumna(fila);
+  const kId       = buscarClave(fila, ["id", "caso", "case", "#"]);
 
   // Fechas: buscamos por separado la de RESPUESTA y la de ENVÍO.
   // (usamos claveConPalabras que exige TODAS las palabras en el nombre)
@@ -397,28 +373,22 @@ function mapearFila(fila, idx) {
     ? Math.round((cincoDelAsesor.reduce((a, b) => a + b, 0) / cincoDelAsesor.length) * 100) / 100
     : null;
 
-  // id ESTABLE y único, SIN el índice de fila (que cambiaba en cada corrida y
-  // rompía el upsert generando duplicados). Prioridad:
-  //   1) el id real de la respuesta de Wise, si lo detectamos;
-  //   2) si no hay, un hash de campos identificatorios ESTABLES de la fila
-  //      (dominio + fechas + asesor + encuesta). Mismo contenido => mismo id
-  //      en cada sincronización, así el upsert actualiza en vez de duplicar.
-  // La de-duplicación dentro del lote (por wise_id) se hace en guardarEnSupabase,
-  // por eso ya no necesitamos el "#idx" para evitar claves repetidas.
-  const idReal = (kId && fila[kId] != null) ? String(fila[kId]).trim() : "";
+  // id estable por CASO (dominio + servicio). Así los reenvíos de la misma
+  // encuesta generan el MISMO wise_id y el upsert los pisa en vez de duplicar.
+  // Usamos el texto crudo de Wise en minúsculas (mismo string en cada reenvío),
+  // md5 idéntico al que calcula la limpieza SQL. Si falta dominio o servicio,
+  // caemos al id viejo único para no colisionar.
+  const domRaw = kDominio ? fila[kDominio] : null;
+  const srvRaw = kServicio ? fila[kServicio] : null;
   let wiseId;
-  if (idReal) {
-    wiseId = idReal;
+  if (domRaw && srvRaw) {
+    const clave = String(domRaw).trim().toLowerCase() + "|" + String(srvRaw).trim().toLowerCase();
+    wiseId = "enc_" + crypto.createHash("md5").update(clave).digest("hex");
   } else {
-    const partes = [
-      kDominio    ? fila[kDominio]    : "",
-      kFechaResp  ? fila[kFechaResp]  : "",
-      kFechaEnvio ? fila[kFechaEnvio] : "",
-      kAsesor     ? fila[kAsesor]     : "",
-      kEncuesta   ? fila[kEncuesta]   : "",
-    ].map((x) => String(x || "").trim()).join("|");
-    const hash = require("crypto").createHash("md5").update(partes).digest("hex").slice(0, 16);
-    wiseId = `enc_${hash}`;
+    const base = (kId && fila[kId])
+      ? String(fila[kId]).trim()
+      : `${kDominio ? fila[kDominio] : ""}_${kFecha ? fila[kFecha] : ""}`.trim();
+    wiseId = `${base}#${idx}`;
   }
 
   // parseo de fechas tolerante
@@ -490,68 +460,56 @@ function esRespondida(registro){
   return registro.promedio_asesor != null;
 }
 
-// 5) Upsert a Supabase vía REST (sin SDK, para mantener la función liviana).
-// Sube en LOTES chicos para que un mes grande (ej. 700 encuestas) nunca genere
-// un payload gigante que devuelva error. Como el wise_id es estable, subir de a
-// tandas es seguro: si algo se corta, reintentar no duplica (upsert por wise_id).
+// 5) Upsert a Supabase vía REST (sin SDK, para mantener la función liviana)
 async function guardarEnSupabase(registros) {
   if (registros.length === 0) return { insertados: 0 };
 
-  // de-duplicar por wise_id (nos quedamos con la última ocurrencia).
-  // Postgres rechaza el upsert si el mismo lote trae dos filas con la
-  // misma clave, así que garantizamos unicidad acá también.
+  // de-duplicar por wise_id quedándonos con la RESPUESTA MÁS RECIENTE
+  // (los reenvíos del mismo caso comparten wise_id). Ordenamos por
+  // fecha_respuesta ascendente para que la última en entrar al Map sea la más nueva.
+  const ordenados = registros.slice().sort((a, b) => {
+    const fa = a.fecha_respuesta || a.fecha || "";
+    const fb = b.fecha_respuesta || b.fecha || "";
+    return fa < fb ? -1 : fa > fb ? 1 : 0;
+  });
   const porId = new Map();
-  for (const r of registros) porId.set(r.wise_id, r);
+  for (const r of ordenados) porId.set(r.wise_id, r);
   registros = Array.from(porId.values());
 
   // limpieza en el objeto (byte nulo real y otros de control)
   registros = registros.map(limpiarNulos);
 
+  // Serializamos y limpiamos el TEXTO final, cubriendo dos casos que
+  // Postgres rechaza: el byte nulo real y la secuencia escapada "\u0000"
+  // (que JSON.stringify puede generar y Postgres no acepta como texto).
+  let payload = JSON.stringify(registros);
+  payload = payload
+    .replace(/\\u0000/g, "")   // literal escapado \u0000
+    .replace(/\u0000/g, "");    // byte nulo real por las dudas
+
   const url = `${process.env.SUPABASE_URL}/rest/v1/encuestas?on_conflict=wise_id`;
-  const TAM_LOTE = 200; // ~200 filas por request: cómodo aunque cada una traiga su "raw"
-  let insertados = 0;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY,
+      "Content-Type": "application/json",
+      // merge-duplicates = upsert: actualiza si ya existe ese wise_id
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: payload,
+  });
 
-  for (let i = 0; i < registros.length; i += TAM_LOTE) {
-    const parte = registros.slice(i, i + TAM_LOTE);
-
-    // Serializamos y limpiamos el TEXTO final, cubriendo dos casos que
-    // Postgres rechaza: el byte nulo real y la secuencia escapada "\u0000"
-    // (que JSON.stringify puede generar y Postgres no acepta como texto).
-    let payload = JSON.stringify(parte)
-      .replace(/\\u0000/g, "")   // literal escapado \u0000
-      .replace(/\u0000/g, "");    // byte nulo real por las dudas
-
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        "Content-Type": "application/json",
-        // merge-duplicates = upsert: actualiza si ya existe ese wise_id
-        Prefer: "resolution=merge-duplicates,return=minimal",
-      },
-      body: payload,
-    });
-
-    if (!res.ok) {
-      const t = await res.text();
-      const nroLote = Math.floor(i / TAM_LOTE) + 1;
-      throw new Error(`Supabase upsert falló en el lote ${nroLote} (${res.status}): ${t}`);
-    }
-    insertados += parte.length;
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Supabase upsert falló (${res.status}): ${t}`);
   }
-  return { insertados };
+  return { insertados: registros.length };
 }
 
 // ------------------------------------------------------------
 //  Handler principal
 // ------------------------------------------------------------
-
-// Pedimos más tiempo de ejecución para meses grandes. En el plan Hobby de
-// Vercel esto se recorta solo a 60s (no da error); en planes pagos da margen
-// para que la generación del reporte en Wise + el upsert entren cómodos.
-export const config = { maxDuration: 300 };
-
 export default async function handler(req, res) {
   // Protección: solo corre si viene del cron de Vercel o con el secreto correcto
   const esCron = req.headers["x-vercel-cron"] === "1";
@@ -561,20 +519,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Rango de fechas. Formato yyyy-MM-dd.
-    // Si vienen en la URL (date_from/date_to) se usan tal cual (sirve para
-    // backfills puntuales, ej: recuperar el 3/8 con date_from=2026-08-01&date_to=2026-08-03).
-    // Si no vienen (ej: cron), la ventana es el MES ACTUAL y DINÁMICO:
-    // del día 1 del mes en curso hasta hoy. Como el sync es aditivo (upsert),
-    // cada corrida re-cubre todo el mes sin perder lo ya guardado, y los meses
-    // anteriores quedan intactos en Supabase (nunca se borran).
+    // Rango de fechas (por fecha de ENVÍO / survey_sent_date). Formato yyyy-MM-dd.
+    // Si vienen en la URL (date_from/date_to) se usan. Si no (ej: cron diario),
+    // se calcula automáticamente "últimos 7 días" para traer solo lo nuevo,
+    // en lotes chicos que entran cómodos en el límite de 60s de Vercel.
     let dateFrom = req.query.date_from || null;
     let dateTo   = req.query.date_to   || null;
     if (!dateFrom || !dateTo) {
       const hoy = new Date();
       dateTo = hoy.toISOString().slice(0, 10);
-      const primeroDeMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-      dateFrom = primeroDeMes.toISOString().slice(0, 10);
+      const hace7 = new Date(hoy);
+      hace7.setDate(hace7.getDate() - 7);
+      dateFrom = hace7.toISOString().slice(0, 10);
     }
 
     const token = await autenticar();
