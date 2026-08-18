@@ -2116,7 +2116,7 @@ function tarjetaDesest(d){
 // Bloque con los controles para que el admin resuelva un pedido pendiente
 function bloqueResolver(d, e, did){
   const desest = preguntasDesestimadas(e);
-  const checks = PREGUNTAS_ASESOR.map(([clave, label]) => {
+  const checks = PREGUNTAS_DESESTIMABLES.map(([clave, label]) => {
     const marcada = desest.includes(clave);
     return `<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);margin-right:12px">
       <input type="checkbox" id="${did}-${clave}" ${marcada?'checked':''}> ${label}
@@ -2154,7 +2154,7 @@ async function resolverDesest(id, accion, did){
 
     if(accion === 'aprobar_preguntas'){
       // leer qué preguntas marcó
-      preguntasAfectadas = PREGUNTAS_ASESOR
+      preguntasAfectadas = PREGUNTAS_DESESTIMABLES
         .map(([clave]) => clave)
         .filter(clave => document.getElementById(did+'-'+clave)?.checked);
       if(preguntasAfectadas.length === 0){
@@ -2167,7 +2167,7 @@ async function resolverDesest(id, accion, did){
         .eq('wise_id', d.encuesta_id);
       if(e1) throw e1;
       if(e) e.preguntas_desestimadas = preguntasAfectadas;
-      const labels = PREGUNTAS_ASESOR.filter(([c])=>preguntasAfectadas.includes(c)).map(([,l])=>l).join(', ');
+      const labels = PREGUNTAS_DESESTIMABLES.filter(([c])=>preguntasAfectadas.includes(c)).map(([,l])=>l).join(', ');
       decision = `Se desestimaron: ${labels}.` + (nota?` ${nota}`:'');
     } else if(accion === 'anular'){
       const { error: e1 } = await sb.from('encuestas')
@@ -2389,6 +2389,13 @@ const PREGUNTAS_ASESOR = [
   ['p_puntualidad', 'Puntualidad en entrega'],
   ['p_explicacion', 'Explicación trabajos/costos'],
   ['p_limpieza',    'Limpieza del vehículo'],
+];
+
+// Preguntas que el ADMIN puede desestimar: las 5 del asesor + Fac. para turnos.
+// (Turnos no afecta el promedio del asesor; se puede desestimar aparte.)
+const PREGUNTAS_DESESTIMABLES = [
+  ...PREGUNTAS_ASESOR,
+  ['p_turnos', 'Fac. para turnos'],
 ];
 
 // ¿la encuesta está anulada por el admin?
