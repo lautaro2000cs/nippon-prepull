@@ -345,6 +345,7 @@ function mapearFila(fila, idx) {
   const kServicio = buscarClave(fila, ["servicio", "service"]);
   const kDominio  = buscarClave(fila, ["dominio", "patente", "domain"]);
   const kEmpresa  = buscarClave(fila, ["empresa", "telefono", "phone", "cliente", "nombre"]);
+  const kTelefono = claveConPalabras(fila, ["contacto", "telefono"]) || buscarClave(fila, ["telefono", "phone", "celular"]);
   const kEncuesta = buscarClave(fila, ["encuesta", "survey"]);
   const kId       = buscarClave(fila, ["id", "caso", "case", "#"]);
 
@@ -417,6 +418,7 @@ function mapearFila(fila, idx) {
     sucursal:  kSucursal ? fila[kSucursal] : null,
     servicio:  kServicio ? fila[kServicio] : null,
     dominio:   kDominio  ? fila[kDominio]  : null,
+    telefono:  kTelefono ? fila[kTelefono] : null,
     empresa:   kEmpresa  ? fila[kEmpresa]  : null,
     encuesta:  kEncuesta ? fila[kEncuesta] : null,
     raw: fila,
