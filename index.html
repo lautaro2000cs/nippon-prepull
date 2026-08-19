@@ -1444,7 +1444,13 @@ tbody td{padding:11px 12px;vertical-align:middle}
 // ============================================
 const SUPABASE_URL = 'https://cotpnjfsxhnqeqbmzpoe.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_czLJbGMTs6vrIepMGOhwAA_6QLk4NoP';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,       // guarda la sesión en el navegador
+    autoRefreshToken: true,     // renueva el token solo antes de que venza
+    detectSessionInUrl: true,
+  },
+});
 
 // Las contraseñas ahora viven en la columna "password" de la tabla "usuarios" en Supabase.
 // El admin puede crear usuarios y definir su contraseña desde la pestaña Usuarios.
@@ -2000,7 +2006,7 @@ async function cargarUsuariosParaSelect(){
 let encuestas = [];            // filas crudas desde Supabase
 // Columnas que la web realmente usa. Evitamos traer 'raw' (el volcado completo
 // de Wise por fila), que es lo más pesado y no se muestra en ningún lado.
-const ENC_COLS = "id,wise_id,fecha,fecha_respuesta,asesor,p_amabilidad,p_atencion,p_puntualidad,p_explicacion,p_limpieza,p_turnos,p_espera,p_calidad,p_recomienda,promedio_asesor,comentario,funciono_ok,puntuacion_prom,puntuacion,sucursal,servicio,dominio,empresa,encuesta,anulada,preguntas_desestimadas";
+const ENC_COLS = "id,wise_id,fecha,fecha_respuesta,asesor,telefono,p_amabilidad,p_atencion,p_puntualidad,p_explicacion,p_limpieza,p_turnos,p_espera,p_calidad,p_recomienda,promedio_asesor,comentario,funciono_ok,puntuacion_prom,puntuacion,sucursal,servicio,dominio,empresa,encuesta,anulada,preguntas_desestimadas";
 let encSubTab = 'resumen';
 let encCargadas = false;
 let desestimaciones = [];      // pedidos de desestimación
@@ -3638,13 +3644,13 @@ function renderEncDetalle(){
   const th = (k, lbl, alinear) => `<th onclick="sortEncDet('${k}')" style="padding:10px 12px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:${encDetSort.key===k?'var(--accent)':'var(--text-4)'};white-space:nowrap;cursor:pointer;user-select:none;text-align:${alinear||'left'}" title="Ordenar por ${lbl}">${lbl}${flecha(k)}</th>`;
 
   const numTh = ENC_NUM_COLS.map(([k,l]) => th(k,l,'center')).join('');
-  const totalCols = 1 + 5 + ENC_NUM_COLS.length + 1; // arrow + fijas + numéricas + prom
+  const totalCols = 1 + 6 + ENC_NUM_COLS.length + 1; // arrow + fijas(+telefono) + numéricas + prom
 
   let html = card + `<div style="overflow-x:auto;background:#fff;border:1px solid var(--border-1);border-radius:14px">
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead><tr style="text-align:left;border-bottom:1px solid var(--border-1)">
         <th style="width:30px"></th>
-        ${th('fecha','Fecha')}${th('asesor','Asesor')}${th('sucursal','Sucursal')}${th('servicio','Servicio')}${th('dominio','Patente')}
+        ${th('fecha','Fecha')}${th('asesor','Asesor')}${th('sucursal','Sucursal')}${th('servicio','Servicio')}${th('dominio','Patente')}${th('telefono','Teléfono')}
         ${numTh}
         ${th('prom','Prom. AS','center')}
       </tr></thead><tbody>`;
@@ -3669,6 +3675,7 @@ function renderEncDetalle(){
       <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap">${escapeHtml(e.sucursal||'—')}</td>
       <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap">${escapeHtml(e.servicio||'—')}</td>
       <td style="padding:9px 12px;color:var(--text-3);font-family:var(--mono);white-space:nowrap">${escapeHtml(e.dominio||'—')}</td>
+      <td style="padding:9px 12px;color:var(--text-3);font-family:var(--mono);white-space:nowrap">${escapeHtml(e.telefono||'—')}</td>
       ${numTds}
       <td style="padding:9px 12px;text-align:center;font-family:var(--mono);font-weight:700;font-size:15px;color:${notaColor(nota)}">${nota!=null?nota.toFixed(2):'—'}${critica?' <i class="ti ti-alert-triangle" style="font-size:12px;color:#dc2626;vertical-align:1px"></i>':''}</td>
     </tr>`;
@@ -3699,6 +3706,7 @@ function exportarEncuestasExcel(){
       'Sucursal': e.sucursal || '',
       'Servicio': e.servicio || '',
       'Patente': e.dominio || '',
+      'Teléfono': e.telefono || '',
       'Fac. turnos': nota('p_turnos'),
       'Tiempo espera': nota('p_espera'),
       'Amabilidad': nota('p_amabilidad'),
