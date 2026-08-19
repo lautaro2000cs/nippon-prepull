@@ -4559,6 +4559,7 @@ function renderTurnoCard(t){
   const expId=`exp-${t.id}`;
   const chevId=`chev-${t.id}`;
   const obsRep=(()=>{const l=comentariosDe(t.id,'repuestos');return l.length?l.map(c=>`<div style="margin-bottom:5px"><div>${escapeHtml(c.texto)}</div><div style="font-size:10.5px;color:var(--text-4)">${escapeHtml(c.autor_nombre||'—')} · ${new Date(c.creado_en).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div>`).join(''):'<span style="color:var(--text-4);font-style:italic">Sin comentarios registrados.</span>';})();
+  const obsCit=(()=>{const l=comentariosDe(t.id,'citas');return l.length?l.map(c=>`<div style="margin-bottom:5px"><div>${escapeHtml(c.texto)}</div><div style="font-size:10.5px;color:var(--text-4)">${escapeHtml(c.autor_nombre||'—')} · ${new Date(c.creado_en).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div>`).join(''):'<span style="color:var(--text-4);font-style:italic">Sin comentarios registrados.</span>';})();
   return`<div class="t-card">
   <div class="t-bar ${barCls}"></div>
   <div class="t-row" onclick="toggleCardExpand('${t.id}')">
@@ -4593,7 +4594,12 @@ function renderTurnoCard(t){
     </div>
   </div>
   <div class="t-expanded" id="${expId}">
-    <div class="t-exp-label">Comentario de repuestos</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <div class="t-exp-label" style="margin:0">Comentarios de Citas</div>
+      <button class="obs-badge" style="background:#E6F1FB;color:#0C447C;cursor:pointer;border:none" onclick="event.stopPropagation();verObs('${t.id}','cita')" title="Ver / agregar"><i class="ti ti-plus" style="font-size:11px"></i> agregar</button>
+    </div>
+    <div class="t-exp-text">${obsCit}</div>
+    <div class="t-exp-label" style="margin-top:12px">Comentario de repuestos</div>
     <div class="t-exp-text">${obsRep}</div>
     <div class="t-exp-summary">
       <div class="t-exp-item"><div class="t-exp-item-label">Repuesto</div><div class="t-exp-item-val">${estPill(t.estado)}</div></div>
