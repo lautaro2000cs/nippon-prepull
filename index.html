@@ -4567,7 +4567,7 @@ function renderTurnoCard(t){
   const expId=`exp-${t.id}`;
   const chevId=`chev-${t.id}`;
   const obsRep=(()=>{const l=comentariosDe(t.id,'repuestos');return l.length?l.map(c=>`<div style="margin-bottom:5px"><div>${escapeHtml(c.texto)}</div><div style="font-size:10.5px;color:var(--text-4)">${escapeHtml(c.autor_nombre||'—')} · ${new Date(c.creado_en).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div>`).join(''):'<span style="color:var(--text-4);font-style:italic">Sin comentarios registrados.</span>';})();
-  const obsCit=(()=>{const l=comentariosDe(t.id,'citas');return l.length?l.map(c=>`<div style="margin-bottom:5px"><div>${escapeHtml(c.texto)}</div><div style="font-size:10.5px;color:var(--text-4)">${escapeHtml(c.autor_nombre||'—')} · ${new Date(c.creado_en).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div>`).join(''):'<span style="color:var(--text-4);font-style:italic">Sin comentarios registrados.</span>';})();
+  const obsCit=(()=>{const l=comentariosDe(t.id,'citas');const esAdm=cu&&cu.rol==='admin';return l.length?l.map(c=>{const pe=(esAdm||c.autor_username===cu?.username);return `<div style="margin-bottom:5px"><div style="display:flex;align-items:flex-start;gap:6px"><div style="flex:1">${escapeHtml(c.texto)}${c.editado_en?' <span style="font-size:10px;color:var(--text-4)">(editado)</span>':''}</div>${pe?`<button onclick="event.stopPropagation();editarComentarioCitas('${t.id}','${c.id}')" title="Editar" style="border:none;background:none;color:#4f46e5;cursor:pointer;font-size:13px;padding:0"><i class="ti ti-edit"></i></button>`:''}</div><div style="font-size:10.5px;color:var(--text-4)">${escapeHtml(c.autor_nombre||'—')} · ${new Date(c.creado_en).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div>`;}).join(''):'<span style="color:var(--text-4);font-style:italic">Sin comentarios registrados.</span>';})();
   return`<div class="t-card">
   <div class="t-bar ${barCls}"></div>
   <div class="t-row" onclick="toggleCardExpand('${t.id}')">
@@ -6396,6 +6396,12 @@ function renderObsLista(){
         </div>
       </div>
     </div>`;}).join('');
+}
+// Abre el modal de comentarios de Citas con un comentario ya en modo edición
+function editarComentarioCitas(turnoId, cid){
+  verObs(turnoId, 'cita');
+  obsEditId = cid;
+  renderObsLista();
 }
 async function guardarEdicionComentario(cid){
   const txt = (document.getElementById('obs-edit-txt')?.value || '').trim();
