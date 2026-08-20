@@ -6329,6 +6329,7 @@ function closeAlert(){document.getElementById('aov').classList.remove('open');}
 // ── Historial de comentarios de turnos (Citas / Repuestos) ────────────
 let TCOM = {};              // turno_id -> [ {sector,texto,autor_nombre,creado_en,id} ] (desc)
 let obsCtx = null;          // { turnoId, sector } del modal abierto
+let obsEditId = null;       // id del comentario que se está editando (solo citas)
 
 async function cargarComentariosTurnos(){
   try{
@@ -6372,14 +6373,42 @@ function renderObsLista(){
   const list = comentariosDe(obsCtx.turnoId, obsCtx.sector);
   const esAdmin = cu && cu.rol==='admin';
   if(!list.length){ cont.innerHTML='<div style="font-size:13px;color:var(--text-4);font-style:italic">Sin comentarios registrados.</div>'; return; }
-  cont.innerHTML = list.map(c=>`
+  cont.innerHTML = list.map(c=>{
+    // Editar: solo comentarios de CITAS, por su autor o el admin
+    const puedeEditar = obsCtx.sector==='citas' && (esAdmin || c.autor_username === cu?.username);
+    if(obsEditId === c.id){
+      return `<div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:9px;padding:9px 11px">
+        <textarea id="obs-edit-txt" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit">${escapeHtml(c.texto)}</textarea>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button onclick="guardarEdicionComentario('${c.id}')" style="font-size:12px;padding:6px 13px;border-radius:7px;border:none;background:var(--accent);color:#fff;font-weight:600;cursor:pointer">Guardar</button>
+          <button onclick="obsEditId=null;renderObsLista()" style="font-size:12px;padding:6px 13px;border-radius:7px;border:1px solid var(--border-2);background:#fff;color:var(--text-3);cursor:pointer">Cancelar</button>
+        </div>
+      </div>`;
+    }
+    return `
     <div style="background:var(--surface-sub,#f6f7f9);border:1px solid var(--border-1);border-radius:9px;padding:9px 11px">
-      <div style="font-size:13px;color:var(--text-1);line-height:1.45;white-space:pre-wrap">${escapeHtml(c.texto)}</div>
+      <div style="font-size:13px;color:var(--text-1);line-height:1.45;white-space:pre-wrap">${escapeHtml(c.texto)}${c.editado_en?' <span style="font-size:10.5px;color:var(--text-4)">(editado)</span>':''}</div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:5px">
         <div style="font-size:11px;color:var(--text-4)"><i class="ti ti-user" style="font-size:11px"></i> ${escapeHtml(c.autor_nombre||'—')} · ${new Date(c.creado_en).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
-        ${esAdmin?`<button onclick="borrarComentario('${c.id}')" title="Borrar (solo admin)" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:13px"><i class="ti ti-trash"></i></button>`:''}
+        <div style="display:flex;gap:8px">
+          ${puedeEditar?`<button onclick="obsEditId='${c.id}';renderObsLista()" title="Editar" style="border:none;background:none;color:#4f46e5;cursor:pointer;font-size:13px"><i class="ti ti-edit"></i></button>`:''}
+          ${esAdmin?`<button onclick="borrarComentario('${c.id}')" title="Borrar (solo admin)" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:13px"><i class="ti ti-trash"></i></button>`:''}
+        </div>
       </div>
-    </div>`).join('');
+    </div>`;}).join('');
+}
+async function guardarEdicionComentario(cid){
+  const txt = (document.getElementById('obs-edit-txt')?.value || '').trim();
+  if(!txt){ alert('El comentario no puede quedar vacío.'); return; }
+  try{
+    const { error } = await sb.from('turno_comentarios')
+      .update({ texto: txt, editado_en: new Date().toISOString() })
+      .eq('id', cid);
+    if(error) throw error;
+    obsEditId = null;
+    await cargarComentariosTurnos();
+    renderObsLista(); renderTurnos(); renderRepuestos();
+  }catch(err){ alert('No se pudo editar: '+(err.message||'error')); }
 }
 async function enviarComentario(){
   if(!obsCtx) return;
