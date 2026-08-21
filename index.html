@@ -1779,7 +1779,7 @@ function canFallback(p){
     repuestos:    ['prepull.ver','prepull.repuestos.ver','prepull.repuestos.marcar','procedimientos.ver'],
     compras:      ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar','procedimientos.ver'],
     asesor:       ['encuestas.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
-    jefe_servicio:['encuestas.ver','encuestas.tableros.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
+    jefe_servicio:['prepull.ver','prepull.turnos.ver','encuestas.ver','encuestas.tableros.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
     seguridad:    ['minutas.ver','procedimientos.ver','procedimientos.subir'],
   };
   const perms = new Set(M[cu.rol] || []);
