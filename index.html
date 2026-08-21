@@ -2430,11 +2430,19 @@ function preguntasDesestimadas(e){
 // Promedio del asesor para una encuesta, RESPETANDO desestimaciones.
 // Si está anulada -> null (no cuenta). Si tiene preguntas desestimadas,
 // se promedian solo las que quedan.
+// Sucursales donde NO se hace lavado: la pregunta Limpieza no cuenta en el promedio.
+const SUC_SIN_LAVADO = new Set(['anelo','stm','cdoyhiace','cdohiace']);
+function sinLavado(e){
+  return SUC_SIN_LAVADO.has(normSucursal(canonSucursal(e.sucursal)));
+}
+
 function promedioEncuesta(e){
   if(estaAnulada(e)) return null;
   const desest = preguntasDesestimadas(e);
+  const excluir = new Set(desest);
+  if(sinLavado(e)) excluir.add('p_limpieza'); // Añelo, S.T.M., CDO Y HIACE: sin lavado
   const notas = PREGUNTAS_ASESOR
-    .filter(([clave]) => !desest.includes(clave))
+    .filter(([clave]) => !excluir.has(clave))
     .map(([clave]) => e[clave])
     .filter(v => v != null && !isNaN(Number(v)))
     .map(Number);
@@ -2673,6 +2681,7 @@ function mesAnterior(m){
 function notaEnc(e, clave){
   if(estaAnulada(e)) return null;
   if(preguntasDesestimadas(e).includes(clave)) return null;
+  if(clave === 'p_limpieza' && sinLavado(e)) return null; // Añelo, S.T.M., CDO Y HIACE: sin lavado
   const v = e[clave];
   return (v!=null && !isNaN(Number(v))) ? Number(v) : null;
 }
@@ -3662,6 +3671,10 @@ function renderEncDetalle(){
     const rid = 'encrow-'+i;
     const desest = preguntasDesestimadas(e);
     const numTds = ENC_NUM_COLS.map(([k]) => {
+      // Limpieza no cuenta en Añelo/S.T.M./CDO Y HIACE: se muestra N/A tachado
+      if(k === 'p_limpieza' && sinLavado(e)){
+        return `<td style="padding:9px 12px;text-align:center;font-family:var(--mono);color:var(--text-5);text-decoration:line-through;opacity:.6" title="Sin lavado en esta sucursal — no cuenta">N/A</td>`;
+      }
       const v = e[k];
       const n = (v!=null && !isNaN(Number(v))) ? Number(v) : null;
       const tach = desest.includes(k);
