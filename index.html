@@ -5449,6 +5449,7 @@ const COMP_SECCIONES=[
   {key:'lubricantes',lbl:'Lubricantes',  icon:'ti-droplet',        color:'#7048e8', tabla:'compras_lubricantes'},
   {key:'especial',   lbl:'Especial',     icon:'ti-star',           color:'#c026a8', tabla:'compras_especial'},
   {key:'cubiertas',  lbl:'Cubiertas',    icon:'ti-circle',         color:'#0d9488', tabla:'compras_cubiertas'},
+  {key:'siniestros', lbl:'Siniestros',   icon:'ti-alert-triangle', color:'#dc2626', tabla:'compras_siniestros'},
 ];
 const MESES_ANIO=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 function getMesesOpciones(){const y=new Date().getFullYear();return MESES_ANIO.flatMap(m=>[`${m} ${y-1}`,`${m} ${y}`,`${m} ${y+1}`]);}
@@ -5613,7 +5614,7 @@ function renderSeccionTabla(){
   let items=compRegistros.filter(r=>{
     if(desde&&r.fecha&&r.fecha<desde)return false;
     if(hasta&&r.fecha&&r.fecha>hasta)return false;
-    if(tipo&&r.tipo_orden!==tipo)return false;
+    if(tipo&&(r.tipo_orden||r.tipo)!==tipo)return false;
     if(mes&&mesLabelFecha(r.fecha)!==mes)return false;
     if(item&&!(r.item||'').toLowerCase().includes(item))return false;
     if(marca&&!(r.marca||'').toLowerCase().includes(marca))return false;
@@ -5654,6 +5655,9 @@ function renderSeccionTabla(){
     rowFn=r=>`<td>${mesLabelFecha(r.fecha)}</td><td>${r.marca}</td><td>${r.item}</td><td style="font-size:12px">${r.descripcion}</td><td><strong>${r.nro_orden}</strong></td><td>${fmtD(r.fecha)}</td><td>${r.cantidad}</td><td>${r.remito_interno}</td>
       <td>${r.fecha_recepcion?`<span class="pill p-arr" style="font-size:11px"><i class="ti ti-check" style="font-size:10px"></i> ${fmtD(r.fecha_recepcion)}</span>`:'<span style="font-size:12px;color:var(--color-text-secondary)">Pendiente</span>'}</td>
       <td style="font-size:12px">${r.observaciones||'—'}</td>`;
+  }else if(k==='siniestros'){
+    ths='<th>Fecha</th><th>N° Orden</th><th>Tipo</th><th>Costo</th><th>Línea</th><th>Item</th><th>Cant.</th><th>Repuesto</th><th>Observaciones</th>';
+    rowFn=r=>`<td>${fmtD(r.fecha)}</td><td><strong>${r.nro_orden||'—'}</strong></td><td>${sinTipoPill(r.tipo)}</td><td>${fmtPesos(r.costo)}</td><td>${r.linea||'—'}</td><td>${r.item||'—'}</td><td>${r.cantidad??'—'}</td><td>${sinArriboPill(r.arribo)}</td><td style="font-size:12px">${r.observaciones||'—'}</td>`;
   }else{
     cont.innerHTML='<div class="empty">Sección no reconocida</div>';return;
   }
@@ -5826,6 +5830,17 @@ const COMP_SCHEMA={
     {id:'f-c-cant',  label:'Cantidad',type:'number',req:true,ph:'0',step:'1'},
     {id:'f-c-obs',   label:'Observaciones',type:'textarea',req:false,ph:'',full:true},
   ],
+  siniestros:[
+    {id:'f-c-fecha',  label:'Fecha de pedido',type:'date',req:true},
+    {id:'f-c-orden',  label:'N° de Orden',type:'text',req:true,ph:''},
+    {id:'f-c-tipo',   label:'Tipo',type:'select',req:true,opts:['Emergencia','Reposición']},
+    {id:'f-c-costo',  label:'Costo ($)',type:'number',req:false,ph:'0.00',step:'0.01'},
+    {id:'f-c-linea',  label:'Línea',type:'text',req:false,ph:''},
+    {id:'f-c-item',   label:'Item',type:'text',req:false,ph:''},
+    {id:'f-c-cant',   label:'Cantidad',type:'number',req:false,ph:'0',step:'1'},
+    {id:'f-c-arribo', label:'Repuesto',type:'select',req:false,opts:['Pendiente','Arribó','No arribó']},
+    {id:'f-c-obs',    label:'Observaciones',type:'textarea',req:false,ph:'',full:true},
+  ],
 };
 function getSchema(key){
   if(['añelo','casacentral','flotas'].includes(key))return COMP_SCHEMA.general;
@@ -5888,6 +5903,8 @@ async function guardarPedido(){
     data={fecha:v('f-c-fecha'),nro_orden:v('f-c-orden'),lineas:v('f-c-lineas'),costo:vn('f-c-costo'),item:v('f-c-item')};
   else if(k==='cubiertas')
     data={mes:v('f-c-mes'),marca:v('f-c-marca'),item:v('f-c-item'),descripcion:v('f-c-desc'),nro_orden:v('f-c-orden'),fecha:v('f-c-fecha'),cantidad:vn('f-c-cant'),observaciones:v('f-c-obs')||''};
+  else if(k==='siniestros')
+    data={fecha:v('f-c-fecha'),nro_orden:v('f-c-orden'),tipo:v('f-c-tipo'),costo:vn('f-c-costo'),linea:v('f-c-linea'),item:v('f-c-item'),cantidad:vn('f-c-cant'),arribo:v('f-c-arribo')||'Pendiente',observaciones:v('f-c-obs')||''};
   if(k==='cubiertas'&&!compEditId) data.remito_interno='';
   try{
     if(compEditId){
@@ -6173,6 +6190,19 @@ function tipoOrdenPill(t){
   return`<span class="pill" style="background:${bg};color:${color}">${t}</span>`;
 }
 function fmtPesos(v){if(!v&&v!==0)return'—';return'$'+Number(v).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+// Pill para el Tipo de siniestro (Emergencia = rojo, Reposición = neutro)
+function sinTipoPill(t){
+  const m={'Emergencia':['#FCEBEB','#791F1F'],'Reposición':['#E6F1FB','#0C447C']};
+  const [bg,color]=m[t]||['#f0f0ee','#444'];
+  return`<span class="pill" style="background:${bg};color:${color}">${t||'—'}</span>`;
+}
+// Pill para el estado de arribo del repuesto
+function sinArriboPill(a){
+  const m={'Arribó':['#E7F5EC','#1F7A48'],'No arribó':['#FCEBEB','#791F1F'],'Pendiente':['#FBF0DA','#8A5A0B']};
+  const [bg,color]=m[a]||['#FBF0DA','#8A5A0B'];
+  return`<span class="pill" style="background:${bg};color:${color}">${a||'Pendiente'}</span>`;
+}
 
 
 
