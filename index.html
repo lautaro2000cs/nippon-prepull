@@ -2006,7 +2006,17 @@ async function cargarUsuariosParaSelect(){
 let encuestas = [];            // filas crudas desde Supabase
 // Columnas que la web realmente usa. Evitamos traer 'raw' (el volcado completo
 // de Wise por fila), que es lo más pesado y no se muestra en ningún lado.
-const ENC_COLS = "id,wise_id,fecha,fecha_respuesta,asesor,telefono,p_amabilidad,p_atencion,p_puntualidad,p_explicacion,p_limpieza,p_turnos,p_espera,p_calidad,p_recomienda,promedio_asesor,comentario,funciono_ok,puntuacion_prom,puntuacion,sucursal,servicio,dominio,empresa,encuesta,anulada,preguntas_desestimadas";
+const ENC_COLS = "id,wise_id,fecha,fecha_respuesta,asesor,asesor_override,telefono,p_amabilidad,p_atencion,p_puntualidad,p_explicacion,p_limpieza,p_turnos,p_espera,p_calidad,p_recomienda,promedio_asesor,comentario,funciono_ok,puntuacion_prom,puntuacion,sucursal,servicio,dominio,empresa,encuesta,anulada,preguntas_desestimadas";
+// Aplica la corrección manual de asesor (solo admin): si hay override, ese es el asesor efectivo.
+function aplicarAsesorOverride(arr){
+  (arr||[]).forEach(e=>{
+    if(e.asesor_override && String(e.asesor_override).trim()){
+      e._asesor_wise = e.asesor;          // guardamos el original de Wise por si hace falta
+      e.asesor = e.asesor_override;        // la app entera usa el corregido
+    }
+  });
+  return arr;
+}
 let encSubTab = 'resumen';
 let encCargadas = false;
 let desestimaciones = [];      // pedidos de desestimación
@@ -2036,7 +2046,7 @@ async function cargarBandejaDesest(){
   // asegurarnos de tener las encuestas cargadas (para mostrar datos de cada una)
   if(!encCargadas){
     const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
-    encuestas = data || [];
+    encuestas = aplicarAsesorOverride(data || []);
     normalizarSucursales();
     encCargadas = true;
   }
@@ -2227,13 +2237,33 @@ function swSubTabEnc(t, el){
 async function refrescarYRender(){
   try{
     const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
-    if(data){ encuestas = data; normalizarSucursales(); }
+    if(data){ encuestas = aplicarAsesorOverride(data); normalizarSucursales(); }
     await cargarDesestimaciones();
   }catch(e){ /* si falla, igual renderizamos lo que hay */ }
   renderEncuestas();
 }
 
 // Carga desde Supabase (la web solo LEE; el backend es quien escribe)
+// Corregir manualmente el asesor de una encuesta (solo admin). Permanente: el sync no lo pisa.
+async function editarAsesorEnc(wiseId){
+  if(!(cu && cu.rol==='admin')) return;
+  const e = encuestas.find(x=>x.wise_id===wiseId);
+  if(!e) return;
+  const actual = e.asesor_override || e.asesor || '';
+  const nuevo = prompt(`Corregir asesor de esta encuesta.\n\nAsesor actual: ${actual}\n\nEscribí el nombre correcto (o dejá vacío para volver al de Wise):`, actual);
+  if(nuevo === null) return; // canceló
+  const val = nuevo.trim();
+  try{
+    const { error } = await sb.from('encuestas')
+      .update({ asesor_override: val || null })
+      .eq('wise_id', wiseId);
+    if(error) throw error;
+    const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
+    if(data){ encuestas = aplicarAsesorOverride(data); normalizarSucursales(); }
+    renderEncuestas();
+  }catch(err){ alert('No se pudo corregir el asesor: '+(err.message||'error')); }
+}
+
 async function cargarEncuestas(){
   // Ajustes de UI según el rol (asesor vs admin/supervisor)
   ajustarUIEncuestas();
@@ -2242,7 +2272,7 @@ async function cargarEncuestas(){
   // asesor vea la resolución del admin sin tener que apretar F5.
   if(encCargadas){
     const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
-    if(data){ encuestas = data; normalizarSucursales(); }
+    if(data){ encuestas = aplicarAsesorOverride(data); normalizarSucursales(); }
     await cargarDesestimaciones();
     renderEncuestas();
     return;
@@ -2257,7 +2287,7 @@ async function cargarEncuestas(){
     cont.innerHTML = '<div class="access-note" style="color:#b91c1c"><i class="ti ti-alert-triangle"></i> No se pudieron cargar las encuestas. ¿Creaste la tabla en Supabase?</div>';
     return;
   }
-  encuestas = data || [];
+  encuestas = aplicarAsesorOverride(data || []);
   normalizarSucursales();
   encCargadas = true;
   await cargarDesestimaciones();
@@ -2364,6 +2394,8 @@ const SUCURSAL_CANON = {
   'neuquencapital':      'NEUQUEN',
   'sucursalneuquen':     'NEUQUEN',
   'cipolletti':          'NEUQUEN',
+  'paimun200':           'NEUQUEN',
+  'paimun':              'NEUQUEN',
   'generalroca':         'ROCA',
   'sucursalroca':        'ROCA',
   'sanmartindelosandes': 'S.T.M.',
@@ -3695,7 +3727,7 @@ function renderEncDetalle(){
     html += `<tr style="border-bottom:1px solid var(--border-1);cursor:pointer;${critica?'background:#fff5f5':''}" onclick="toggleEncDetalle('${rid}')">
       <td style="padding:9px 12px;text-align:center;color:var(--text-4)"><span id="${rid}-arr" style="display:inline-block;transition:transform .15s">▸</span></td>
       <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap;font-family:var(--mono)">${f}</td>
-      <td style="padding:9px 12px;font-weight:600;color:var(--text-1);white-space:nowrap">${escapeHtml(e.asesor||'—')}</td>
+      <td style="padding:9px 12px;font-weight:600;color:var(--text-1);white-space:nowrap">${escapeHtml(e.asesor||'—')}${e.asesor_override?' <span style="font-size:10px;color:#4f46e5" title="Asesor corregido manualmente">✎</span>':''}${(cu&&cu.rol==='admin')?` <button onclick="event.stopPropagation();editarAsesorEnc('${e.wise_id}')" title="Corregir asesor" style="border:none;background:none;color:#4f46e5;cursor:pointer;font-size:12px;padding:0;margin-left:2px"><i class="ti ti-edit"></i></button>`:''}</td>
       <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap">${escapeHtml(e.sucursal||'—')}</td>
       <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap">${escapeHtml(e.servicio||'—')}</td>
       <td style="padding:9px 12px;color:var(--text-3);font-family:var(--mono);white-space:nowrap">${escapeHtml(e.dominio||'—')}</td>
