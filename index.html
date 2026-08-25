@@ -996,6 +996,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
               </select>
             </div>
           </div>
+          <div id="desest-cards" style="margin-bottom:16px"></div>
           <div id="desest-lista"></div>
         </div>
 
@@ -1778,8 +1779,8 @@ function canFallback(p){
     citas:        ['prepull.ver','prepull.turnos.ver','procedimientos.ver','encuestas.fir.crear','encuestas.desestimacion.pedir'],
     repuestos:    ['prepull.ver','prepull.repuestos.ver','prepull.repuestos.marcar','procedimientos.ver'],
     compras:      ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar','procedimientos.ver'],
-    asesor:       ['encuestas.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
-    jefe_servicio:['prepull.ver','prepull.turnos.ver','encuestas.ver','encuestas.tableros.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
+    asesor:       ['encuestas.ver','encuestas.desestimaciones.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
+    jefe_servicio:['prepull.ver','prepull.turnos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
     seguridad:    ['minutas.ver','procedimientos.ver','procedimientos.subir'],
   };
   const perms = new Set(M[cu.rol] || []);
@@ -2043,12 +2044,11 @@ function actualizarBadgeDesest(){
   if(cu && cu.rol === 'admin'){
     n = desestimaciones.filter(d => d.estado === 'pendiente').length;
   }else if(cu){
-    const mios = desestimaciones.filter(d =>
-      (d.solicitante_username && d.solicitante_username === cu.username));
+    const mios = desestDelUsuario();
     const vistos = pedidosVistos();
     n = mios.filter(d =>
       ['en_revision','aprobado','rechazado'].includes(d.estado) &&
-      vistos[d.id] !== d.estado   // novedad = cambió de estado desde la última vez que miró
+      vistos[d.id] !== d.estado
     ).length;
   }
   if(n > 0){ badge.textContent = n; badge.style.display = ''; }
@@ -2061,9 +2061,7 @@ function pedidosVistos(){
 function marcarPedidosVistos(){
   if(!cu) return;
   const map = {};
-  desestimaciones.forEach(d => {
-    if(d.solicitante_username === cu.username) map[d.id] = d.estado;
-  });
+  desestDelUsuario().forEach(d => { map[d.id] = d.estado; });
   try{ localStorage.setItem('desest_vistos_'+cu.username, JSON.stringify(map)); }catch(e){}
 }
 
@@ -2087,24 +2085,91 @@ function urlEvidencia(path){
   return data?.publicUrl || null;
 }
 
+// Estado global del filtro por tarjeta (para asesor/jefe)
+let desestCardFilter = 'todos';
+
+// Devuelve los pedidos que le corresponden al usuario actual:
+//  - admin: todos
+//  - jefe de servicio: los de las encuestas de su sucursal
+//  - asesor / otros: los suyos (que él pidió)
+function desestDelUsuario(){
+  if(!cu) return [];
+  if(cu.rol === 'admin') return desestimaciones.slice();
+  if(cu.rol === 'jefe_servicio'){
+    return desestimaciones.filter(d => {
+      const e = encuestas.find(x => x.wise_id === d.encuesta_id);
+      return e && encuestaEnSucursalDelJefe(e);
+    });
+  }
+  return desestimaciones.filter(d => d.solicitante_username === cu.username);
+}
+
 function renderDesest(){
   const cont = document.getElementById('desest-lista');
   const sub = document.getElementById('desest-sub');
-  const filtro = document.getElementById('desest-filtro')?.value || 'pendiente';
-  let arr = desestimaciones.slice();
-  if(filtro !== 'todos') arr = arr.filter(d => d.estado === filtro);
+  const cards = document.getElementById('desest-cards');
+  const esAdmin = cu && cu.rol === 'admin';
 
-  const pend = desestimaciones.filter(d=>d.estado==='pendiente').length;
-  if(sub) sub.textContent = `${pend} pendiente${pend===1?'':'s'} · ${desestimaciones.length} en total`;
+  // Ámbito según rol
+  const mios = desestDelUsuario();
+
+  // --- Panel de tarjetas de resumen (para asesor y jefe de servicio) ---
+  if(cards){
+    if(!esAdmin){
+      const cnt = {
+        total: mios.length,
+        pendiente: mios.filter(d=>d.estado==='pendiente').length,
+        en_revision: mios.filter(d=>d.estado==='en_revision').length,
+        aprobado: mios.filter(d=>d.estado==='aprobado').length,
+        rechazado: mios.filter(d=>d.estado==='rechazado').length,
+      };
+      const card=(key,label,val,grad)=>`
+        <button onclick="filtrarDesestCard('${key}')" style="flex:1;min-width:130px;text-align:left;border:none;cursor:pointer;border-radius:14px;padding:14px 16px;color:#fff;background:${grad};box-shadow:0 2px 8px rgba(0,0,0,.08);opacity:${desestCardFilter===key||desestCardFilter==='todos'?'1':'.55'};transition:opacity .15s">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.9">${label}</div>
+          <div style="font-size:30px;font-weight:800;line-height:1.1;margin-top:4px">${val}</div>
+        </button>`;
+      cards.innerHTML = `<div style="display:flex;gap:12px;flex-wrap:wrap">
+        ${card('todos','Total pedidos',cnt.total,'linear-gradient(135deg,#2563eb,#1d4ed8)')}
+        ${card('pendiente','Pendiente revisión',cnt.pendiente,'linear-gradient(135deg,#d97706,#b45309)')}
+        ${card('en_revision','En revisión / descargo',cnt.en_revision,'linear-gradient(135deg,#7c3aed,#6d28d9)')}
+        ${card('aprobado','Aprobados',cnt.aprobado,'linear-gradient(135deg,#059669,#047857)')}
+        ${card('rechazado','Rechazados',cnt.rechazado,'linear-gradient(135deg,#dc2626,#b91c1c)')}
+      </div>`;
+      // ocultar el select de filtro del admin para estos roles
+      const selWrap = document.getElementById('desest-filtro');
+      if(selWrap) selWrap.style.display='none';
+    }else{
+      cards.innerHTML='';
+    }
+  }
+
+  // --- Lista ---
+  let arr = mios.slice();
+  if(esAdmin){
+    const filtro = document.getElementById('desest-filtro')?.value || 'pendiente';
+    if(filtro !== 'todos') arr = arr.filter(d => d.estado === filtro);
+  }else if(desestCardFilter !== 'todos'){
+    arr = arr.filter(d => d.estado === desestCardFilter);
+  }
+
+  const pend = mios.filter(d=>d.estado==='pendiente').length;
+  if(sub) sub.textContent = esAdmin
+    ? `${pend} pendiente${pend===1?'':'s'} · ${mios.length} en total`
+    : (cu.rol==='jefe_servicio' ? `Pedidos de tu sucursal · ${mios.length} en total` : `Tus pedidos · ${mios.length} en total`);
 
   if(arr.length === 0){
     cont.innerHTML = '<div class="access-note"><i class="ti ti-info-circle"></i> No hay pedidos en esta categoría.</div>';
-    return;
+  }else{
+    cont.innerHTML = arr.map(d => tarjetaDesest(d)).join('');
   }
 
-  cont.innerHTML = arr.map(d => tarjetaDesest(d)).join('');
-  // El solicitante "vio" sus pedidos: apagamos la notificación
+  // El solicitante/jefe "vio" sus pedidos: apagamos la notificación
   if(cu && cu.rol !== 'admin'){ marcarPedidosVistos(); actualizarBadgeDesest(); }
+}
+
+function filtrarDesestCard(key){
+  desestCardFilter = key;
+  renderDesest();
 }
 
 // Tarjeta de un pedido de desestimación
@@ -2150,7 +2215,7 @@ function tarjetaDesest(d){
 
       ${d.descargo ? `<div style="margin:10px 0;padding:10px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#2563eb;font-weight:700;margin-bottom:3px">Descargo del solicitante</div><div style="font-size:13px;color:var(--text-2)">${escapeHtml(d.descargo)}${d.descargo_por?` <span style="color:var(--text-4)">— ${escapeHtml(d.descargo_por)}</span>`:''}</div></div>` : ''}
 
-      ${d.estado === 'pendiente' && e ? bloqueResolver(d, e, did) : ''}
+      ${(cu && cu.rol==='admin') && d.estado === 'pendiente' && e ? bloqueResolver(d, e, did) : ''}
       ${d.estado === 'en_revision' ? `<div style="margin-top:8px;padding:10px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;font-size:13px;color:var(--text-2)"><b>En revisión:</b> ${escapeHtml(d.decision_admin||'Se pidió descargo al solicitante.')} <span style="color:var(--text-4)">— esperando descargo</span></div>` : ''}
       ${(d.estado === 'aprobado' || d.estado === 'rechazado') ? `<div style="margin-top:8px;padding:10px 13px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;font-size:13px;color:var(--text-2)"><b>Resolución:</b> ${escapeHtml(d.decision_admin||'—')}${d.resuelto_por?` <span style="color:var(--text-4)">— por ${escapeHtml(d.resuelto_por)}</span>`:''}</div>` : ''}
     </div>
