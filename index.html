@@ -1985,7 +1985,12 @@ async function cargarTodo(){
   if(drQuien){drQuien.innerHTML='<option value="">Seleccionar...</option>';usuarios.filter(u=>u.rol==='citas').forEach(u=>{const o=document.createElement('option');o.textContent=u.nombre;drQuien.appendChild(o);});}
   // Mostrar FAB si el rol puede crear turnos
   const fab=document.getElementById('fab-nuevo');
-  if(fab) fab.style.display=(cu&&(cu.rol==='citas'||cu.rol==='admin'))?'flex':'none';
+  if(fab) fab.style.display=puedeGestionarTurnos()?'flex':'none';
+}
+// ¿Puede crear/editar turnos? Citas y admin siempre; además, quien tenga
+// el permiso extra 'prepull.turnos.editar' (ej. Analía, supervisora).
+function puedeGestionarTurnos(){
+  return !!(cu && (cu.rol==='citas' || cu.rol==='admin' || can('prepull.turnos.editar')));
 }
 async function cargarTurnos(){
   const {data,error}=await sb.from('turnos').select('*').order('fecha',{ascending:true});
@@ -4614,7 +4619,7 @@ function buildFilters(){
       <input type="text" class="search-input" id="search-turnos" placeholder="Buscar cliente, dominio..." oninput="searchVal=this.value;renderTurnos()">
     </div>
     ${cu.sucursalFija?`<div class="filter-locked"><i class="ti ti-lock" style="font-size:13px"></i> ${cu.sucursalFija} (fijo)</div>`:`<select class="filter-sel" id="fil-suc-t" onchange="renderTurnos()"><option value="">Todas las sucursales</option>${SUCURSALES.map(s=>`<option>${s}</option>`).join('')}</select>`}
-    ${(cu.rol==='citas'||cu.rol==='admin')?`<button class="btn-add" onclick="openDrawer()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Nuevo turno</button>`:''}`;
+    ${puedeGestionarTurnos()?`<button class="btn-add" onclick="openDrawer()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Nuevo turno</button>`:''}`;
 
   const fr=document.getElementById('fil-rep-wrap');
   if(fr){
@@ -4722,7 +4727,7 @@ const TIPO_COLORS={'Campaña':'#E91E8C','Pedido especial':'#7C3AED','Reparación
 function getTipoColor(t){return TIPO_COLORS[t]||'#8a8680';}
 
 function renderTurnoCard(t){
-  const cC=cu&&(cu.rol==='citas'||cu.rol==='admin');
+  const cC=cu&&puedeGestionarTurnos();
   const cA=cu&&cu.rol==='admin';
   const barCls=t.prioridad==='Alta'?'t-bar-alta':t.prioridad==='Baja'?'t-bar-baja':'t-bar-media';
   const adjT=(Array.isArray(t.adjuntos)&&t.adjuntos.length)?`<span class="obs-badge" onclick='verAdjuntos(${JSON.stringify(t.id)})' title="Adjuntos" style="font-size:11px"><i class="ti ti-paperclip" style="font-size:11px"></i> ${t.adjuntos.length}</span>`:'';
@@ -4957,7 +4962,7 @@ function renderNoShow(){
   const items=turnos.filter(t=>noShowVigente(t)&&(!f||t.sucursal===f));
   const cont=document.getElementById('tabla-noshow');
   if(!items.length){cont.innerHTML='<div class="empty"><i class="ti ti-user-check"></i>No hay clientes marcados como No Show</div>';return;}
-  const cC=cu&&(cu.rol==='citas'||cu.rol==='admin');
+  const cC=cu&&puedeGestionarTurnos();
   cont.innerHTML=`<div class="table-wrap"><table><thead><tr><th style="width:10%">Pre-Or</th><th style="width:16%">Cliente</th><th style="width:10%">Dominio</th><th style="width:11%">Modelo</th><th style="width:11%">Fecha del turno</th><th style="width:11%">Sucursal</th><th style="width:13%">Tipo</th><th style="width:18%">Acción</th></tr></thead>
   <tbody>${items.map(t=>{const acc=cC?`<button class="btn-sm btn-repr" onclick="openRepr('${t.id}')"><i class="ti ti-calendar-event" style="font-size:12px"></i> Reprogramar</button>`:`<span style="font-size:11px;color:var(--color-text-secondary)">Solo Citas reprograma</span>`;return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${fmtD(t.fecha)}</td><td>${t.sucursal}</td><td>${tipoDot(t.tipo)}</td><td>${acc}</td></tr>`;}).join('')}</tbody></table></div>`;
 }
@@ -4967,7 +4972,7 @@ function renderHistorico(){
   const items=turnos.filter(t=>esHistorico(t)&&(!f||t.sucursal===f));
   const cont=document.getElementById('tabla-historico');
   if(!items.length){cont.innerHTML='<div class="empty"><i class="ti ti-history"></i>No hay turnos vencidos pendientes de resolución</div>';return;}
-  const cC=cu&&(cu.rol==='citas'||cu.rol==='admin');
+  const cC=cu&&puedeGestionarTurnos();
   cont.innerHTML=`<div class="table-wrap"><table><thead><tr><th style="width:9%">Pre-Or</th><th style="width:14%">Cliente</th><th style="width:9%">Dominio</th><th style="width:10%">Modelo</th><th style="width:10%">Fecha del turno</th><th style="width:9%">Sucursal</th><th style="width:11%">Tipo</th><th style="width:8%">Estado</th><th style="width:20%">Acción</th></tr></thead>
   <tbody>${items.map(t=>{
     const acc=cC?`<div class="act-group">
@@ -6462,7 +6467,7 @@ function openModal(id){
   document.getElementById('modal-title').innerHTML=`<i class="ti ti-calendar-plus" style="font-size:16px;vertical-align:-3px;margin-right:6px"></i>${iE?'Editar turno':'Nuevo turno'}`;
   document.getElementById('repr-box').style.display='none';
   document.getElementById('f-repr-wrap').style.display='none';
-  document.getElementById('f-adj-wrap').style.display=(cu&&(cu.rol==='citas'||cu.rol==='admin'))?'block':'none';
+  document.getElementById('f-adj-wrap').style.display=puedeGestionarTurnos()?'block':'none';
   if(iE){const t=findTurno(id);document.getElementById('f-preor').value=t.preor;document.getElementById('f-fecha').value=t.fecha;document.getElementById('f-cliente').value=t.cliente;document.getElementById('f-dominio').value=t.dominio;document.getElementById('f-modelo').value=t.modelo||'';document.getElementById('f-suc').value=t.sucursal;document.getElementById('f-tipo').value=t.tipo||'';document.getElementById('f-pri').value=t.prioridad;document.getElementById('f-quien').value=t.quien;document.getElementById('f-obs').value='';currentAdjuntos=Array.isArray(t.adjuntos)?JSON.parse(JSON.stringify(t.adjuntos)):[];}
   else{['f-preor','f-fecha','f-cliente','f-dominio','f-obs','f-repr-mot'].forEach(id=>document.getElementById(id).value='');['f-modelo','f-suc','f-tipo','f-pri','f-quien'].forEach(id=>document.getElementById(id).value='');currentAdjuntos=[];}
   renderAdjuntosForm();
