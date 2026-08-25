@@ -2387,9 +2387,20 @@ function sucursalesJefe(){
 }
 
 // ¿esta encuesta pertenece a la/s sucursal/es del jefe logueado?
+// Traducción de nombres de sucursal de Pre Pull -> nombre en Encuestas (Wise).
+// Ej: en Pre Pull la sucursal de Neuquén se llama "Perticone" (por la calle),
+// pero en las encuestas figura como "NEUQUEN". Solo se usa para el alcance
+// del jefe de servicio sobre ENCUESTAS (no afecta el filtro de Pre Pull).
+const PREPULL_A_ENCUESTA = {
+  'perticone': 'neuquen',
+};
 function encuestaEnSucursalDelJefe(e){
-  const sucs = sucursalesJefe();
-  return sucs.length > 0 && sucs.includes(normSucursal(e.sucursal));
+  const base = sucursalesJefe(); // ya normalizadas
+  if(!base.length) return false;
+  // sumamos las equivalencias de encuestas
+  const sucs = new Set(base);
+  base.forEach(s => { if(PREPULL_A_ENCUESTA[s]) sucs.add(PREPULL_A_ENCUESTA[s]); });
+  return sucs.has(normSucursal(e.sucursal));
 }
 
 // normaliza para comparar nombres de asesor (espacios/tildes/mayúsculas)
