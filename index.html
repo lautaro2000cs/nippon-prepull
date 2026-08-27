@@ -1775,7 +1775,7 @@ function canFallback(p){
   if(!cu) return false;
   if(cu.rol === 'admin') return true;
   const M = {
-    supervisor:   ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.sincronizar','minutas.ver','procedimientos.ver','procedimientos.subir'],
+    supervisor:   ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','encuestas.sincronizar','minutas.ver','procedimientos.ver','procedimientos.subir'],
     citas:        ['prepull.ver','prepull.turnos.ver','procedimientos.ver','encuestas.fir.crear','encuestas.desestimacion.pedir'],
     repuestos:    ['prepull.ver','prepull.repuestos.ver','prepull.repuestos.marcar','procedimientos.ver'],
     compras:      ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar','procedimientos.ver'],
