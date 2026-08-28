@@ -4631,7 +4631,7 @@ function buildFilters(){
   if(fr){
     const buscadorRep=`<div class="search-wrap">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input type="text" class="search-input" id="search-rep" placeholder="Buscar por dominio o patente..." value="${searchRepVal||''}" oninput="searchRepVal=this.value;renderRepuestos()">
+      <input type="text" class="search-input" id="search-rep" placeholder="Buscar por dominio, cliente, N° pre-orden o N° de nota/presupuesto (en comentarios)..." value="${searchRepVal||''}" oninput="searchRepVal=this.value;renderRepuestos()">
     </div>`;
     if(cu.sucursalFija){
       fr.innerHTML=`${buscadorRep}<div class="filter-locked"><i class="ti ti-lock" style="font-size:13px"></i> ${cu.sucursalFija} (fijo)</div>`;
@@ -4644,7 +4644,7 @@ function buildFilters(){
   if(frh){
     const buscadorHist=`<div class="search-wrap">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input type="text" class="search-input" id="search-rephist" placeholder="Buscar por dominio o patente..." value="${searchRepHistVal||''}" oninput="searchRepHistVal=this.value;renderRepHistorico()">
+      <input type="text" class="search-input" id="search-rephist" placeholder="Buscar por dominio, cliente, N° pre-orden o N° de nota/presupuesto (en comentarios)..." value="${searchRepHistVal||''}" oninput="searchRepHistVal=this.value;renderRepHistorico()">
     </div>`;
     if(cu.sucursalFija){
       frh.innerHTML=`${buscadorHist}<div class="filter-locked"><i class="ti ti-lock" style="font-size:13px"></i> ${cu.sucursalFija} (fijo)</div>`;
@@ -4882,6 +4882,16 @@ function togglePasados(pid,header){
   if(chev) chev.innerHTML=isOpen?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg> Ver':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg> Ocultar';
 }
 
+// Búsqueda en Repuestos: dominio, cliente, N° pre-orden y dentro de los
+// comentarios (Citas suele dejar ahí el N° de nota de pedido / presupuesto).
+function coincideBusquedaRep(t, qr){
+  if((t.dominio||'').toLowerCase().includes(qr)) return true;
+  if((t.cliente||'').toLowerCase().includes(qr)) return true;
+  if((t.preor||'').toString().toLowerCase().includes(qr)) return true;
+  const coms = [...comentariosDe(t.id,'citas'), ...comentariosDe(t.id,'repuestos')];
+  return coms.some(c => (c.texto||'').toLowerCase().includes(qr));
+}
+
 function renderRepuestos(){
   const f=cu.sucursalFija?cu.sucursalFija:(document.getElementById('fil-suc-r')?document.getElementById('fil-suc-r').value:'');
   const qr=(searchRepVal||'').toLowerCase().trim();
@@ -4890,7 +4900,7 @@ function renderRepuestos(){
   const items=turnos.filter(t=>{
     if(f&&t.sucursal!==f) return false;
     if(tiposFilt&&!tiposFilt.includes(t.tipo)) return false;
-    if(qr&&!(t.dominio||'').toLowerCase().includes(qr)) return false;
+    if(qr && !coincideBusquedaRep(t, qr)) return false;
     if(metricaActivaRep==='today'&&diff(t.fecha)!==0) return false;
     if(metricaActivaRep==='noshow'&&!noShowVigente(t)) return false;
     if(metricaActivaRep==='repuesto'&&t.estado!=='pendiente') return false;
@@ -4944,7 +4954,7 @@ function renderRepHistorico(){
     if(!esRepHistorico(t)) return false;
     if(f&&t.sucursal!==f) return false;
     if(tiposFilt&&!tiposFilt.includes(t.tipo)) return false;
-    if(qr&&!(t.dominio||'').toLowerCase().includes(qr)) return false;
+    if(qr && !coincideBusquedaRep(t, qr)) return false;
     return true;
   }).sort((a,b)=>parseD(b.fecha)-parseD(a.fecha)); // más recientes primero
   actualizarContadoresRep();
