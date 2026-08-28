@@ -4918,9 +4918,7 @@ function renderRepuestos(){
       acc=`<div class="act-group">${estPill(t.estado)}</div>`;
     }
     const nsBadge=t.no_show?'<span class="pill p-noshow" style="margin-left:3px" title="No Show"><i class="ti ti-user-x" style="font-size:10px"></i></span>':'';
-    const confVale = (t.estado==='arribo' && t.vale);
-    const rowStyle = confVale ? ' style="background:#E7F6EC;border-left:3px solid #1F9D57"' : '';
-    return`<tr${rowStyle}><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}${nsBadge}</td><td>${t.dominio}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${valePill(t.vale)}</td><td><span style="display:inline-flex;gap:3px">${obsCitaTag}${obsTag}</span></td><td>${estPill(t.estado)}</td><td>${acc}</td></tr>`;
+    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}${nsBadge}</td><td>${t.dominio}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${valePill(t.vale)}</td><td><span style="display:inline-flex;gap:3px">${obsCitaTag}${obsTag}</span></td><td>${estPill(t.estado)}</td><td>${acc}</td></tr>`;
   }).join('')}</tbody></table>`,horizFilt);
   actualizarContadoresRep();
 }
