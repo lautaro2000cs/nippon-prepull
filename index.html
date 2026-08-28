@@ -1993,7 +1993,7 @@ function puedeGestionarTurnos(){
   return !!(cu && (cu.rol==='citas' || cu.rol==='admin' || can('prepull.turnos.editar')));
 }
 async function cargarTurnos(){
-  const {data,error}=await sb.from('turnos').select('*').order('fecha',{ascending:true});
+  const {data,error}=await sb.from('turnos').select('*').order('fecha',{ascending:true}).order('id',{ascending:true});
   if(error){console.error('Error al cargar turnos:',error);turnos=[];return;}
   turnos=data;
 }
@@ -4912,7 +4912,9 @@ function renderRepuestos(){
     }else{
       acc=`<div class="act-group">${estPill(t.estado)}</div>`;
     }
-    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${t.quien?`<span class="obs-badge" style="background:#E6F1FB;color:#0C447C"><i class="ti ti-user" style="font-size:10px"></i> ${escapeHtml(t.quien)}</span>`:'—'}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${valePill(t.vale)}</td><td>${nsBadge}</td><td>${obsCitaTag}</td><td>${obsTag}</td><td>${estPill(t.estado)}</td><td>${acc}</td></tr>`;
+    const confVale = (t.estado==='arribo' && t.vale);
+    const rowStyle = confVale ? ' style="background:#E7F6EC;border-left:3px solid #1F9D57"' : '';
+    return`<tr${rowStyle}><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${t.quien?`<span class="obs-badge" style="background:#E6F1FB;color:#0C447C"><i class="ti ti-user" style="font-size:10px"></i> ${escapeHtml(t.quien)}</span>`:'—'}</td><td>${tipoDot(t.tipo)}</td><td>${priPill(t.prioridad)}</td><td>${valePill(t.vale)}</td><td>${nsBadge}</td><td>${obsCitaTag}</td><td>${obsTag}</td><td>${estPill(t.estado)}</td><td>${acc}</td></tr>`;
   }).join('')}</tbody></table>`,horizFilt);
   actualizarContadoresRep();
 }
