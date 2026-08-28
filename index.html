@@ -4707,11 +4707,11 @@ function getHorizontesFiltrados(){
   return horizonteActivoChip==='all'?null:[horizonteActivoChip];
 }
 
-function valePill(v){return v?'<span class="pill p-vale"><i class="ti ti-check" style="font-size:11px"></i> Con vale</span>':'<span class="pill p-sinvale"><i class="ti ti-x" style="font-size:11px"></i> Sin vale</span>';}
+function valePill(v){return v?'<span class="pill p-arr"><i class="ti ti-check" style="font-size:11px"></i> Con vale</span>':'<span class="pill p-falt"><i class="ti ti-x" style="font-size:11px"></i> Sin vale</span>';}
 
 function priPill(p){const m={Alta:'pri-alta',Mediana:'pri-med',Baja:'pri-baja'};return`<span class="pill ${m[p]||'pri-baja'}">${p||'-'}</span>`;}
 function estPill(e){const m={pendiente:['p-pend','Pendiente'],arribo:['p-arr','Arribó'],faltante:['p-falt','Faltante'],bo:['p-bo','<i class="ti ti-alert-triangle" style="font-size:12px;vertical-align:-1px"></i> B/O']};const[c,l]=m[e]||['p-pend','Pendiente'];return`<span class="pill ${c}">${l}</span>`;}
-function valePill(v){return v?'<span class="pill vale-yes"><i class="ti ti-check" style="font-size:11px"></i> Con vale</span>':'<span class="pill vale-no"><i class="ti ti-x" style="font-size:11px"></i> Sin vale</span>';}
+function valePill(v){return v?'<span class="pill p-arr"><i class="ti ti-check" style="font-size:11px"></i> Con vale</span>':'<span class="pill p-falt"><i class="ti ti-x" style="font-size:11px"></i> Sin vale</span>';}
 function rolPill(r){const m={admin:'<span class="pill" style="background:#fbeceb;color:#c62a27">Admin</span>',citas:'<span class="pill" style="background:#e6f4ec;color:#1f7a48">Citas</span>',repuestos:'<span class="pill" style="background:#eef0ff;color:#4f46e5">Repuestos</span>',compras:'<span class="pill" style="background:#fbf1de;color:#9a6a08">Compras</span>',supervisor:'<span class="pill" style="background:#e6f1fb;color:#0c447c">Supervisor</span>',jefe_servicio:'<span class="pill" style="background:#f3e8ff;color:#7c3aed">Jefe de Servicio</span>'};return m[r]||`<span style="font-size:11px">${r}</span>`;}
 
 function renderGroups(cid,items,fn,horizFilt){
