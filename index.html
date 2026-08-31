@@ -1075,37 +1075,43 @@ tbody td{padding:11px 12px;vertical-align:middle}
 
   <!-- MODAL VEHÍCULO DETENIDO -->
   <div class="modal-ov" id="det-modal-ov">
-    <div class="modal" style="max-width:720px">
-      <div class="modal-hd"><h3 id="det-modal-title">Nuevo vehículo detenido</h3><button class="modal-x" onclick="cerrarDetModal()">&times;</button></div>
-      <div class="modal-bd">
-        <div id="det-modal-err" style="display:none;background:var(--accent-tint);color:var(--accent-h);padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:12px"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <div><label>Ubicación</label><input id="dm-ubicacion" placeholder="Perticone, Roca..."></div>
-          <div><label>Cliente</label><input id="dm-cliente"></div>
-          <div><label>Dominio</label><input id="dm-dominio"></div>
-          <div><label>Unidad / Modelo</label><input id="dm-unidad"></div>
-          <div><label>Asesor</label><input id="dm-asesor"></div>
-          <div><label>N° Orden</label><input id="dm-orden"></div>
-          <div><label>Fecha de entrega</label><input id="dm-fentrega" type="date"></div>
-          <div><label>Cargo</label><input id="dm-cargo" placeholder="Cliente / Cortesía..."></div>
-          <div><label>Tiempo taller (hs)</label><input id="dm-tiempo" type="number" step="0.5" placeholder="hs de reparación"></div>
-        </div>
-        <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border-2)">
-          <div style="font-size:12px;color:var(--text-3);margin-bottom:8px"><b>Gestión</b> — el estado se calcula solo: cargar NP → "Esperando repuesto"; cargar Arribo → "Esperando reparación".</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-            <div><label>Fecha realización NP</label><input id="dm-fnp" type="date"></div>
-            <div><label>N° NP</label><input id="dm-nronp"></div>
-            <div><label>Entrega NP a Rtos</label><input id="dm-entreganp" type="date"></div>
-            <div><label>N° Presupuesto</label><input id="dm-pres"></div>
-            <div><label>Arribo del repuesto</label><input id="dm-arribo" type="date"></div>
-            <div><label>Turno asignado</label><input id="dm-turno" placeholder="ej. 24/08 - 25/08"></div>
-          </div>
-        </div>
-        <div style="margin-top:12px"><label>Observaciones</label><textarea id="dm-obs" rows="2" style="width:100%"></textarea></div>
+    <div class="modal" style="max-width:760px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <h3 id="det-modal-title" style="margin:0;font-size:19px">Nuevo vehículo detenido</h3>
+        <button onclick="cerrarDetModal()" style="background:none;border:none;font-size:24px;line-height:1;color:var(--text-4);cursor:pointer">&times;</button>
       </div>
-      <div class="modal-ft">
-        <button class="btn-ghost" onclick="cerrarDetModal()">Cancelar</button>
-        <button class="btn-primary" onclick="guardarDetenido()">Guardar</button>
+      <div class="sec-eyebrow" style="margin-bottom:16px">Taller · Ocupación de bahías</div>
+      <div id="det-modal-err" style="display:none;background:var(--accent-tint);color:var(--accent-h);padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:14px"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px">
+        <div class="drawer-field"><label class="drawer-label">Ubicación</label><input class="drawer-input" id="dm-ubicacion" placeholder="Perticone, Roca..."></div>
+        <div class="drawer-field"><label class="drawer-label">Cliente</label><input class="drawer-input" id="dm-cliente"></div>
+        <div class="drawer-field"><label class="drawer-label">Dominio</label><input class="drawer-input" id="dm-dominio"></div>
+        <div class="drawer-field"><label class="drawer-label">Unidad / Modelo</label><input class="drawer-input" id="dm-unidad"></div>
+        <div class="drawer-field"><label class="drawer-label">Asesor</label><input class="drawer-input" id="dm-asesor"></div>
+        <div class="drawer-field"><label class="drawer-label">N° Orden</label><input class="drawer-input" id="dm-orden"></div>
+        <div class="drawer-field"><label class="drawer-label">Fecha de entrega</label><input class="drawer-input" id="dm-fentrega" type="date"></div>
+        <div class="drawer-field"><label class="drawer-label">Cargo</label><input class="drawer-input" id="dm-cargo" placeholder="Cliente / Cortesía..."></div>
+        <div class="drawer-field"><label class="drawer-label">Tiempo taller (hs)</label><input class="drawer-input" id="dm-tiempo" type="number" step="0.5" placeholder="hs de reparación"></div>
+      </div>
+
+      <div style="margin-top:16px;padding:13px 15px;background:var(--surface-sub,#f6f7f9);border:1px solid var(--border-1);border-radius:12px">
+        <div style="font-size:13px;color:var(--text-2);margin-bottom:11px"><b>Gestión</b> — el estado se calcula solo: al cargar la <b>NP</b> pasa a “Esperando repuesto”; al cargar el <b>Arribo</b> pasa a “Esperando reparación”.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px">
+          <div class="drawer-field"><label class="drawer-label">Fecha realización NP</label><input class="drawer-input" id="dm-fnp" type="date"></div>
+          <div class="drawer-field"><label class="drawer-label">N° NP</label><input class="drawer-input" id="dm-nronp"></div>
+          <div class="drawer-field"><label class="drawer-label">Entrega NP a Rtos</label><input class="drawer-input" id="dm-entreganp" type="date"></div>
+          <div class="drawer-field"><label class="drawer-label">N° Presupuesto</label><input class="drawer-input" id="dm-pres"></div>
+          <div class="drawer-field"><label class="drawer-label">Arribo del repuesto</label><input class="drawer-input" id="dm-arribo" type="date"></div>
+          <div class="drawer-field"><label class="drawer-label">Turno asignado</label><input class="drawer-input" id="dm-turno" placeholder="ej. 24/08 - 25/08"></div>
+        </div>
+      </div>
+
+      <div class="drawer-field" style="margin-top:14px"><label class="drawer-label">Observaciones</label><textarea class="drawer-input" id="dm-obs" rows="2" style="resize:vertical"></textarea></div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px">
+        <button class="btn-cancel" onclick="cerrarDetModal()">Cancelar</button>
+        <button class="btn-save" onclick="guardarDetenido()">Guardar</button>
       </div>
     </div>
   </div>
