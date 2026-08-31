@@ -525,6 +525,8 @@ tbody td{padding:11px 12px;vertical-align:middle}
 .rep-compact .pill{font-size:10.5px;padding:2px 6px}
 .rep-compact .btn-sm{font-size:11px;padding:4px 8px}
 .rep-compact .obs-badge{font-size:10.5px;padding:1px 5px}
+.det-tab-btn{padding:7px 14px;border:1px solid var(--border-2);background:#fff;border-radius:8px;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer}
+.det-tab-btn.act{background:var(--accent);color:#fff;border-color:var(--accent)}
 
 /* ── SECTION HEADER (repuestos, usuarios, etc) ───────── */
 .tc{display:none}
@@ -680,6 +682,10 @@ tbody td{padding:11px 12px;vertical-align:middle}
         <button class="nav-item" id="tab-proc" style="display:none" onclick="swTab('proc',this)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4a2 2 0 0 1 2-2h5l2 3h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>
           Procedimientos
+        </button>
+        <button class="nav-item" id="tab-detenidos" style="display:none" onclick="swTab('detenidos',this)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+          Vehículos Detenidos
         </button>
       </nav>
 
@@ -1041,10 +1047,69 @@ tbody td{padding:11px 12px;vertical-align:middle}
           <div id="proc-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
         </div>
 
+        <!-- VEHÍCULOS DETENIDOS -->
+        <div class="tc" id="tc-detenidos">
+          <div class="sec-hdr">
+            <div class="sec-hdr-left">
+              <div class="sec-eyebrow">Taller · Ocupación de bahías</div>
+              <h2>Vehículos Detenidos</h2>
+              <div class="tb-sub" id="det-sub" style="margin-top:4px"></div>
+            </div>
+            <div class="hdr-actions" style="display:flex;gap:8px;align-items:center">
+              <input type="text" id="det-buscar" placeholder="Buscar dominio, cliente, N° orden, NP..." oninput="renderDetenidos()" style="padding:9px 12px;border:1px solid var(--border-2);border-radius:10px;font-size:13px;min-width:240px">
+              <button class="btn-add" onclick="abrirDetModal()"><i class="ti ti-plus"></i> Nuevo vehículo</button>
+            </div>
+          </div>
+          <div class="det-tabs" style="display:flex;gap:6px;margin:6px 0 14px">
+            <button class="det-tab-btn act" id="det-tab-activos" onclick="detVista='activos';renderDetenidos()">En taller</button>
+            <button class="det-tab-btn" id="det-tab-hist" onclick="detVista='historico';renderDetenidos()">Histórico (reparados)</button>
+          </div>
+          <div id="det-cards" style="margin-bottom:16px"></div>
+          <div id="det-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
+        </div>
+
       </div><!-- /main-inner -->
     </main>
 
   </div><!-- /app-body -->
+
+  <!-- MODAL VEHÍCULO DETENIDO -->
+  <div class="modal-ov" id="det-modal-ov">
+    <div class="modal" style="max-width:720px">
+      <div class="modal-hd"><h3 id="det-modal-title">Nuevo vehículo detenido</h3><button class="modal-x" onclick="cerrarDetModal()">&times;</button></div>
+      <div class="modal-bd">
+        <div id="det-modal-err" style="display:none;background:var(--accent-tint);color:var(--accent-h);padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:12px"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div><label>Ubicación</label><input id="dm-ubicacion" placeholder="Perticone, Roca..."></div>
+          <div><label>Cliente</label><input id="dm-cliente"></div>
+          <div><label>Dominio</label><input id="dm-dominio"></div>
+          <div><label>Unidad / Modelo</label><input id="dm-unidad"></div>
+          <div><label>Asesor</label><input id="dm-asesor"></div>
+          <div><label>N° Orden</label><input id="dm-orden"></div>
+          <div><label>Fecha de entrega</label><input id="dm-fentrega" type="date"></div>
+          <div><label>Cargo</label><input id="dm-cargo" placeholder="Cliente / Cortesía..."></div>
+          <div><label>Tiempo taller (hs)</label><input id="dm-tiempo" type="number" step="0.5" placeholder="hs de reparación"></div>
+        </div>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border-2)">
+          <div style="font-size:12px;color:var(--text-3);margin-bottom:8px"><b>Gestión</b> — el estado se calcula solo: cargar NP → "Esperando repuesto"; cargar Arribo → "Esperando reparación".</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+            <div><label>Fecha realización NP</label><input id="dm-fnp" type="date"></div>
+            <div><label>N° NP</label><input id="dm-nronp"></div>
+            <div><label>Entrega NP a Rtos</label><input id="dm-entreganp" type="date"></div>
+            <div><label>N° Presupuesto</label><input id="dm-pres"></div>
+            <div><label>Arribo del repuesto</label><input id="dm-arribo" type="date"></div>
+            <div><label>Turno asignado</label><input id="dm-turno" placeholder="ej. 24/08 - 25/08"></div>
+          </div>
+        </div>
+        <div style="margin-top:12px"><label>Observaciones</label><textarea id="dm-obs" rows="2" style="width:100%"></textarea></div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn-ghost" onclick="cerrarDetModal()">Cancelar</button>
+        <button class="btn-primary" onclick="guardarDetenido()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
 
   <!-- FAB nuevo turno -->
   <button class="fab" id="fab-nuevo" onclick="openDrawer()" style="display:none" title="Nuevo turno">
@@ -1759,6 +1824,13 @@ const MODULOS = {
     color: '#0d9488',
     icono: '<path d="M4 4a2 2 0 0 1 2-2h5l2 3h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>'
   },
+  detenidos: {
+    id: 'detenidos',
+    nombre: 'Vehículos Detenidos',
+    desc: 'Control de vehículos detenidos en taller y ocupación de bahías.',
+    color: '#b45309',
+    icono: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>'
+  },
   admin: {
     id: 'admin',
     nombre: 'Administración',
@@ -1800,6 +1872,7 @@ function canFallback(p){
 function puedeAcceder(moduloId){
   if(moduloId === 'admin') return !!(cu && cu.rol === 'admin'); // solo admin, regla dura
   if(moduloId === 'procedimientos') return can('procedimientos.ver');
+  if(moduloId === 'detenidos') return can('detenidos.gestionar');
   return can(moduloId + '.ver');
 }
 
@@ -1889,6 +1962,7 @@ async function showApp(){
   const enMinutas = cu.modulo === 'minutas';
   const enAdmin = cu.modulo === 'admin';
   const enProc = cu.modulo === 'procedimientos';
+  const enDetenidos = cu.modulo === 'detenidos';
 
   document.getElementById('tab-dash').style.display=(enPrepull && can('prepull.dashboard.ver'))?'':'none';
   document.getElementById('tab-turnos').style.display=(enPrepull && can('prepull.turnos.ver'))?'':'none';
@@ -1901,6 +1975,8 @@ async function showApp(){
   if(tabMin) tabMin.style.display=enMinutas?'':'none';
   const tabProc = document.getElementById('tab-proc');
   if(tabProc) tabProc.style.display=enProc?'':'none';
+  const tabDet = document.getElementById('tab-detenidos');
+  if(tabDet) tabDet.style.display=enDetenidos?'':'none';
   // el botón flotante "+" es de Pre Pull (crear turno): ocultarlo en otros módulos
   const fab = document.getElementById('fab-nuevo');
   if(fab && !enPrepull) fab.style.display='none';
@@ -1914,6 +1990,8 @@ async function showApp(){
     startTab = 'minutas';
   } else if(enProc){
     startTab = 'proc';
+  } else if(enDetenidos){
+    startTab = 'detenidos';
   } else if(enAdmin){
     startTab = 'usuarios';
   } else {
@@ -1948,6 +2026,8 @@ async function showApp(){
     cargarMinutas();
   } else if(enProc){
     cargarProcedimientos();
+  } else if(enDetenidos){
+    cargarDetenidos();
   } else if(enAdmin){
     await cargarUsuariosParaSelect();
     renderUsers();
@@ -2366,6 +2446,173 @@ async function editarAsesorEnc(wiseId){
     if(data){ encuestas = aplicarAsesorOverride(data); normalizarSucursales(); }
     renderEncuestas();
   }catch(err){ alert('No se pudo corregir el asesor: '+(err.message||'error')); }
+}
+
+// ============================================================
+//  MÓDULO VEHÍCULOS DETENIDOS
+// ============================================================
+let detenidos = [];
+let detVista = 'activos';   // 'activos' | 'historico'
+let detEditId = null;
+let detCardFilter = 'todos';
+
+const DET_ESTADOS = {
+  sin_gestion:          { lbl:'Sin gestión',          bg:'#efeeeb', color:'#7c7873' },
+  esperando_repuesto:   { lbl:'Esperando repuesto',   bg:'#fbf1de', color:'#9a6a08' },
+  esperando_reparacion: { lbl:'Esperando reparación', bg:'#e6f0fb', color:'#1f5fa8' },
+};
+// Estado AUTOMÁTICO según los campos cargados
+function estadoDetenido(v){
+  if(v.arribo) return 'esperando_reparacion';
+  if(v.nro_np || v.fecha_np) return 'esperando_repuesto';
+  return 'sin_gestion';
+}
+function detEstadoPill(v){
+  const e = DET_ESTADOS[estadoDetenido(v)] || DET_ESTADOS.sin_gestion;
+  return `<span class="pill" style="background:${e.bg};color:${e.color}">${e.lbl}</span>`;
+}
+
+async function cargarDetenidos(){
+  const cont=document.getElementById('det-cont');
+  const { data, error } = await sb.from('vehiculos_detenidos').select('*').order('fecha_entrega',{ascending:true}).order('creado_en',{ascending:true});
+  if(error){ if(cont) cont.innerHTML='<div class="access-note"><i class="ti ti-alert-triangle"></i> No se pudieron cargar los vehículos: '+escapeHtml(error.message)+'</div>'; return; }
+  detenidos = data || [];
+  renderDetenidos();
+}
+
+function renderDetenidos(){
+  const cont=document.getElementById('det-cont');
+  const cards=document.getElementById('det-cards');
+  const sub=document.getElementById('det-sub');
+  if(!cont) return;
+  // toggle vista
+  document.getElementById('det-tab-activos')?.classList.toggle('act', detVista==='activos');
+  document.getElementById('det-tab-hist')?.classList.toggle('act', detVista==='historico');
+
+  const activos = detenidos.filter(v=>!v.reparado);
+  const histn   = detenidos.filter(v=>v.reparado);
+  const base = detVista==='activos' ? activos : histn;
+
+  // Tarjetas de resumen (solo en vista activos)
+  if(cards){
+    if(detVista==='activos'){
+      const c = {
+        total: activos.length,
+        sin_gestion: activos.filter(v=>estadoDetenido(v)==='sin_gestion').length,
+        esperando_repuesto: activos.filter(v=>estadoDetenido(v)==='esperando_repuesto').length,
+        esperando_reparacion: activos.filter(v=>estadoDetenido(v)==='esperando_reparacion').length,
+      };
+      const card=(key,label,val,grad)=>`<button onclick="detCardFilter='${key}';renderDetenidos()" style="flex:1;min-width:150px;text-align:left;border:none;cursor:pointer;border-radius:14px;padding:14px 16px;color:#fff;background:${grad};box-shadow:0 2px 8px rgba(0,0,0,.08);opacity:${detCardFilter===key||detCardFilter==='todos'?'1':'.55'}"><div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.9">${label}</div><div style="font-size:30px;font-weight:800;line-height:1.1;margin-top:4px">${val}</div></button>`;
+      cards.innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap">
+        ${card('todos','Total en taller',c.total,'linear-gradient(135deg,#b45309,#92400e)')}
+        ${card('sin_gestion','Sin gestión',c.sin_gestion,'linear-gradient(135deg,#6b7280,#4b5563)')}
+        ${card('esperando_repuesto','Esperando repuesto',c.esperando_repuesto,'linear-gradient(135deg,#d97706,#b45309)')}
+        ${card('esperando_reparacion','Esperando reparación',c.esperando_reparacion,'linear-gradient(135deg,#2563eb,#1d4ed8)')}
+      </div>`;
+    }else cards.innerHTML='';
+  }
+
+  // filtro por tarjeta + búsqueda
+  const q=(document.getElementById('det-buscar')?.value||'').toLowerCase().trim();
+  let arr = base.slice();
+  if(detVista==='activos' && detCardFilter!=='todos') arr=arr.filter(v=>estadoDetenido(v)===detCardFilter);
+  if(q) arr=arr.filter(v=>[v.dominio,v.cliente,v.nro_orden,v.nro_np,v.unidad,v.ubicacion].some(x=>(x||'').toString().toLowerCase().includes(q)));
+
+  if(sub) sub.textContent = detVista==='activos'
+    ? `${activos.length} vehículo${activos.length===1?'':'s'} en taller`
+    : `${histn.length} reparado${histn.length===1?'':'s'} en el histórico`;
+
+  const fmtN=n=>{ if(n==null||n==='') return '—'; return String(n); };
+  const th = detVista==='activos'
+    ? `<th>Estado</th><th>Ubic.</th><th>Cliente</th><th>Dominio</th><th>Unidad</th><th>Asesor</th><th>N° Orden</th><th>F. entrega</th><th>Cargo</th><th>N° NP</th><th>Arribo</th><th>T. taller (hs)</th><th>Turno</th><th>Obs.</th><th>Acciones</th>`
+    : `<th>Ubic.</th><th>Cliente</th><th>Dominio</th><th>Unidad</th><th>N° Orden</th><th>F. entrega</th><th>N° NP</th><th>T. taller (hs)</th><th>Reparado</th><th>Acciones</th>`;
+
+  const rows = arr.map(v=>{
+    if(detVista==='activos'){
+      return `<tr>
+        <td>${detEstadoPill(v)}</td><td>${escapeHtml(v.ubicacion||'—')}</td><td>${escapeHtml(v.cliente||'—')}</td>
+        <td><strong>${escapeHtml(v.dominio||'—')}</strong></td><td>${escapeHtml(v.unidad||'—')}</td><td>${escapeHtml(v.asesor||'—')}</td>
+        <td>${escapeHtml(v.nro_orden||'—')}</td><td>${v.fecha_entrega?fmtD(v.fecha_entrega):'—'}</td><td>${escapeHtml(v.cargo||'—')}</td>
+        <td>${escapeHtml(v.nro_np||'—')}</td><td>${v.arribo?fmtD(v.arribo):'—'}</td><td>${fmtN(v.tiempo_taller)}</td>
+        <td>${escapeHtml(v.turno_asignado||'—')}</td><td style="max-width:160px;font-size:12px">${escapeHtml(v.observaciones||'—')}</td>
+        <td><div style="display:flex;gap:5px"><button class="btn-sm btn-rep-mark" onclick="abrirDetModal('${v.id}')"><i class="ti ti-edit" style="font-size:12px"></i> Editar</button><button class="btn-sm" style="background:#059669;color:#fff" onclick="marcarReparado('${v.id}')"><i class="ti ti-check" style="font-size:12px"></i> Reparado</button></div></td>
+      </tr>`;
+    }else{
+      return `<tr>
+        <td>${escapeHtml(v.ubicacion||'—')}</td><td>${escapeHtml(v.cliente||'—')}</td><td><strong>${escapeHtml(v.dominio||'—')}</strong></td>
+        <td>${escapeHtml(v.unidad||'—')}</td><td>${escapeHtml(v.nro_orden||'—')}</td><td>${v.fecha_entrega?fmtD(v.fecha_entrega):'—'}</td>
+        <td>${escapeHtml(v.nro_np||'—')}</td><td>${fmtN(v.tiempo_taller)}</td><td>${v.reparado_en?fmtD(v.reparado_en):'—'}</td>
+        <td><button class="btn-sm" onclick="reabrirDetenido('${v.id}')" title="Volver a poner en taller"><i class="ti ti-arrow-back-up" style="font-size:12px"></i> Reabrir</button></td>
+      </tr>`;
+    }
+  }).join('');
+
+  cont.innerHTML = arr.length
+    ? `<div class="table-wrap"><table class="rep-compact" style="font-size:12px"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div>`
+    : '<div class="access-note"><i class="ti ti-car"></i> No hay vehículos en esta vista.</div>';
+}
+
+// Alta / edición
+function abrirDetModal(id){
+  detEditId = id || null;
+  const v = id ? detenidos.find(x=>x.id===id) : {};
+  const g=(k)=>v&&v[k]!=null?v[k]:'';
+  const gd=(k)=>v&&v[k]?String(v[k]).slice(0,10):'';
+  document.getElementById('det-modal-title').textContent = id ? 'Editar vehículo detenido' : 'Nuevo vehículo detenido';
+  const set=(id2,val)=>{const el=document.getElementById(id2); if(el) el.value=val;};
+  set('dm-ubicacion',g('ubicacion')); set('dm-cliente',g('cliente')); set('dm-dominio',g('dominio'));
+  set('dm-unidad',g('unidad')); set('dm-asesor',g('asesor')); set('dm-orden',g('nro_orden'));
+  set('dm-fentrega',gd('fecha_entrega')); set('dm-cargo',g('cargo')); set('dm-fnp',gd('fecha_np'));
+  set('dm-entreganp',gd('entrega_np_rtos')); set('dm-nronp',g('nro_np')); set('dm-pres',g('pres'));
+  set('dm-arribo',gd('arribo')); set('dm-tiempo',g('tiempo_taller')); set('dm-turno',g('turno_asignado'));
+  set('dm-obs',g('observaciones'));
+  document.getElementById('det-modal-ov').classList.add('open');
+}
+function cerrarDetModal(){ document.getElementById('det-modal-ov').classList.remove('open'); }
+
+async function guardarDetenido(){
+  const val=(id)=>{const el=document.getElementById(id); return el?el.value.trim():'';};
+  const vald=(id)=>{const el=document.getElementById(id); return el&&el.value?el.value:null;};
+  const dominio=val('dm-dominio'), cliente=val('dm-cliente');
+  const errEl=document.getElementById('det-modal-err'); errEl.style.display='none';
+  if(!dominio && !cliente){ errEl.textContent='Completá al menos Dominio o Cliente.'; errEl.style.display='block'; return; }
+  const tiempo=val('dm-tiempo');
+  const data={
+    ubicacion:val('dm-ubicacion'), cliente, dominio, unidad:val('dm-unidad'), asesor:val('dm-asesor'),
+    nro_orden:val('dm-orden'), fecha_entrega:vald('dm-fentrega'), cargo:val('dm-cargo'),
+    fecha_np:vald('dm-fnp'), entrega_np_rtos:vald('dm-entreganp'), nro_np:val('dm-nronp'), pres:val('dm-pres'),
+    arribo:vald('dm-arribo'), tiempo_taller: tiempo===''?null:Number(tiempo), turno_asignado:val('dm-turno'),
+    observaciones:val('dm-obs'),
+  };
+  try{
+    if(detEditId){
+      const { error } = await sb.from('vehiculos_detenidos').update(data).eq('id',detEditId);
+      if(error) throw error;
+    }else{
+      data.creado_por = cu?.username || null;
+      const { error } = await sb.from('vehiculos_detenidos').insert(data);
+      if(error) throw error;
+    }
+    cerrarDetModal();
+    await cargarDetenidos();
+  }catch(err){ errEl.textContent='No se pudo guardar: '+(err.message||'error'); errEl.style.display='block'; }
+}
+
+async function marcarReparado(id){
+  if(!confirm('¿Marcar este vehículo como REPARADO? Sale del taller y pasa al histórico.')) return;
+  try{
+    const { error } = await sb.from('vehiculos_detenidos').update({ reparado:true, reparado_en:new Date().toISOString() }).eq('id',id);
+    if(error) throw error;
+    await cargarDetenidos();
+  }catch(err){ alert('No se pudo marcar: '+(err.message||'error')); }
+}
+async function reabrirDetenido(id){
+  if(!confirm('¿Volver a poner este vehículo en taller?')) return;
+  try{
+    const { error } = await sb.from('vehiculos_detenidos').update({ reparado:false, reparado_en:null }).eq('id',id);
+    if(error) throw error;
+    await cargarDetenidos();
+  }catch(err){ alert('No se pudo reabrir: '+(err.message||'error')); }
 }
 
 async function cargarEncuestas(){
