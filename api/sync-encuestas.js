@@ -15,7 +15,7 @@
 
 const crypto = require("crypto");
 const WISE_BASE = "https://api.wcx.cloud/core/v1";
-const REPORT_ID = process.env.WISE_REPORT_ID || "138189"; // reporte "Respuestas de Encuestas"
+const REPORT_ID = process.env.WISE_REPORT_ID || "240327"; // reporte "Respuestas de Encuestas"
 
 // --- helpers -------------------------------------------------
 
@@ -346,6 +346,14 @@ function mapearFila(fila, idx) {
   const kDominio  = buscarClave(fila, ["dominio", "patente", "domain"]);
   const kEmpresa  = buscarClave(fila, ["empresa", "telefono", "phone", "cliente", "nombre"]);
   const kTelefono = claveConPalabras(fila, ["contacto", "telefono"]) || buscarClave(fila, ["telefono", "phone", "celular"]);
+  // N° de Orden (viene de Wise como "Contacto: N° orden"). Preferimos la que
+  // tenga "orden" pero NO "grupo"; primero la que además diga "n°"/"nro".
+  const _claves = Object.keys(fila);
+  const _norm = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const kNroOrden =
+    _claves.find(k => { const n=_norm(k); return n.includes("orden") && !n.includes("grupo") && (n.includes("n° orden")||n.includes("n orden")||n.includes("nro")); })
+    || _claves.find(k => { const n=_norm(k); return n.includes("contacto") && n.includes("orden") && !n.includes("grupo"); })
+    || null;
   const kEncuesta = buscarClave(fila, ["encuesta", "survey"]);
   const kId       = buscarClave(fila, ["id", "caso", "case", "#"]);
 
@@ -419,6 +427,7 @@ function mapearFila(fila, idx) {
     servicio:  kServicio ? fila[kServicio] : null,
     dominio:   kDominio  ? fila[kDominio]  : null,
     telefono:  kTelefono ? fila[kTelefono] : null,
+    nro_orden: kNroOrden ? fila[kNroOrden] : null,
     empresa:   kEmpresa  ? fila[kEmpresa]  : null,
     encuesta:  kEncuesta ? fila[kEncuesta] : null,
     raw: fila,
@@ -552,6 +561,25 @@ export default async function handler(req, res) {
 
     const reportUrl = await esperarReporte(token, exportId);
     const filas = await descargarFilas(reportUrl);
+
+    // modo diagnóstico de columnas: /api/sync-encuestas?key=...&debug=cols
+    // muestra los nombres de columna REALES que devuelve el reporte de Wise,
+    // y qué columna detecta como teléfono. Sirve para saber el nombre exacto.
+    if (req.query.debug === "cols") {
+      const cols = filas.length ? Object.keys(filas[0]) : [];
+      const kTel = filas.length
+        ? (claveConPalabras(filas[0], ["contacto", "telefono"]) ||
+           buscarClave(filas[0], ["telefono", "phone", "celular"]))
+        : null;
+      return res.status(200).json({
+        ok: true,
+        modo: "debug-columnas",
+        total_columnas: cols.length,
+        columnas: cols,
+        columna_telefono_detectada: kTel,
+        ejemplo_valor_telefono: kTel && filas[0] ? filas[0][kTel] : null,
+      });
+    }
 
     // Mapear y quedarnos SOLO con las respondidas (descarta las no contestadas)
     let registros = filas.map(mapearFila);
