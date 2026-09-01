@@ -1090,7 +1090,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
         <div class="drawer-field"><label class="drawer-label">Unidad / Modelo</label><select class="drawer-input" id="dm-unidad"><option value="">Seleccionar...</option><option>Corolla</option><option>Corolla Cross</option><option>Yaris</option><option>Yaris Cross</option><option>Hilux</option><option>SW4</option><option>Etios</option><option>Hiace</option><option>Rav4</option><option>Innova</option><option>Otros</option></select></div>
         <div class="drawer-field"><label class="drawer-label">Asesor</label><select class="drawer-input" id="dm-asesor"><option value="">Seleccionar...</option></select></div>
         <div class="drawer-field"><label class="drawer-label">N° Orden</label><input class="drawer-input" id="dm-orden"></div>
-        <div class="drawer-field"><label class="drawer-label">Fecha de entrega</label><input class="drawer-input" id="dm-fentrega" type="date"></div>
+        <div class="drawer-field"><label class="drawer-label">Fecha de ingreso</label><input class="drawer-input" id="dm-fentrega" type="date"></div>
         <div class="drawer-field"><label class="drawer-label">Cargo</label><input class="drawer-input" id="dm-cargo" placeholder="Cliente / Cortesía..."></div>
         <div class="drawer-field"><label class="drawer-label">Tiempo taller (hs)</label><input class="drawer-input" id="dm-tiempo" type="number" step="0.5" placeholder="hs de reparación"></div>
       </div>
@@ -1103,7 +1103,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
           <div class="drawer-field"><label class="drawer-label">Entrega NP a Rtos</label><input class="drawer-input" id="dm-entreganp" type="date"></div>
           <div class="drawer-field"><label class="drawer-label">N° Presupuesto</label><input class="drawer-input" id="dm-pres"></div>
           <div class="drawer-field"><label class="drawer-label">Arribo del repuesto</label><input class="drawer-input" id="dm-arribo" type="date"></div>
-          <div class="drawer-field"><label class="drawer-label">Turno asignado</label><input class="drawer-input" id="dm-turno" placeholder="ej. 24/08 - 25/08"></div>
+          <div class="drawer-field"><label class="drawer-label">Turno asignado</label><input class="drawer-input" id="dm-turno" type="date"></div>
         </div>
       </div>
 
@@ -2468,8 +2468,16 @@ const DET_ESTADOS = {
   sin_gestion:          { lbl:'Sin gestión',          bg:'#efeeeb', color:'#7c7873' },
   esperando_repuesto:   { lbl:'Esperando repuesto',   bg:'#fbf1de', color:'#9a6a08' },
   esperando_reparacion: { lbl:'Esperando reparación', bg:'#e6f0fb', color:'#1f5fa8' },
+  en_bahia:             { lbl:'En bahía',             bg:'#ede9fe', color:'#6d28d9' },
 };
+// Estado AUTOMÁTICO. "En bahía" cuando hay turno cuya fecha ya pasó.
 function estadoDetenido(v){
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  if(v.turno_fecha){
+    const tf = new Date(v.turno_fecha+'T00:00:00');
+    if(tf < hoy) return 'en_bahia';          // ya pasó la fecha del turno
+    if(v.arribo) return 'esperando_reparacion'; // turno futuro y repuesto llegó
+  }
   if(v.arribo) return 'esperando_reparacion';
   if(v.nro_np || v.fecha_np) return 'esperando_repuesto';
   return 'sin_gestion';
@@ -2482,7 +2490,7 @@ function normUbic(s){ return normSucursal(canonSucursal(s||'')); }
 
 async function cargarDetenidos(){
   const cont=document.getElementById('det-cont');
-  const { data, error } = await sb.from('vehiculos_detenidos').select('*').order('fecha_entrega',{ascending:true}).order('creado_en',{ascending:true});
+  const { data, error } = await sb.from('vehiculos_detenidos').select('*').order('fecha_ingreso',{ascending:true}).order('creado_en',{ascending:true});
   if(error){ if(cont) cont.innerHTML='<div class="access-note"><i class="ti ti-alert-triangle"></i> No se pudieron cargar los vehículos: '+escapeHtml(error.message)+'</div>'; return; }
   detenidos = data || [];
   // llenar selects del formulario
@@ -2510,21 +2518,20 @@ function fmtDur(hs){
 }
 // promedios REALES de tiempo por estado (sobre todos los vehículos con datos)
 function promediosPorEstado(){
-  const acc={sin_gestion:[],esperando_repuesto:[],esperando_reparacion:[]};
+  const acc={sin_gestion:[],esperando_repuesto:[],esperando_reparacion:[],en_bahia:[]};
   detenidos.forEach(v=>{
-    // sin gestión: desde que entró hasta que se cargó la NP (o hasta ahora si sigue)
-    const finSG = v.ts_esperando_repuesto || v.ts_esperando_reparacion || v.reparado_en;
+    const finSG = v.ts_esperando_repuesto || v.ts_esperando_reparacion || v.ts_en_bahia || v.reparado_en;
     let h=horasEntre(v.ts_sin_gestion, finSG); if(h!=null&&h>=0) acc.sin_gestion.push(h);
-    // esperando repuesto: desde NP hasta arribo
-    let h2=horasEntre(v.ts_esperando_repuesto, v.ts_esperando_reparacion || v.reparado_en); if(h2!=null&&h2>=0) acc.esperando_repuesto.push(h2);
-    // esperando reparación: desde arribo hasta reparado
-    let h3=horasEntre(v.ts_esperando_reparacion, v.reparado_en); if(h3!=null&&h3>=0) acc.esperando_reparacion.push(h3);
+    let h2=horasEntre(v.ts_esperando_repuesto, v.ts_esperando_reparacion || v.ts_en_bahia || v.reparado_en); if(h2!=null&&h2>=0) acc.esperando_repuesto.push(h2);
+    let h3=horasEntre(v.ts_esperando_reparacion, v.ts_en_bahia || v.reparado_en); if(h3!=null&&h3>=0) acc.esperando_reparacion.push(h3);
+    let h4=horasEntre(v.ts_en_bahia, v.reparado_en); if(h4!=null&&h4>=0) acc.en_bahia.push(h4);
   });
   const prom=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
   return {
     sin_gestion:prom(acc.sin_gestion),
     esperando_repuesto:prom(acc.esperando_repuesto),
     esperando_reparacion:prom(acc.esperando_reparacion),
+    en_bahia:prom(acc.en_bahia),
   };
 }
 
@@ -2565,7 +2572,7 @@ function renderDetenidos(){
       <div style="background:var(--surface-sub,#f6f7f9);border:1px solid var(--border-1);border-radius:14px;padding:18px 20px">
         <div style="font-size:13px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px">Tiempo promedio real por estado</div>
         <div style="display:flex;gap:14px;flex-wrap:wrap">
-          ${[['sin_gestion','Sin gestión'],['esperando_repuesto','Esperando repuesto'],['esperando_reparacion','Esperando reparación']].map(([k,l])=>{
+          ${[['sin_gestion','Sin gestión'],['esperando_repuesto','Esperando repuesto'],['esperando_reparacion','Esperando reparación'],['en_bahia','En bahía']].map(([k,l])=>{
             const e=DET_ESTADOS[k];
             return `<div style="flex:1;min-width:180px;background:#fff;border:1px solid var(--border-1);border-radius:11px;padding:13px 15px">
               <div style="display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:${e.bg};color:${e.color};margin-bottom:6px">${l}</div>
@@ -2592,13 +2599,15 @@ function renderDetenidos(){
       const c={ total:base.length,
         sin_gestion:base.filter(v=>estadoDetenido(v)==='sin_gestion').length,
         esperando_repuesto:base.filter(v=>estadoDetenido(v)==='esperando_repuesto').length,
-        esperando_reparacion:base.filter(v=>estadoDetenido(v)==='esperando_reparacion').length };
-      const card=(key,label,val,grad)=>`<button onclick="detCardFilter='${key}';renderDetenidos()" style="flex:1;min-width:150px;text-align:left;border:none;cursor:pointer;border-radius:14px;padding:14px 16px;color:#fff;background:${grad};box-shadow:0 2px 8px rgba(0,0,0,.08);opacity:${detCardFilter===key||detCardFilter==='todos'?'1':'.55'}"><div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.9">${label}</div><div style="font-size:30px;font-weight:800;line-height:1.1;margin-top:4px">${val}</div></button>`;
+        esperando_reparacion:base.filter(v=>estadoDetenido(v)==='esperando_reparacion').length,
+        en_bahia:base.filter(v=>estadoDetenido(v)==='en_bahia').length };
+      const card=(key,label,val,grad)=>`<button onclick="detCardFilter='${key}';renderDetenidos()" style="flex:1;min-width:130px;text-align:left;border:none;cursor:pointer;border-radius:14px;padding:14px 16px;color:#fff;background:${grad};box-shadow:0 2px 8px rgba(0,0,0,.08);opacity:${detCardFilter===key||detCardFilter==='todos'?'1':'.55'}"><div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.9">${label}</div><div style="font-size:30px;font-weight:800;line-height:1.1;margin-top:4px">${val}</div></button>`;
       cards.innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap">
         ${card('todos','Total',c.total,'linear-gradient(135deg,#b45309,#92400e)')}
         ${card('sin_gestion','Sin gestión',c.sin_gestion,'linear-gradient(135deg,#6b7280,#4b5563)')}
         ${card('esperando_repuesto','Esperando repuesto',c.esperando_repuesto,'linear-gradient(135deg,#d97706,#b45309)')}
         ${card('esperando_reparacion','Esperando reparación',c.esperando_reparacion,'linear-gradient(135deg,#2563eb,#1d4ed8)')}
+        ${card('en_bahia','En bahía',c.en_bahia,'linear-gradient(135deg,#7c3aed,#6d28d9)')}
       </div>`;
     } else cards.innerHTML='';
   }
@@ -2613,13 +2622,13 @@ function renderDetenidos(){
 
   const fmtN=n=>{ if(n==null||n==='') return '—'; return String(n); };
   const th = detVista==='activos'
-    ? `<th>Estado</th><th>Cliente</th><th>Dominio</th><th>Unidad</th><th>Asesor</th><th>N° Orden</th><th>F. entrega</th><th>Cargo</th><th>N° NP</th><th>Arribo</th><th>T. taller (hs)</th><th>Turno</th><th>Obs.</th><th>Acciones</th>`
-    : `<th>Cliente</th><th>Dominio</th><th>Unidad</th><th>N° Orden</th><th>F. entrega</th><th>N° NP</th><th>T. taller (hs)</th><th>Reparado</th><th>Acciones</th>`;
+    ? `<th>Estado</th><th>Cliente</th><th>Dominio</th><th>Unidad</th><th>Asesor</th><th>N° Orden</th><th>F. ingreso</th><th>Cargo</th><th>N° NP</th><th>Arribo</th><th>Turno</th><th>T. taller (hs)</th><th>Obs.</th><th>Acciones</th>`
+    : `<th>Cliente</th><th>Dominio</th><th>Unidad</th><th>N° Orden</th><th>F. ingreso</th><th>N° NP</th><th>T. taller (hs)</th><th>Orden cerrada</th><th>Acciones</th>`;
   const rows=arr.map(v=>{
     if(detVista==='activos'){
-      return `<tr><td>${detEstadoPill(v)}</td><td>${escapeHtml(v.cliente||'—')}</td><td><strong>${escapeHtml(v.dominio||'—')}</strong></td><td>${escapeHtml(v.unidad||'—')}</td><td>${escapeHtml(v.asesor||'—')}</td><td>${escapeHtml(v.nro_orden||'—')}</td><td>${v.fecha_entrega?fmtD(v.fecha_entrega):'—'}</td><td>${escapeHtml(v.cargo||'—')}</td><td>${escapeHtml(v.nro_np||'—')}</td><td>${v.arribo?fmtD(v.arribo):'—'}</td><td>${fmtN(v.tiempo_taller)}</td><td>${escapeHtml(v.turno_asignado||'—')}</td><td style="max-width:150px;font-size:12px">${escapeHtml(v.observaciones||'—')}</td><td><div style="display:flex;gap:5px"><button class="btn-sm btn-rep-mark" onclick="abrirDetModal('${v.id}')"><i class="ti ti-edit" style="font-size:12px"></i></button><button class="btn-sm" style="background:#059669;color:#fff" onclick="marcarReparado('${v.id}')"><i class="ti ti-check" style="font-size:12px"></i> Reparado</button></div></td></tr>`;
+      return `<tr><td>${detEstadoPill(v)}</td><td>${escapeHtml(v.cliente||'—')}</td><td><strong>${escapeHtml(v.dominio||'—')}</strong></td><td>${escapeHtml(v.unidad||'—')}</td><td>${escapeHtml(v.asesor||'—')}</td><td>${escapeHtml(v.nro_orden||'—')}</td><td>${v.fecha_ingreso?fmtD(v.fecha_ingreso):'—'}</td><td>${escapeHtml(v.cargo||'—')}</td><td>${escapeHtml(v.nro_np||'—')}</td><td>${v.arribo?fmtD(v.arribo):'—'}</td><td>${v.turno_fecha?fmtD(v.turno_fecha):'—'}</td><td>${fmtN(v.tiempo_taller)}</td><td style="max-width:150px;font-size:12px">${escapeHtml(v.observaciones||'—')}</td><td><div style="display:flex;gap:5px"><button class="btn-sm btn-rep-mark" onclick="abrirDetModal('${v.id}')"><i class="ti ti-edit" style="font-size:12px"></i></button><button class="btn-sm" style="background:#059669;color:#fff" onclick="marcarReparado('${v.id}')"><i class="ti ti-lock" style="font-size:12px"></i> Cerrar orden</button></div></td></tr>`;
     }else{
-      return `<tr><td>${escapeHtml(v.cliente||'—')}</td><td><strong>${escapeHtml(v.dominio||'—')}</strong></td><td>${escapeHtml(v.unidad||'—')}</td><td>${escapeHtml(v.nro_orden||'—')}</td><td>${v.fecha_entrega?fmtD(v.fecha_entrega):'—'}</td><td>${escapeHtml(v.nro_np||'—')}</td><td>${fmtN(v.tiempo_taller)}</td><td>${v.reparado_en?fmtD(v.reparado_en):'—'}</td><td><button class="btn-sm" onclick="reabrirDetenido('${v.id}')"><i class="ti ti-arrow-back-up" style="font-size:12px"></i> Reabrir</button></td></tr>`;
+      return `<tr><td>${escapeHtml(v.cliente||'—')}</td><td><strong>${escapeHtml(v.dominio||'—')}</strong></td><td>${escapeHtml(v.unidad||'—')}</td><td>${escapeHtml(v.nro_orden||'—')}</td><td>${v.fecha_ingreso?fmtD(v.fecha_ingreso):'—'}</td><td>${escapeHtml(v.nro_np||'—')}</td><td>${fmtN(v.tiempo_taller)}</td><td>${v.reparado_en?fmtD(v.reparado_en):'—'}</td><td><button class="btn-sm" onclick="reabrirDetenido('${v.id}')"><i class="ti ti-arrow-back-up" style="font-size:12px"></i> Reabrir</button></td></tr>`;
     }
   }).join('');
   cont.innerHTML = volver + (arr.length
@@ -2638,9 +2647,9 @@ function abrirDetModal(id){
   const set=(id2,val)=>{const el=document.getElementById(id2); if(el) el.value=val;};
   set('dm-ubicacion',g('ubicacion')); set('dm-cliente',g('cliente')); set('dm-dominio',g('dominio'));
   set('dm-unidad',g('unidad')); set('dm-asesor',g('asesor')); set('dm-orden',g('nro_orden'));
-  set('dm-fentrega',gd('fecha_entrega')); set('dm-cargo',g('cargo')); set('dm-fnp',gd('fecha_np'));
+  set('dm-fentrega',gd('fecha_ingreso')); set('dm-cargo',g('cargo')); set('dm-fnp',gd('fecha_np'));
   set('dm-entreganp',gd('entrega_np_rtos')); set('dm-nronp',g('nro_np')); set('dm-pres',g('pres'));
-  set('dm-arribo',gd('arribo')); set('dm-tiempo',g('tiempo_taller')); set('dm-turno',g('turno_asignado'));
+  set('dm-arribo',gd('arribo')); set('dm-tiempo',g('tiempo_taller')); set('dm-turno',gd('turno_fecha'));
   set('dm-obs',g('observaciones'));
   // si venís de una sucursal, preseleccionarla al crear
   if(!id && detSucSel) set('dm-ubicacion', detSucSel);
@@ -2658,16 +2667,17 @@ async function guardarDetenido(){
   const prev = detEditId ? detenidos.find(x=>x.id===detEditId) : null;
   const data={
     ubicacion:val('dm-ubicacion'), cliente, dominio, unidad:val('dm-unidad'), asesor:val('dm-asesor'),
-    nro_orden:val('dm-orden'), fecha_entrega:vald('dm-fentrega'), cargo:val('dm-cargo'),
+    nro_orden:val('dm-orden'), fecha_ingreso:vald('dm-fentrega'), cargo:val('dm-cargo'),
     fecha_np:vald('dm-fnp'), entrega_np_rtos:vald('dm-entreganp'), nro_np:val('dm-nronp'), pres:val('dm-pres'),
-    arribo:vald('dm-arribo'), tiempo_taller: tiempo===''?null:Number(tiempo), turno_asignado:val('dm-turno'),
+    arribo:vald('dm-arribo'), tiempo_taller: tiempo===''?null:Number(tiempo), turno_fecha:vald('dm-turno'),
     observaciones:val('dm-obs'),
   };
   // Registrar la fecha/hora en que ENTRA a cada estado (para tiempos reales)
   const nuevoEstado = estadoDetenido(data);
   const now = new Date().toISOString();
-  if(nuevoEstado==='esperando_repuesto' && (!prev || !prev.ts_esperando_repuesto)) data.ts_esperando_repuesto = now;
-  if(nuevoEstado==='esperando_reparacion' && (!prev || !prev.ts_esperando_reparacion)) data.ts_esperando_reparacion = now;
+  if((nuevoEstado==='esperando_repuesto'||nuevoEstado==='esperando_reparacion'||nuevoEstado==='en_bahia') && (!prev || !prev.ts_esperando_repuesto)) data.ts_esperando_repuesto = data.ts_esperando_repuesto || now;
+  if((nuevoEstado==='esperando_reparacion'||nuevoEstado==='en_bahia') && (!prev || !prev.ts_esperando_reparacion)) data.ts_esperando_reparacion = now;
+  if(nuevoEstado==='en_bahia' && (!prev || !prev.ts_en_bahia)) data.ts_en_bahia = now;
   try{
     if(detEditId){
       const { error } = await sb.from('vehiculos_detenidos').update(data).eq('id',detEditId);
@@ -2684,7 +2694,7 @@ async function guardarDetenido(){
 }
 
 async function marcarReparado(id){
-  if(!confirm('¿Marcar este vehículo como REPARADO? Sale del taller y pasa al histórico.')) return;
+  if(!confirm('¿Cerrar la orden de este vehículo? Sale de detenidos y pasa al histórico.')) return;
   try{
     const { error } = await sb.from('vehiculos_detenidos').update({ reparado:true, reparado_en:new Date().toISOString() }).eq('id',id);
     if(error) throw error;
