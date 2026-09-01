@@ -565,6 +565,27 @@ export default async function handler(req, res) {
     // modo diagnóstico de columnas: /api/sync-encuestas?key=...&debug=cols
     // muestra los nombres de columna REALES que devuelve el reporte de Wise,
     // y qué columna detecta como teléfono. Sirve para saber el nombre exacto.
+    // debug=orden: busca en TODAS las filas qué columnas contienen algo parecido
+    // a un N° de orden (varias filas con valor numérico), para identificar la real.
+    if (req.query.debug === "orden") {
+      const cols = filas.length ? Object.keys(filas[0]) : [];
+      const resumen = cols.map(c => {
+        let conDato = 0; const ejemplos = [];
+        for (const f of filas) {
+          const v = (f[c] ?? "").toString().trim();
+          if (v) { conDato++; if (ejemplos.length < 3) ejemplos.push(v); }
+        }
+        return { columna: c, filas_con_dato: conDato, ejemplos };
+      }).filter(x => x.filas_con_dato > 0);
+      // ordenar por las que más se parecen a un número de orden (columnas con "orden" primero)
+      resumen.sort((a,b)=>{
+        const oa = /orden/i.test(a.columna)?1:0, ob = /orden/i.test(b.columna)?1:0;
+        if(oa!==ob) return ob-oa;
+        return b.filas_con_dato - a.filas_con_dato;
+      });
+      return res.status(200).json({ ok:true, modo:"debug-orden", total_filas:filas.length, columnas_con_datos:resumen });
+    }
+
     if (req.query.debug === "cols") {
       const cols = filas.length ? Object.keys(filas[0]) : [];
       const kTel = filas.length
