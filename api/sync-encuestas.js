@@ -382,23 +382,29 @@ function mapearFila(fila, idx) {
     ? Math.round((cincoDelAsesor.reduce((a, b) => a + b, 0) / cincoDelAsesor.length) * 100) / 100
     : null;
 
-  // id estable por CASO (dominio + servicio). Así los reenvíos de la misma
-  // encuesta generan el MISMO wise_id y el upsert los pisa en vez de duplicar.
-  // Usamos el texto crudo de Wise en minúsculas (mismo string en cada reenvío),
-  // md5 idéntico al que calcula la limpieza SQL. Si falta dominio o servicio,
-  // caemos al id viejo único para no colisionar.
-  const domRaw = kDominio ? fila[kDominio] : null;
-  const srvRaw = kServicio ? fila[kServicio] : null;
-  let wiseId;
-  if (domRaw && srvRaw) {
-    const clave = String(domRaw).trim().toLowerCase() + "|" + String(srvRaw).trim().toLowerCase();
-    wiseId = "enc_" + crypto.createHash("md5").update(clave).digest("hex");
+  // ============================================================
+  //  wise_id: UNA ORDEN = UNA ENCUESTA
+  //  La clave es el N° de orden. Si la misma orden vuelve a aparecer
+  //  (reenvío, o dos servicios distintos sobre la misma orden), el
+  //  upsert la pisa y queda la respuesta más reciente.
+  //
+  //  Si NO hay N° de orden, usamos dominio + fecha de envío + fecha de
+  //  respuesta. Es una clave ESTABLE entre corridas: antes se usaba un
+  //  índice de fila (#idx) que cambiaba en cada sync y generaba duplicados.
+  // ============================================================
+  const ordenRaw = kNroOrden ? fila[kNroOrden] : null;
+  const domRaw   = kDominio  ? fila[kDominio]  : null;
+  const envioRaw = kFecha    ? fila[kFecha]    : null;
+  const respRaw  = kFechaResp ? fila[kFechaResp] : null;
+  const normId = (v) => String(v ?? "").trim().toLowerCase();
+
+  let claveId;
+  if (ordenRaw && String(ordenRaw).trim()) {
+    claveId = "ord|" + normId(ordenRaw);
   } else {
-    const base = (kId && fila[kId])
-      ? String(fila[kId]).trim()
-      : `${kDominio ? fila[kDominio] : ""}_${kFecha ? fila[kFecha] : ""}`.trim();
-    wiseId = `${base}#${idx}`;
+    claveId = "sin-orden|" + normId(domRaw) + "|" + normId(envioRaw) + "|" + normId(respRaw);
   }
+  const wiseId = "enc_" + crypto.createHash("md5").update(claveId).digest("hex");
 
   // parseo de fechas tolerante
   const parseFecha = (val) => {
@@ -476,7 +482,7 @@ async function guardarEnSupabase(registros) {
   if (registros.length === 0) return { insertados: 0 };
 
   // de-duplicar por wise_id quedándonos con la RESPUESTA MÁS RECIENTE
-  // (los reenvíos del mismo caso comparten wise_id). Ordenamos por
+  // (los reenvíos de la misma orden comparten wise_id). Ordenamos por
   // fecha_respuesta ascendente para que la última en entrar al Map sea la más nueva.
   const ordenados = registros.slice().sort((a, b) => {
     const fa = a.fecha_respuesta || a.fecha || "";
@@ -606,6 +612,11 @@ export default async function handler(req, res) {
     let registros = filas.map(mapearFila);
     const antesDeFiltrar = registros.length;
     registros = registros.filter(esRespondida);
+    const respondidasCrudas = registros.length;
+
+    // cuántas se colapsaron por compartir N° de orden (informativo)
+    const idsUnicos = new Set(registros.map(r => r.wise_id)).size;
+    const sinNroOrden = registros.filter(r => !r.nro_orden || !String(r.nro_orden).trim()).length;
 
     const r = await guardarEnSupabase(registros);
 
@@ -613,7 +624,10 @@ export default async function handler(req, res) {
       ok: true,
       rango_pedido: { date_from: dateFrom, date_to: dateTo },
       filas_recibidas: antesDeFiltrar,
-      respondidas: registros.length,
+      respondidas: respondidasCrudas,
+      ids_unicos: idsUnicos,
+      colapsadas_por_orden_repetida: respondidasCrudas - idsUnicos,
+      sin_nro_orden: sinNroOrden,
       registros_guardados: r.insertados,
       muestra: registros.slice(0, 2), // primeras 2 para verificar el mapeo
     });
