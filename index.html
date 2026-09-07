@@ -2284,8 +2284,7 @@ async function cargarTodo(){
   if(typeof renderMetricas==='function') renderMetricas();
   if(typeof actualizarContadoresSubTabs==='function') actualizarContadoresSubTabs();
   // Poblar select del drawer con usuarios de Citas
-  const drQuien=document.getElementById('dr-quien');
-  if(drQuien){drQuien.innerHTML='<option value="">Seleccionar...</option>';usuarios.filter(u=>u.rol==='citas').forEach(u=>{const o=document.createElement('option');o.textContent=u.nombre;drQuien.appendChild(o);});}
+  llenarSelectCitas(document.getElementById('dr-quien'));
   // Mostrar FAB si el rol puede crear turnos
   const fab=document.getElementById('fab-nuevo');
   if(fab) fab.style.display=puedeGestionarTurnos()?'flex':'none';
@@ -2300,13 +2299,38 @@ async function cargarTurnos(){
   if(error){console.error('Error al cargar turnos:',error);turnos=[];return;}
   turnos=data;
 }
+// Quiénes aparecen en el select "Cargado por".
+// Por defecto, los usuarios con rol 'citas'. Además, personas que cargan
+// citas pero tienen otro rol (ej. una supervisora con permiso extra):
+// se listan acá por nombre y basta con agregar una línea para sumar a alguien.
+const CARGAN_CITAS_EXTRA = [
+  'Analia Carrillo'
+];
+function _normNom(s){
+  return String(s||'').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+function usuariosQueCarganCitas(){
+  const extra = CARGAN_CITAS_EXTRA.map(_normNom);
+  return usuarios
+    .filter(u => u.rol==='citas' || extra.includes(_normNom(u.nombre)))
+    .sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
+}
+function llenarSelectCitas(sel){
+  if(!sel) return;
+  const prev = sel.value;
+  sel.innerHTML='<option value="">Seleccionar...</option>';
+  usuariosQueCarganCitas().forEach(function(u){
+    const o=document.createElement('option'); o.textContent=u.nombre; sel.appendChild(o);
+  });
+  if(prev) sel.value=prev;
+}
+
 async function cargarUsuariosParaSelect(){
   const {data,error}=await sb.from('usuarios').select('*');
   if(error){console.error('Error al cargar usuarios:',error);usuarios=[];return;}
   usuarios=data;
-  const sel=document.getElementById('f-quien');
-  sel.innerHTML='<option value="">Seleccionar...</option>';
-  usuarios.filter(u=>u.rol==='citas').forEach(u=>{const o=document.createElement('option');o.textContent=u.nombre;sel.appendChild(o);});
+  llenarSelectCitas(document.getElementById('f-quien'));
 }
 
 // ============================================================
