@@ -1146,7 +1146,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
   </div>
   <div class="drawer-body">
     <div class="drawer-row">
-      <div><label class="drawer-label">N° Pre-Or</label><input class="drawer-input" type="text" id="dr-preor" placeholder="PO-00123"></div>
+      <div><label class="drawer-label">N° Pre-Or <span style="color:var(--accent)">*</span></label><input class="drawer-input" type="text" id="dr-preor" placeholder="PO-00123" required></div>
       <div><label class="drawer-label">Fecha del turno</label><input class="drawer-input" type="date" id="dr-fecha"></div>
     </div>
     <div class="drawer-field full"><label class="drawer-label">Cliente</label><input class="drawer-input" type="text" id="dr-cliente" placeholder="Nombre del cliente"></div>
@@ -1215,7 +1215,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
     <h3 id="modal-title"></h3>
     <div class="repr-box" id="repr-box"><i class="ti ti-calendar-event"></i> Estás reprogramando este turno. Modificá la fecha y/o sucursal y agregá el motivo.</div>
     <div class="mgrid">
-      <div><label>N° Pre-Or</label><input type="text" id="f-preor" placeholder="PO-00123"/></div>
+      <div><label>N° Pre-Or <span style="color:var(--accent)">*</span></label><input type="text" id="f-preor" placeholder="PO-00123" required/></div>
       <div><label>Fecha del turno</label><input type="date" id="f-fecha"/></div>
       <div><label>Nombre del cliente</label><input type="text" id="f-cliente" placeholder="Apellido, Nombre"/></div>
       <div><label>Dominio (patente)</label><input type="text" id="f-dominio" placeholder="AB 123 CD"/></div>
@@ -5255,7 +5255,7 @@ function renderRepuestos(){
   renderGroups('grupos-repuestos',items,gi=>`<table class="rep-compact"><thead><tr>
     <th style="width:8%">Pre-Or</th><th style="width:16%">Cliente</th><th style="width:8%">Dominio</th>
     <th style="width:10%">Sucursal</th><th style="width:10%">Fecha</th><th style="width:9%">Tipo</th>
-    <th style="width:8%">Vale</th><th style="width:9%">Coment.</th><th style="width:8%">Estado</th><th style="width:14%">Acciones</th>
+    <th style="width:8%">Estado</th><th style="width:9%">Coment.</th><th style="width:8%">Vale</th><th style="width:14%">Acciones</th>
   </tr></thead><tbody>${gi.map(t=>{
     const cR=can('prepull.repuestos.marcar');
     const cSup=cu&&cu.rol==='supervisor';
@@ -5272,7 +5272,7 @@ function renderRepuestos(){
       acc=`<div class="act-group">${estPill(t.estado)}</div>`;
     }
     const nsBadge=t.no_show?'<span class="pill p-noshow" style="margin-left:3px" title="No Show"><i class="ti ti-user-x" style="font-size:10px"></i></span>':'';
-    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}${nsBadge}</td><td>${t.dominio}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${valePill(t.vale)}</td><td><span style="display:inline-flex;gap:3px">${obsCitaTag}${obsTag}</span></td><td>${estPill(t.estado)}</td><td>${acc}</td></tr>`;
+    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}${nsBadge}</td><td>${t.dominio}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${estPill(t.estado)}</td><td><span style="display:inline-flex;gap:3px">${obsCitaTag}${obsTag}</span></td><td>${valePill(t.vale)}</td><td>${acc}</td></tr>`;
   }).join('')}</tbody></table>`,horizFilt);
   actualizarContadoresRep();
 }
@@ -5308,11 +5308,11 @@ function renderRepHistorico(){
   cont.innerHTML=`<div class="table-wrap"><table><thead><tr>
     <th style="width:8%">Pre-Or</th><th style="width:13%">Cliente</th><th style="width:8%">Dominio</th><th style="width:9%">Modelo</th>
     <th style="width:9%">Sucursal</th><th style="width:10%">Fecha del turno</th><th style="width:10%">Tipo</th>
-    <th style="width:7%">Vale</th><th style="width:7%">No Show</th><th style="width:11%">Comentario Repuestos</th><th style="width:8%">Estado</th>
+    <th style="width:8%">Estado</th><th style="width:7%">No Show</th><th style="width:11%">Comentario Repuestos</th><th style="width:7%">Vale</th>
   </tr></thead><tbody>${items.map(t=>{
     const nsBadge=t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i></span>':'—';
     const obsTag=`<span class="obs-badge" onclick="verObs('${t.id}','rep')" title="Comentarios de Repuestos"><i class="ti ti-message" style="font-size:11px"></i> ${comentariosDe(t.id,'repuestos').length||'+'}</span>`;
-    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${valePill(t.vale)}</td><td>${nsBadge}</td><td>${obsTag}</td><td>${estPill(t.estado)}</td></tr>`;
+    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${estPill(t.estado)}</td><td>${nsBadge}</td><td>${obsTag}</td><td>${valePill(t.vale)}</td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
 
@@ -7083,7 +7083,7 @@ function setDrawerPri(val,btn){
   document.getElementById("dr-pri-seg").dataset.val=val;
 }
 
-async function crearTurnoDrawer(){const errEl=document.getElementById("drawer-err");errEl.style.display="none";const btn=document.querySelector('.drawer-btn-create');if(btn&&btn.dataset.saving==='1')return;const preor=document.getElementById("dr-preor").value.trim();const fecha=document.getElementById("dr-fecha").value;const cliente=document.getElementById("dr-cliente").value.trim();const dominio=document.getElementById("dr-dominio").value.trim();const modelo=document.getElementById("dr-modelo").value;const suc=document.getElementById("dr-suc").value;const tipo=document.getElementById("dr-tipo").value;const prioridad=document.getElementById("dr-pri-seg").dataset.val||"Mediana";const quien=document.getElementById("dr-quien").value;const obs=document.getElementById("dr-obs").value.trim();if(!cliente||!dominio){errEl.textContent="Completá al menos Cliente y Dominio.";errEl.style.display="block";return;}if(btn){btn.dataset.saving='1';btn.disabled=true;btn.textContent='Guardando…';}try{const{data:ins,error}=await sb.from("turnos").insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad,quien,estado:"pendiente",reprogramado:false,motivo_repr:"",no_show:false,vale:false,adjuntos:drawerAdjuntos}]).select('id').single();if(error)throw error;if(obs&&ins?.id){await agregarComentario(ins.id,'citas',obs);}closeDrawer();await cargarTurnos();await cargarComentariosTurnos();renderTurnos();renderRepuestos();renderDash();showToast("Turno creado correctamente");}catch(err){errEl.textContent="Error: "+err.message;errEl.style.display="block";}finally{if(btn){btn.dataset.saving='0';btn.disabled=false;btn.textContent='Crear turno';}}}
+async function crearTurnoDrawer(){const errEl=document.getElementById("drawer-err");errEl.style.display="none";const btn=document.querySelector('.drawer-btn-create');if(btn&&btn.dataset.saving==='1')return;const preor=document.getElementById("dr-preor").value.trim();const fecha=document.getElementById("dr-fecha").value;const cliente=document.getElementById("dr-cliente").value.trim();const dominio=document.getElementById("dr-dominio").value.trim();const modelo=document.getElementById("dr-modelo").value;const suc=document.getElementById("dr-suc").value;const tipo=document.getElementById("dr-tipo").value;const prioridad=document.getElementById("dr-pri-seg").dataset.val||"Mediana";const quien=document.getElementById("dr-quien").value;const obs=document.getElementById("dr-obs").value.trim();if(!preor){errEl.textContent="El N° de Pre-Or es obligatorio.";errEl.style.display="block";document.getElementById("dr-preor").focus();return;}if(!cliente||!dominio){errEl.textContent="Completá al menos Cliente y Dominio.";errEl.style.display="block";return;}if(btn){btn.dataset.saving='1';btn.disabled=true;btn.textContent='Guardando…';}try{const{data:ins,error}=await sb.from("turnos").insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad,quien,estado:"pendiente",reprogramado:false,motivo_repr:"",no_show:false,vale:false,adjuntos:drawerAdjuntos}]).select('id').single();if(error)throw error;if(obs&&ins?.id){await agregarComentario(ins.id,'citas',obs);}closeDrawer();await cargarTurnos();await cargarComentariosTurnos();renderTurnos();renderRepuestos();renderDash();showToast("Turno creado correctamente");}catch(err){errEl.textContent="Error: "+err.message;errEl.style.display="block";}finally{if(btn){btn.dataset.saving='0';btn.disabled=false;btn.textContent='Crear turno';}}}
 
 async function subirAdjuntosDrawer(){
   const input=document.getElementById("dr-adj-input");
