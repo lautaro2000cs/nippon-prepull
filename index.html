@@ -1410,11 +1410,9 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
     <div id="eq-bx-turno" style="display:none;margin-bottom:.85rem">
       <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:6px">Asignar turno</label>
       <div id="eq-mo-aviso" style="display:none;background:#e6f0fb;color:#1f5fa8;border-radius:8px;padding:8px 11px;font-size:12px;margin-bottom:9px"></div>
-      <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:8px">
-        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Fecha del turno</label>
-          <input type="date" id="eq-mo-fecha"/></div>
-        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Hora</label>
-          <input type="time" id="eq-mo-hora"/></div>
+      <div>
+        <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Fecha del turno</label>
+        <input type="date" id="eq-mo-fecha"/>
       </div>
     </div>
 
@@ -7452,8 +7450,10 @@ function eqRender(){
   const P={urgente:0,alta:1,normal:2};
   arr.sort(function(a,b){
     if(eqVista==='turnado'){
+      // sin hora: dentro del día, primero los urgentes y después por antigüedad
       return String(a.fecha||'').localeCompare(String(b.fecha||''))
-          || String(a.hora||'').localeCompare(String(b.hora||''));
+          || (P[a.prioridad]-P[b.prioridad])
+          || String(a.creado_en).localeCompare(String(b.creado_en));
     }
     return (P[a.prioridad]-P[b.prioridad]) || String(a.creado_en).localeCompare(String(b.creado_en));
   });
@@ -7502,11 +7502,10 @@ function eqPorDia(arr){
     return '<div class="eq-daygroup" id="eq-d-'+f+'">'+eqFmtDia(f)+
       '<span style="font-weight:400;color:var(--text-5)"> · '+n+' '+(n===1?'turno':'turnos')+' · '+eqFmtHoras(hs)+'</span></div>'+
       '<div class="table-wrap"><table><thead><tr>'+
-      '<th style="width:7%">Hora</th><th style="width:22%">Cliente</th><th style="width:11%">Vehículo</th>'+
-      '<th>Qué se vendió</th><th style="width:11%">Sucursal</th><th style="width:8%">Dur.</th><th style="width:10%"></th>'+
+      '<th style="width:24%">Cliente</th><th style="width:12%">Vehículo</th>'+
+      '<th>Qué se vendió</th><th style="width:12%">Sucursal</th><th style="width:9%">Dur.</th><th style="width:10%"></th>'+
       '</tr></thead><tbody>'+g[f].map(function(p){
         return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+'">'+
-        '<td><strong>'+(p.hora?p.hora.slice(0,5):'—')+'</strong></td>'+
         '<td><strong>'+eqEsc(p.cliente)+'</strong>'+
           (p.prioridad!=='normal'?' '+eqPrioPill(p.prioridad):'')+'</td>'+
         '<td><strong>'+eqEsc(p.dominio||'—')+'</strong>'+
@@ -7670,7 +7669,6 @@ function eqAbrir(id){
       av.style.display='block';
     } else av.style.display='none';
     fEl.value=p.fecha||'';
-    document.getElementById('eq-mo-hora').value=p.hora?p.hora.slice(0,5):'';
   }
 
   const cs=(p.equip_comentarios||[]).slice().sort((a,b)=>String(a.creado_en).localeCompare(String(b.creado_en)));
@@ -7733,7 +7731,6 @@ async function eqGuardarModal(){
         return;
       }
       upd.fecha=f;
-      upd.hora=document.getElementById('eq-mo-hora').value||null;
       if(!eqAbierto.fecha){ upd.turnado_por=cu.nombre; upd.turnado_en=ahora; }
     }
   }
