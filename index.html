@@ -554,14 +554,19 @@ tbody td{padding:11px 12px;vertical-align:middle}
 
 
 /* ── EQUIPAMIENTO ─────────────────────────────────────── */
-.eq-rail{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
-.eq-step{flex:1;min-width:150px;background:#fff;border:1px solid var(--border-1);border-radius:12px;padding:11px 13px;cursor:pointer;text-align:left;font-family:inherit}
-.eq-step:hover{border-color:var(--border-2)}
-.eq-step.act{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-tint)}
-.eq-step .eq-sn{font-size:11px;font-weight:700;color:var(--text-4);display:flex;align-items:center;gap:6px}
-.eq-step .eq-sv{font-family:var(--mono);font-size:22px;font-weight:700;margin-top:3px;line-height:1;color:var(--text-1)}
-.eq-step .eq-sd{font-size:11px;color:var(--text-5);margin-top:2px}
+.eq-rail{display:flex;align-items:stretch;gap:0;margin-bottom:18px;background:#fff;border:1px solid var(--border-1);border-radius:14px;overflow:hidden}
+.eq-step{flex:1;min-width:0;background:none;border:none;border-right:1px solid var(--border-1);padding:13px 16px;cursor:pointer;text-align:left;font-family:inherit;position:relative;transition:background .15s}
+.eq-step:last-child{border-right:none}
+.eq-step:hover{background:var(--surface-sub,#faf9f7)}
+.eq-step.act{background:var(--accent-tint)}
+.eq-step.act:after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--accent)}
+.eq-step .eq-sn{font-size:11.5px;font-weight:700;color:var(--text-3);display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eq-step.act .eq-sn{color:var(--accent-h,#c62a27)}
+.eq-step .eq-sv{font-family:var(--mono);font-size:26px;font-weight:700;margin-top:5px;line-height:1;color:var(--text-1);font-variant-numeric:tabular-nums}
+.eq-step .eq-sd{font-size:11px;color:var(--text-5);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .eq-step.alerta .eq-sv{color:var(--accent)}
+.eq-step.vacio .eq-sv{color:var(--text-6,#b3afa9)}
+@media (max-width:820px){.eq-rail{flex-wrap:wrap}.eq-step{flex:1 1 50%;border-bottom:1px solid var(--border-1)}}
 .eq-seg{flex:1;padding:9px 6px;border-radius:9px;border:1.5px solid var(--border-2);background:none;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-4);transition:all .15s}
 .eq-seg:hover{border-color:var(--text-4)}
 .eq-seg.on-verde{background:#e6f4ec;border-color:#0f7b3f;color:#0f7b3f}
@@ -581,6 +586,11 @@ tbody td{padding:11px 12px;vertical-align:middle}
 .eq-dias{font-family:var(--mono);font-size:10.5px;color:var(--text-5);margin-top:3px}
 .eq-dias.viejo{color:var(--accent);font-weight:700}
 tr.eq-urg{background:rgba(224,50,47,.035)}
+.eq-chip{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--text-4);background:var(--surface-sub,#faf9f7);border:1px solid var(--border-1);border-radius:6px;padding:1px 6px;margin-right:4px}
+.eq-empty{text-align:center;padding:44px 20px}
+.eq-empty i{font-size:26px;color:var(--text-6,#b3afa9);display:block;margin-bottom:10px}
+.eq-empty .t{font-size:14px;font-weight:600;color:var(--text-3);margin-bottom:3px}
+.eq-empty .s{font-size:12.5px;color:var(--text-5);line-height:1.55;max-width:380px;margin:0 auto}
 .eq-cit{background:var(--surface-sub,#faf9f7);border-radius:8px;padding:7px 9px;font-size:12.5px}
 .eq-cit .cm{font-size:10.5px;color:var(--text-5);margin-top:2px}
 </style>
@@ -1130,7 +1140,7 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
 
           <div class="filters-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
             <input type="text" class="search-input" id="eq-q" style="flex:1;min-width:220px"
-                   placeholder="Buscar por cliente, dominio, prospecto, pre-orden o trabajo..." oninput="eqRender()">
+                   placeholder="Buscar por cliente, dominio, prospecto o trabajo..." oninput="eqRender()">
             <select id="eq-fp" onchange="eqRender()" class="filter-sel">
               <option value="">Toda prioridad</option>
               <option value="urgente">Urgente</option>
@@ -1342,7 +1352,7 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
 <div class="modal-ov" id="eq-mov-alta">
   <div class="modal">
     <h3><i class="ti ti-shopping-cart" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0f766e"></i>Cargar venta de equipamiento</h3>
-    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem">Cargá el prospecto apenas cerrás la venta. La pre-orden y el turno se completan después, cuando stock confirma la pieza.</div>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem">Cargá todo lo que sepas de la venta. La fecha del turno se asigna después, cuando stock confirma la pieza.</div>
     <div class="mgrid">
       <div><label>Cliente <span style="color:var(--accent)">*</span></label><input type="text" id="eqa-cliente" placeholder="Apellido, Nombre"/></div>
       <div><label>Dominio / chasis</label><input type="text" id="eqa-dominio" placeholder="AB 123 CD"/></div>
@@ -1352,6 +1362,10 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
         <input type="text" id="eqa-trabajo" placeholder="Ej: COBERTOR + BARRA DE TRABAJO + LANZA"/></div>
       <div><label>Sucursal</label><select id="eqa-suc"><option value="">Seleccionar...</option><option>Roca</option><option>Perticone</option><option>Aguado</option><option>Añelo</option><option>Bariloche</option></select></div>
       <div><label>Vendedor</label><input type="text" id="eqa-vendedor"/></div>
+      <div><label>Duración estimada</label>
+        <select id="eqa-tiempo"><option value="">Seleccionar...</option><option>15MIN</option><option>30MIN</option><option>45MIN</option><option>1HS</option><option>2HS</option><option>3HS</option><option>4HS</option><option>5HS</option><option>6HS</option></select></div>
+      <div><label>Código de turno</label>
+        <select id="eqa-cod"><option value="">Seleccionar...</option><option>EQ OR</option><option>EQP OR</option><option>EQS OR</option><option>EQK OR</option><option>EQU OR</option></select></div>
       <div class="full"><label>Observaciones</label><input type="text" id="eqa-obs" placeholder="Lo que stock o turnos deberían saber"/></div>
     </div>
     <p class="login-err" id="eqa-err" style="display:none"></p>
@@ -1396,18 +1410,16 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
     <div id="eq-bx-turno" style="display:none;margin-bottom:.85rem">
       <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:6px">Asignar turno</label>
       <div id="eq-mo-aviso" style="display:none;background:#e6f0fb;color:#1f5fa8;border-radius:8px;padding:8px 11px;font-size:12px;margin-bottom:9px"></div>
-      <div style="margin-bottom:8px">
-        <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">N° de pre-orden <span style="color:var(--accent)">* obligatorio</span></label>
-        <input type="text" id="eq-mo-preorden" placeholder="PO-00123"/>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Fecha</label>
+      <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:8px;margin-bottom:10px">
+        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Fecha del turno</label>
           <input type="date" id="eq-mo-fecha"/></div>
         <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Hora</label>
           <input type="time" id="eq-mo-hora"/></div>
-        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Duración</label>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Duración <span style="font-weight:400">· la cargó el vendedor</span></label>
           <select id="eq-mo-tiempo"><option value="">—</option><option>15MIN</option><option>30MIN</option><option>45MIN</option><option>1HS</option><option>2HS</option><option>3HS</option><option>4HS</option><option>5HS</option><option>6HS</option></select></div>
-        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Código</label>
+        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Código de turno</label>
           <select id="eq-mo-cod"><option value="">—</option><option>EQ OR</option><option>EQP OR</option><option>EQS OR</option><option>EQK OR</option><option>EQU OR</option></select></div>
       </div>
     </div>
@@ -7411,10 +7423,10 @@ const EQ_SUB={
   turnado:'Ya tienen fecha y hora asignada.'
 };
 const EQ_VACIO={
-  espera :'No hay ventas esperando revisión de stock.',
-  listo  :'Todavía no hay pedidos con pieza confirmada.',
-  sin    :'No hay pedidos trabados por falta de pieza.',
-  turnado:'Todavía no se turnó ningún pedido.'
+  espera :['inbox','Nada esperando revisión','Cuando un vendedor cargue una venta, aparece acá para que control de stock la revise.'],
+  listo  :['package','Ningún pedido listo todavía','Los pedidos llegan acá cuando stock confirma que hay pieza, o que está pedida con fecha de arribo.'],
+  sin    :['circle-check','Sin pedidos trabados','Ningún pedido está frenado por falta de pieza.'],
+  turnado:['calendar','Sin turnos asignados','Los pedidos con pieza confirmada se turnan desde la solapa "Listos para turnar".']
 };
 
 function eqRender(){
@@ -7426,6 +7438,10 @@ function eqRender(){
   Object.keys(c).forEach(k=>{ const el=document.getElementById('eq-v-'+k); if(el) el.textContent=c[k]; });
   const sSin=document.getElementById('eq-s-sin');
   if(sSin) sSin.classList.toggle('alerta', c.sin>0);
+  Object.keys(c).forEach(function(k){
+    const el=document.getElementById('eq-s-'+k);
+    if(el) el.classList.toggle('vacio', c[k]===0);
+  });
 
   const sub=document.getElementById('eq-sub');
   if(sub) sub.textContent=EQ_SUB[eqVista];
@@ -7436,7 +7452,7 @@ function eqRender(){
   const fs=cu&&cu.sucursalFija ? cu.sucursalFija : document.getElementById('eq-fs').value;
   if(fp) arr=arr.filter(p=>p.prioridad===fp);
   if(fs) arr=arr.filter(p=>p.sucursal===fs);
-  if(q) arr=arr.filter(p=>[p.cliente,p.dominio,p.nro_prosp,p.preorden,p.trabajo,p.vendedor]
+  if(q) arr=arr.filter(p=>[p.cliente,p.dominio,p.nro_prosp,p.trabajo,p.vendedor]
     .some(v=>String(v||'').toLowerCase().includes(q)));
 
   const P={urgente:0,alta:1,normal:2};
@@ -7448,15 +7464,23 @@ function eqRender(){
     return (P[a.prioridad]-P[b.prioridad]) || String(a.creado_en).localeCompare(String(b.creado_en));
   });
 
-  if(!arr.length){ cont.innerHTML='<div class="empty"><i class="ti ti-inbox"></i>'+EQ_VACIO[eqVista]+'</div>'; return; }
+  if(!arr.length){
+    const v=EQ_VACIO[eqVista];
+    const filtrando = q || fp || (fs && !(cu&&cu.sucursalFija));
+    cont.innerHTML = filtrando
+      ? '<div class="eq-empty"><i class="ti ti-search-off"></i><div class="t">Ningún pedido coincide</div>'+
+        '<div class="s">Probá con otro texto o quitá los filtros de prioridad y sucursal.</div></div>'
+      : '<div class="eq-empty"><i class="ti ti-'+v[0]+'"></i><div class="t">'+v[1]+'</div><div class="s">'+v[2]+'</div></div>';
+    return;
+  }
   cont.innerHTML = eqVista==='turnado' ? eqPorDia(arr) : eqTabla(arr);
 }
 
 function eqTabla(arr){
   return '<div class="table-wrap"><table><thead><tr>'+
-    '<th style="width:18%">Cliente</th><th style="width:9%">Dominio</th><th>Qué se vendió</th>'+
-    '<th style="width:9%">Prospecto</th><th style="width:10%">Sucursal</th>'+
-    '<th style="width:10%">Prioridad</th><th style="width:12%">Stock</th><th style="width:9%"></th>'+
+    '<th style="width:22%">Cliente</th><th style="width:11%">Vehículo</th><th>Qué se vendió</th>'+
+    '<th style="width:11%">Sucursal</th>'+
+    '<th style="width:11%">Prioridad</th><th style="width:12%">Stock</th><th style="width:10%"></th>'+
     '</tr></thead><tbody>'+arr.map(eqFila).join('')+'</tbody></table></div>';
 }
 
@@ -7484,19 +7508,19 @@ function eqPorDia(arr){
     return '<div class="eq-daygroup" id="eq-d-'+f+'">'+eqFmtDia(f)+
       '<span style="font-weight:400;color:var(--text-5)"> · '+n+' '+(n===1?'turno':'turnos')+' · '+eqFmtHoras(hs)+'</span></div>'+
       '<div class="table-wrap"><table><thead><tr>'+
-      '<th style="width:6%">Hora</th><th style="width:20%">Cliente</th><th style="width:9%">Dominio</th>'+
-      '<th>Qué se vendió</th><th style="width:10%">Sucursal</th><th style="width:8%">Dur.</th><th style="width:9%"></th>'+
+      '<th style="width:7%">Hora</th><th style="width:22%">Cliente</th><th style="width:11%">Vehículo</th>'+
+      '<th>Qué se vendió</th><th style="width:11%">Sucursal</th><th style="width:8%">Dur.</th><th style="width:10%"></th>'+
       '</tr></thead><tbody>'+g[f].map(function(p){
         return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+'">'+
         '<td><strong>'+(p.hora?p.hora.slice(0,5):'—')+'</strong></td>'+
         '<td><strong>'+eqEsc(p.cliente)+'</strong>'+
-          (p.preorden?'<div class="eq-dias">pre-orden '+eqEsc(p.preorden)+'</div>':'')+
           (p.prioridad!=='normal'?' '+eqPrioPill(p.prioridad):'')+'</td>'+
-        '<td>'+eqEsc(p.dominio||'—')+'</td>'+
+        '<td><strong>'+eqEsc(p.dominio||'—')+'</strong>'+
+          (p.codigo_turno?'<div class="eq-dias">'+eqEsc(p.codigo_turno)+'</div>':'')+'</td>'+
         '<td>'+eqEsc(p.trabajo)+
           (p.estado_stock==='pedido'?'<div class="eq-dias" style="color:#1f5fa8">pieza en camino · llega '+fmtD(p.eta_pieza)+'</div>':'')+'</td>'+
         '<td>'+eqEsc(p.sucursal||'—')+'</td>'+
-        '<td>'+eqEsc(p.tiempo_trabajo||'—')+'</td>'+
+        '<td>'+(p.tiempo_trabajo?'<span class="eq-chip">'+eqEsc(p.tiempo_trabajo)+'</span>':'—')+'</td>'+
         '<td>'+eqBtn(p)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   }).join('');
@@ -7525,17 +7549,21 @@ function eqStockPill(e){
 function eqFila(p){
   const d=eqDiasDesde(p.creado_en);
   const espera = eqPaso(p)==='espera'
-    ? '<div class="eq-dias'+(d>=3?' viejo':'')+'">'+(d===0?'hoy':d+' día'+(d>1?'s':''))+' esperando</div>' : '';
+    ? '<div class="eq-dias'+(d>=3?' viejo':'')+'">'+(d===0?'cargado hoy':'esperando hace '+d+' día'+(d>1?'s':''))+'</div>' : '';
   const eta = p.eta_pieza ? '<div class="eq-dias">llega '+fmtD(p.eta_pieza)+'</div>' : '';
   const nc = (p.equip_comentarios||[]).length;
+  const dur = p.tiempo_trabajo ? '<span class="eq-chip">'+eqEsc(p.tiempo_trabajo)+'</span>' : '';
+  const cod = p.codigo_turno ? '<span class="eq-chip">'+eqEsc(p.codigo_turno)+'</span>' : '';
   return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+'">'+
     '<td><strong>'+eqEsc(p.cliente)+'</strong>'+
+      (p.nro_prosp?'<div class="eq-dias">prospecto '+eqEsc(p.nro_prosp)+'</div>':'')+
       (p.contacto?'<div style="font-size:11px;color:var(--text-5)">'+eqEsc(p.contacto)+'</div>':'')+
-      (p.obs_venta?'<div style="font-size:11px;color:var(--text-4);margin-top:2px">'+eqEsc(p.obs_venta)+'</div>':'')+
       espera+'</td>'+
-    '<td>'+eqEsc(p.dominio||'—')+'</td>'+
-    '<td>'+eqEsc(p.trabajo)+'</td>'+
-    '<td>'+eqEsc(p.nro_prosp||'—')+'</td>'+
+    '<td><strong>'+eqEsc(p.dominio||'—')+'</strong>'+
+      (p.vendedor?'<div style="font-size:11px;color:var(--text-5)">'+eqEsc(p.vendedor)+'</div>':'')+'</td>'+
+    '<td>'+eqEsc(p.trabajo)+
+      ((dur||cod)?'<div style="margin-top:4px">'+dur+cod+'</div>':'')+
+      (p.obs_venta?'<div style="font-size:11px;color:var(--text-4);margin-top:3px">'+eqEsc(p.obs_venta)+'</div>':'')+'</td>'+
     '<td>'+eqEsc(p.sucursal||'—')+'</td>'+
     '<td>'+eqPrioPill(p.prioridad)+
       (p.motivo_prioridad?'<div style="font-size:10.5px;color:var(--text-5);margin-top:3px">'+eqEsc(p.motivo_prioridad)+'</div>':'')+'</td>'+
@@ -7562,6 +7590,8 @@ function eqAbrirAlta(){
   });
   document.getElementById('eqa-vendedor').value = (cu && cu.nombre) || '';
   document.getElementById('eqa-suc').value = (cu && cu.sucursalFija) || '';
+  document.getElementById('eqa-tiempo').value='';
+  document.getElementById('eqa-cod').value='';
   document.getElementById('eqa-err').style.display='none';
   document.getElementById('eq-mov-alta').classList.add('open');
 }
@@ -7586,6 +7616,8 @@ async function eqGuardarAlta(){
       vendedor: document.getElementById('eqa-vendedor').value.trim() || null,
       sucursal: document.getElementById('eqa-suc').value || null,
       obs_venta: document.getElementById('eqa-obs').value.trim() || null,
+      tiempo_trabajo: document.getElementById('eqa-tiempo').value || null,
+      codigo_turno: document.getElementById('eqa-cod').value || null,
       creado_por: cu.nombre
     }]);
     if(error) throw error;
@@ -7631,7 +7663,6 @@ function eqAbrir(id){
       av.style.display='block';
     } else av.style.display='none';
     fEl.value=p.fecha||'';
-    document.getElementById('eq-mo-preorden').value=p.preorden||'';
     document.getElementById('eq-mo-hora').value=p.hora?p.hora.slice(0,5):'';
     document.getElementById('eq-mo-tiempo').value=p.tiempo_trabajo||'';
     document.getElementById('eq-mo-cod').value=p.codigo_turno||'';
@@ -7690,20 +7721,12 @@ async function eqGuardarModal(){
   if(eqPuedeTurnar() && document.getElementById('eq-bx-turno').style.display!=='none'){
     const f=document.getElementById('eq-mo-fecha').value;
     if(f){
-      const po=document.getElementById('eq-mo-preorden').value.trim();
-      if(!po){
-        err.textContent='Falta el N° de pre-orden. Es obligatorio para turnar.';
-        err.style.display='block';
-        document.getElementById('eq-mo-preorden').focus();
-        return;
-      }
       const min=eqDesdeCuando(eqAbierto);
       if(min && f<min){
         err.textContent='La pieza llega el '+fmtD(min)+'. Elegí una fecha de ese día en adelante.';
         err.style.display='block';
         return;
       }
-      upd.preorden=po;
       upd.fecha=f;
       upd.hora=document.getElementById('eq-mo-hora').value||null;
       upd.tiempo_trabajo=document.getElementById('eq-mo-tiempo').value||null;
@@ -7730,7 +7753,6 @@ async function eqGuardarModal(){
   }catch(e){
     const msg=String(e.message||'');
     err.textContent =
-      msg.indexOf('N° de pre-orden')>=0 ? 'Falta el N° de pre-orden. Es obligatorio para turnar.' :
       msg.indexOf('todavía no está confirmada')>=0 ? 'No se puede turnar: la pieza no está confirmada como disponible.' :
       msg.indexOf('anterior a la llegada')>=0 ? 'El turno no puede ser anterior a la llegada de la pieza.' :
       msg.indexOf('falta la fecha estimada')>=0 ? 'La pieza está pedida: cargá la fecha estimada de arribo para poder turnar.' :
