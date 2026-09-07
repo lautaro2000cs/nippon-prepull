@@ -5983,7 +5983,7 @@ function getMesesEnRegistros(){
 let compSeccionActual=null;
 let compRegistros=[];
 let compEditId=null;
-let compOrdenAsc=true; // true = más antiguo primero, false = más nuevo primero
+let compOrdenAsc=false; // true = más antiguo primero, false = más nuevo primero (por defecto)
 let compTargetEq=null, compTargetCub=null;
 
 async function cargarPedidos(){
@@ -6473,7 +6473,7 @@ function abrirISD(){
   cargarISD();
 }
 async function cargarISD(){
-  const {data,error}=await sb.from('isd').select('*').order('created_at',{ascending:true});
+  const {data,error}=await sb.from('isd').select('*').order('created_at',{ascending:false});
   if(error){console.error(error);isdRegistros=[];}else{isdRegistros=data||[];}
   renderIsdFiltros();
   renderISD();
