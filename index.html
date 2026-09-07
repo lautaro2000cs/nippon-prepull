@@ -1410,17 +1410,11 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
     <div id="eq-bx-turno" style="display:none;margin-bottom:.85rem">
       <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:6px">Asignar turno</label>
       <div id="eq-mo-aviso" style="display:none;background:#e6f0fb;color:#1f5fa8;border-radius:8px;padding:8px 11px;font-size:12px;margin-bottom:9px"></div>
-      <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:8px">
         <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Fecha del turno</label>
           <input type="date" id="eq-mo-fecha"/></div>
         <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Hora</label>
           <input type="time" id="eq-mo-hora"/></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Duración <span style="font-weight:400">· la cargó el vendedor</span></label>
-          <select id="eq-mo-tiempo"><option value="">—</option><option>15MIN</option><option>30MIN</option><option>45MIN</option><option>1HS</option><option>2HS</option><option>3HS</option><option>4HS</option><option>5HS</option><option>6HS</option></select></div>
-        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Código de turno</label>
-          <select id="eq-mo-cod"><option value="">—</option><option>EQ OR</option><option>EQP OR</option><option>EQS OR</option><option>EQK OR</option><option>EQU OR</option></select></div>
       </div>
     </div>
 
@@ -7638,20 +7632,33 @@ function eqAbrir(id){
   const pa=eqPaso(p);
 
   document.getElementById('eq-mo-cli').textContent=p.cliente;
+  // Ficha del pedido: lo que la persona necesita para decidir, sin repetir el nombre
+  const meta=[];
+  if(p.dominio)   meta.push(eqEsc(p.dominio));
+  if(p.nro_prosp) meta.push('prospecto '+eqEsc(p.nro_prosp));
+  if(p.sucursal)  meta.push(eqEsc(p.sucursal));
+  if(p.tiempo_trabajo) meta.push(eqEsc(p.tiempo_trabajo));
+  if(p.codigo_turno)   meta.push(eqEsc(p.codigo_turno));
   document.getElementById('eq-mo-sub').innerHTML =
-    eqEsc(p.trabajo)+'<br>'+eqEsc(p.dominio||'sin dominio')+' · prospecto '+eqEsc(p.nro_prosp||'—')+' · '+eqEsc(p.sucursal||'—')+
-    (p.obs_venta?'<br><span style="color:var(--text-3)">'+eqEsc(p.obs_venta)+'</span>':'');
+    '<div style="font-weight:600;color:var(--text-2);font-size:13px">'+eqEsc(p.trabajo)+'</div>'+
+    (meta.length?'<div style="margin-top:2px">'+meta.join(' · ')+'</div>':'')+
+    (p.obs_venta?'<div style="margin-top:4px;color:var(--text-3)">'+eqEsc(p.obs_venta)+'</div>':'');
   document.getElementById('eq-mo-err').style.display='none';
 
-  const verPrio = eqPuedePrioridad() && pa!=='turnado';
+  // Cada sección aparece según el PASO del pedido, no según los permisos
+  // acumulados: quien turna sólo ve la fecha, quien controla stock sólo ve
+  // la pieza. Así el admin tampoco se encuentra con las tres cosas juntas.
+  const enTurno = (pa==='listo' || pa==='turnado');
+
+  const verPrio = eqPuedePrioridad() && !enTurno;
   document.getElementById('eq-bx-prio').style.display = verPrio?'block':'none';
   if(verPrio){ eqPintarPrio(); document.getElementById('eq-mo-motivo').value = p.motivo_prioridad||''; }
 
-  const verStock = eqPuedeStock() && pa!=='turnado';
+  const verStock = eqPuedeStock() && !enTurno;
   document.getElementById('eq-bx-stock').style.display = verStock?'block':'none';
   if(verStock){ eqPintarStock(); document.getElementById('eq-mo-eta').value = p.eta_pieza||''; }
 
-  const verTurno = eqPuedeTurnar() && (pa==='listo'||pa==='turnado');
+  const verTurno = eqPuedeTurnar() && enTurno;
   document.getElementById('eq-bx-turno').style.display = verTurno?'block':'none';
   if(verTurno){
     const min=eqDesdeCuando(p);
@@ -7659,13 +7666,11 @@ function eqAbrir(id){
     if(min) fEl.min=min; else fEl.removeAttribute('min');
     const av=document.getElementById('eq-mo-aviso');
     if(min){
-      av.textContent='La pieza está pedida y llega el '+fmtD(min)+'. El turno tiene que ser de esa fecha en adelante.';
+      av.textContent='La pieza llega el '+fmtD(min)+'. Elegí una fecha de ese día en adelante.';
       av.style.display='block';
     } else av.style.display='none';
     fEl.value=p.fecha||'';
     document.getElementById('eq-mo-hora').value=p.hora?p.hora.slice(0,5):'';
-    document.getElementById('eq-mo-tiempo').value=p.tiempo_trabajo||'';
-    document.getElementById('eq-mo-cod').value=p.codigo_turno||'';
   }
 
   const cs=(p.equip_comentarios||[]).slice().sort((a,b)=>String(a.creado_en).localeCompare(String(b.creado_en)));
@@ -7729,8 +7734,6 @@ async function eqGuardarModal(){
       }
       upd.fecha=f;
       upd.hora=document.getElementById('eq-mo-hora').value||null;
-      upd.tiempo_trabajo=document.getElementById('eq-mo-tiempo').value||null;
-      upd.codigo_turno=document.getElementById('eq-mo-cod').value||null;
       if(!eqAbierto.fecha){ upd.turnado_por=cu.nombre; upd.turnado_en=ahora; }
     }
   }
