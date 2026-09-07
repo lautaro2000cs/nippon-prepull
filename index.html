@@ -81,12 +81,17 @@ a{color:#c62a27;text-decoration:none}
 .conn-ok{background:#e6f4ec;color:#1f7a48}
 .conn-loading{background:var(--surface-sub);color:var(--text-4)}
 /* Selector de módulos */
-.sel-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem}
+.sel-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem 0}
 .sel-header{text-align:center;margin-bottom:2.5rem}
 .sel-title{font-size:1.9rem;font-weight:700;color:var(--text-1);margin:0}
 .sel-title span{color:var(--accent-h)}
 .sel-sub{font-size:1rem;color:var(--text-4);margin-top:6px}
-.sel-cards{display:flex;gap:1.5rem;flex-wrap:wrap;justify-content:center;max-width:760px}
+.sel-cards{display:flex;gap:1.25rem;flex-wrap:nowrap;justify-content:flex-start;width:100%;max-width:100%;align-self:stretch;overflow-x:auto;padding:.5rem 1.5rem 1rem;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.sel-cards::-webkit-scrollbar{height:8px}
+.sel-cards::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:99px}
+.sel-cards::-webkit-scrollbar-track{background:transparent}
+.sel-cards>.sel-card{flex:0 0 auto;scroll-snap-align:start}
+@media (max-width:640px){.sel-cards{padding-left:1rem;padding-right:1rem}}
 .sel-card{background:#fff;border:1px solid var(--border-1);border-radius:18px;padding:2rem 1.75rem;width:300px;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;box-shadow:0 1px 2px rgba(0,0,0,.05);text-align:left}
 .sel-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px -12px rgba(0,0,0,.25);border-color:var(--accent)}
 .sel-card-locked{opacity:.6}
@@ -2039,7 +2044,15 @@ const MODULOS = {
 // no se cargaron, cae a un mapa por rol idéntico a la matriz sembrada en la
 // base, así nunca deja a nadie trabado.
 function can(p){
-  if(cu && cu.permisos instanceof Set) return cu.permisos.has(p);
+  // El admin siempre tiene acceso a todo, sin depender de la matriz de la base.
+  if(cu && cu.rol === 'admin') return true;
+  if(cu && cu.permisos instanceof Set){
+    if(cu.permisos.has(p)) return true;
+    // Permisos nuevos que todavía no están sembrados en la base: se resuelven
+    // por rol hasta que se carguen en usuario_permiso / rol_permiso.
+    if(p.indexOf('equipamiento.') === 0) return canFallback(p);
+    return false;
+  }
   return canFallback(p);
 }
 function canFallback(p){
