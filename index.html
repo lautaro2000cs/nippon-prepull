@@ -547,6 +547,37 @@ tbody td{padding:11px 12px;vertical-align:middle}
 .ds-val{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--text-1);line-height:1;letter-spacing:-0.03em}
 .ds-sub{font-size:11px;color:var(--text-5);margin-top:4px}
 
+
+/* ── EQUIPAMIENTO ─────────────────────────────────────── */
+.eq-rail{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.eq-step{flex:1;min-width:150px;background:#fff;border:1px solid var(--border-1);border-radius:12px;padding:11px 13px;cursor:pointer;text-align:left;font-family:inherit}
+.eq-step:hover{border-color:var(--border-2)}
+.eq-step.act{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-tint)}
+.eq-step .eq-sn{font-size:11px;font-weight:700;color:var(--text-4);display:flex;align-items:center;gap:6px}
+.eq-step .eq-sv{font-family:var(--mono);font-size:22px;font-weight:700;margin-top:3px;line-height:1;color:var(--text-1)}
+.eq-step .eq-sd{font-size:11px;color:var(--text-5);margin-top:2px}
+.eq-step.alerta .eq-sv{color:var(--accent)}
+.eq-seg{flex:1;padding:9px 6px;border-radius:9px;border:1.5px solid var(--border-2);background:none;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-4);transition:all .15s}
+.eq-seg:hover{border-color:var(--text-4)}
+.eq-seg.on-verde{background:#e6f4ec;border-color:#0f7b3f;color:#0f7b3f}
+.eq-seg.on-rojo{background:#fbeceb;border-color:#c62a27;color:#c62a27}
+.eq-seg.on-azul{background:#e6f0fb;border-color:#1f5fa8;color:#1f5fa8}
+.eq-seg.on-amar{background:#fbf1de;border-color:#d99b0b;color:#9a6a08}
+.eq-seg.on-gris{background:#efeeeb;border-color:var(--text-4);color:var(--text-2)}
+.eq-resumen{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
+.eq-rdia{flex:none;min-width:118px;background:var(--surface-sub,#faf9f7);border:1px solid var(--border-1);border-radius:11px;padding:9px 11px;cursor:pointer;text-align:left;font-family:inherit}
+.eq-rdia:hover{border-color:var(--border-2)}
+.eq-rdia.esHoy{border-color:var(--accent);background:var(--accent-tint)}
+.eq-rdia .rf{font-size:11px;font-weight:700;color:var(--text-4);white-space:nowrap}
+.eq-rdia .rn{font-family:var(--mono);font-size:21px;font-weight:700;line-height:1.1;margin-top:2px;color:var(--text-1)}
+.eq-rdia .rh{font-size:10.5px;color:var(--text-5);white-space:nowrap;margin-top:1px}
+.eq-totales{font-size:12px;color:var(--text-3);padding:2px 2px 6px;font-weight:600}
+.eq-daygroup{font-size:12px;font-weight:700;color:var(--text-3);padding:15px 2px 6px;scroll-margin-top:12px}
+.eq-dias{font-family:var(--mono);font-size:10.5px;color:var(--text-5);margin-top:3px}
+.eq-dias.viejo{color:var(--accent);font-weight:700}
+tr.eq-urg{background:rgba(224,50,47,.035)}
+.eq-cit{background:var(--surface-sub,#faf9f7);border-radius:8px;padding:7px 9px;font-size:12.5px}
+.eq-cit .cm{font-size:10.5px;color:var(--text-5);margin-top:2px}
 </style>
 </head>
 <body>
@@ -682,6 +713,10 @@ tbody td{padding:11px 12px;vertical-align:middle}
         <button class="nav-item" id="tab-proc" style="display:none" onclick="swTab('proc',this)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4a2 2 0 0 1 2-2h5l2 3h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>
           Procedimientos
+        </button>
+        <button class="nav-item" id="tab-equip" style="display:none" onclick="swTab('equip',this)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          Equipamiento
         </button>
         <button class="nav-item" id="tab-detenidos" style="display:none" onclick="swTab('detenidos',this)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
@@ -1047,6 +1082,64 @@ tbody td{padding:11px 12px;vertical-align:middle}
           <div id="proc-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
         </div>
 
+        <!-- EQUIPAMIENTO -->
+        <div class="tc" id="tc-equip">
+          <div class="sec-hdr">
+            <div class="sec-hdr-left">
+              <div class="sec-eyebrow">Accesorios · De la venta al turno</div>
+              <h2>Equipamiento</h2>
+              <div class="tb-sub" id="eq-sub" style="margin-top:4px"></div>
+            </div>
+            <div class="hdr-actions" style="display:flex;gap:8px;align-items:center">
+              <button class="btn-sm" id="eq-btn-nueva" onclick="eqAbrirAlta()" style="display:none">
+                <i class="ti ti-plus" style="font-size:13px;vertical-align:-2px"></i> Cargar venta
+              </button>
+              <button class="btn-sm" onclick="cargarEquip()" title="Actualizar">
+                <i class="ti ti-refresh" style="font-size:13px;vertical-align:-2px"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="eq-rail">
+            <button class="eq-step act" id="eq-s-espera" onclick="eqVer('espera')">
+              <div class="eq-sn"><i class="ti ti-clock"></i> Esperando stock</div>
+              <div class="eq-sv" id="eq-v-espera">0</div>
+              <div class="eq-sd">Stock todavía no revisó</div>
+            </button>
+            <button class="eq-step" id="eq-s-listo" onclick="eqVer('listo')">
+              <div class="eq-sn"><i class="ti ti-circle-check"></i> Listos para turnar</div>
+              <div class="eq-sv" id="eq-v-listo">0</div>
+              <div class="eq-sd">Con pieza confirmada</div>
+            </button>
+            <button class="eq-step" id="eq-s-sin" onclick="eqVer('sin')">
+              <div class="eq-sn"><i class="ti ti-alert-triangle"></i> Sin pieza</div>
+              <div class="eq-sv" id="eq-v-sin">0</div>
+              <div class="eq-sd">Faltante o pedida</div>
+            </button>
+            <button class="eq-step" id="eq-s-turnado" onclick="eqVer('turnado')">
+              <div class="eq-sn"><i class="ti ti-calendar-check"></i> Turnados</div>
+              <div class="eq-sv" id="eq-v-turnado">0</div>
+              <div class="eq-sd">Con fecha asignada</div>
+            </button>
+          </div>
+
+          <div class="filters-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <input type="text" class="search-input" id="eq-q" style="flex:1;min-width:220px"
+                   placeholder="Buscar por cliente, dominio, prospecto, pre-orden o trabajo..." oninput="eqRender()">
+            <select id="eq-fp" onchange="eqRender()" class="filter-sel">
+              <option value="">Toda prioridad</option>
+              <option value="urgente">Urgente</option>
+              <option value="alta">Alta</option>
+              <option value="normal">Normal</option>
+            </select>
+            <select id="eq-fs" onchange="eqRender()" class="filter-sel">
+              <option value="">Todas las sucursales</option>
+            </select>
+          </div>
+
+          <div id="eq-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
+        </div>
+
         <!-- VEHÍCULOS DETENIDOS -->
         <div class="tc" id="tc-detenidos">
           <div class="sec-hdr">
@@ -1238,6 +1331,93 @@ tbody td{padding:11px 12px;vertical-align:middle}
       </div>
     </div>
     <div class="mfooter"><button class="btn-cancel" onclick="closeModal()">Cancelar</button><button class="btn-save" id="btn-guardar-turno" onclick="guardar()">Guardar</button></div>
+  </div>
+</div>
+
+<div class="modal-ov" id="eq-mov-alta">
+  <div class="modal">
+    <h3><i class="ti ti-shopping-cart" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0f766e"></i>Cargar venta de equipamiento</h3>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem">Cargá el prospecto apenas cerrás la venta. La pre-orden y el turno se completan después, cuando stock confirma la pieza.</div>
+    <div class="mgrid">
+      <div><label>Cliente <span style="color:var(--accent)">*</span></label><input type="text" id="eqa-cliente" placeholder="Apellido, Nombre"/></div>
+      <div><label>Dominio / chasis</label><input type="text" id="eqa-dominio" placeholder="AB 123 CD"/></div>
+      <div><label>N° prospecto</label><input type="text" id="eqa-prosp"/></div>
+      <div><label>Contacto</label><input type="text" id="eqa-contacto" placeholder="Teléfono"/></div>
+      <div class="full"><label>Qué se vendió <span style="color:var(--accent)">*</span></label>
+        <input type="text" id="eqa-trabajo" placeholder="Ej: COBERTOR + BARRA DE TRABAJO + LANZA"/></div>
+      <div><label>Sucursal</label><select id="eqa-suc"><option value="">Seleccionar...</option><option>Roca</option><option>Perticone</option><option>Aguado</option><option>Añelo</option><option>Bariloche</option></select></div>
+      <div><label>Vendedor</label><input type="text" id="eqa-vendedor"/></div>
+      <div class="full"><label>Observaciones</label><input type="text" id="eqa-obs" placeholder="Lo que stock o turnos deberían saber"/></div>
+    </div>
+    <p class="login-err" id="eqa-err" style="display:none"></p>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="eqCerrarAlta()">Cancelar</button>
+      <button class="btn-save" id="eqa-btn" onclick="eqGuardarAlta()">Guardar venta</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-ov" id="eq-mov">
+  <div class="modal sm">
+    <h3 id="eq-mo-t"><i class="ti ti-tool" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0f766e"></i><span id="eq-mo-cli"></span></h3>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem;line-height:1.5" id="eq-mo-sub"></div>
+
+    <div id="eq-bx-prio" style="display:none;margin-bottom:.85rem">
+      <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:8px">Prioridad</label>
+      <div style="display:flex;gap:8px">
+        <button id="eq-prio-normal" onclick="eqSetPrio('normal')" class="eq-seg">Normal</button>
+        <button id="eq-prio-alta" onclick="eqSetPrio('alta')" class="eq-seg">Alta</button>
+        <button id="eq-prio-urgente" onclick="eqSetPrio('urgente')" class="eq-seg">Urgente</button>
+      </div>
+      <div id="eq-bx-motivo" style="display:none;margin-top:8px">
+        <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Motivo</label>
+        <input type="text" id="eq-mo-motivo" placeholder="Ej: cliente conflictivo, ya reclamó dos veces"/>
+      </div>
+    </div>
+
+    <div id="eq-bx-stock" style="display:none;margin-bottom:.85rem">
+      <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:8px">¿Tenemos la pieza?</label>
+      <div style="display:flex;gap:8px">
+        <button id="eq-stk-disponible" onclick="eqSetStock('disponible')" class="eq-seg">Sí, hay</button>
+        <button id="eq-stk-faltante" onclick="eqSetStock('faltante')" class="eq-seg">No hay</button>
+        <button id="eq-stk-pedido" onclick="eqSetStock('pedido')" class="eq-seg">Ya se pidió</button>
+      </div>
+      <div id="eq-bx-eta" style="display:none;margin-top:8px">
+        <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Llegada estimada</label>
+        <input type="date" id="eq-mo-eta"/>
+      </div>
+    </div>
+
+    <div id="eq-bx-turno" style="display:none;margin-bottom:.85rem">
+      <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:6px">Asignar turno</label>
+      <div id="eq-mo-aviso" style="display:none;background:#e6f0fb;color:#1f5fa8;border-radius:8px;padding:8px 11px;font-size:12px;margin-bottom:9px"></div>
+      <div style="margin-bottom:8px">
+        <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">N° de pre-orden <span style="color:var(--accent)">* obligatorio</span></label>
+        <input type="text" id="eq-mo-preorden" placeholder="PO-00123"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Fecha</label>
+          <input type="date" id="eq-mo-fecha"/></div>
+        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Hora</label>
+          <input type="time" id="eq-mo-hora"/></div>
+        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Duración</label>
+          <select id="eq-mo-tiempo"><option value="">—</option><option>15MIN</option><option>30MIN</option><option>45MIN</option><option>1HS</option><option>2HS</option><option>3HS</option><option>4HS</option><option>5HS</option><option>6HS</option></select></div>
+        <div><label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Código</label>
+          <select id="eq-mo-cod"><option value="">—</option><option>EQ OR</option><option>EQP OR</option><option>EQS OR</option><option>EQK OR</option><option>EQU OR</option></select></div>
+      </div>
+    </div>
+
+    <div>
+      <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Comentarios registrados</label>
+      <div id="eq-mo-hist" style="display:flex;flex-direction:column;gap:6px;max-height:130px;overflow:auto;margin-bottom:8px"></div>
+      <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Agregar comentario <span style="font-weight:400">(queda con tu nombre y fecha; no se edita)</span></label>
+      <textarea id="eq-mo-com" placeholder="Ej: falta sólo la lanza, el resto está"></textarea>
+    </div>
+    <p class="login-err" id="eq-mo-err" style="display:none"></p>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="eqCerrar()">Cancelar</button>
+      <button class="btn-save" onclick="eqGuardarModal()">Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -1837,6 +2017,13 @@ const MODULOS = {
     color: '#b45309',
     icono: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>'
   },
+  equipamiento: {
+    id: 'equipamiento',
+    nombre: 'Equipamiento',
+    desc: 'De la venta al turno: control de stock, prioridades y agenda de accesorios.',
+    color: '#0f766e',
+    icono: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'
+  },
   admin: {
     id: 'admin',
     nombre: 'Administración',
@@ -1860,12 +2047,14 @@ function canFallback(p){
   if(cu.rol === 'admin') return true;
   const M = {
     supervisor:   ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','encuestas.sincronizar','minutas.ver','procedimientos.ver','procedimientos.subir'],
-    citas:        ['prepull.ver','prepull.turnos.ver','procedimientos.ver','encuestas.fir.crear','encuestas.desestimacion.pedir'],
+    citas:        ['prepull.ver','prepull.turnos.ver','procedimientos.ver','encuestas.fir.crear','encuestas.desestimacion.pedir','equipamiento.ver','equipamiento.vender'],
     repuestos:    ['prepull.ver','prepull.repuestos.ver','prepull.repuestos.marcar','procedimientos.ver'],
     compras:      ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar','procedimientos.ver'],
     asesor:       ['encuestas.ver','encuestas.desestimaciones.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
     jefe_servicio:['prepull.ver','prepull.turnos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
     seguridad:    ['minutas.ver','procedimientos.ver','procedimientos.subir'],
+    equip_stock:  ['equipamiento.ver','equipamiento.stock','procedimientos.ver'],
+    equip_turnos: ['equipamiento.ver','equipamiento.turnar','equipamiento.prioridad','procedimientos.ver'],
   };
   const perms = new Set(M[cu.rol] || []);
   // overrides por usuario (mismos que en usuario_permiso)
@@ -1879,6 +2068,7 @@ function puedeAcceder(moduloId){
   if(moduloId === 'admin') return !!(cu && cu.rol === 'admin'); // solo admin, regla dura
   if(moduloId === 'procedimientos') return can('procedimientos.ver');
   if(moduloId === 'detenidos') return can('detenidos.gestionar');
+  if(moduloId === 'equipamiento') return can('equipamiento.ver');
   return can(moduloId + '.ver');
 }
 
@@ -1951,7 +2141,7 @@ async function showApp(){
   document.getElementById('s-login').classList.remove('active');
   document.getElementById('s-app').classList.add('active');
   document.getElementById('tb-user').textContent=cu.nombre;
-  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene',jefe_servicio:'Jefe de Servicio'}[cu.rol]||cu.rol;
+  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene',equip_stock:'Equipamiento · Stock',equip_turnos:'Equipamiento · Turnos',jefe_servicio:'Jefe de Servicio'}[cu.rol]||cu.rol;
   const sucEl=document.getElementById('tb-suc');
   if(cu.sucursalFija){sucEl.style.display='inline-flex';sucEl.innerHTML=`<i class="ti ti-map-pin" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${cu.sucursalFija}`;}
   else sucEl.style.display='none';
@@ -1969,6 +2159,7 @@ async function showApp(){
   const enAdmin = cu.modulo === 'admin';
   const enProc = cu.modulo === 'procedimientos';
   const enDetenidos = cu.modulo === 'detenidos';
+  const enEquip = cu.modulo === 'equipamiento';
 
   document.getElementById('tab-dash').style.display=(enPrepull && can('prepull.dashboard.ver'))?'':'none';
   document.getElementById('tab-turnos').style.display=(enPrepull && can('prepull.turnos.ver'))?'':'none';
@@ -1983,6 +2174,8 @@ async function showApp(){
   if(tabProc) tabProc.style.display=enProc?'':'none';
   const tabDet = document.getElementById('tab-detenidos');
   if(tabDet) tabDet.style.display=enDetenidos?'':'none';
+  const tabEq = document.getElementById('tab-equip');
+  if(tabEq) tabEq.style.display=enEquip?'':'none';
   // el botón flotante "+" es de Pre Pull (crear turno): ocultarlo en otros módulos
   const fab = document.getElementById('fab-nuevo');
   if(fab && !enPrepull) fab.style.display='none';
@@ -1998,6 +2191,8 @@ async function showApp(){
     startTab = 'proc';
   } else if(enDetenidos){
     startTab = 'detenidos';
+  } else if(enEquip){
+    startTab = 'equip';
   } else if(enAdmin){
     startTab = 'usuarios';
   } else {
@@ -4920,6 +5115,7 @@ function swTab(t,el){
   if(t==='encuestas') cargarEncuestas();
   if(t==='desest') cargarBandejaDesest();
   if(t==='minutas') cargarMinutas();
+  if(t==='equip') cargarEquip();
 }
 function swSubTab(t,el){const cont=document.getElementById('tc-turnos');cont.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('act'));cont.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));el.classList.add('act');document.getElementById('subtc-'+t).classList.add('act');if(t==='noshow')renderNoShow();if(t==='historico')renderHistorico();}
 function swSubTabRep(t,el){
@@ -5056,7 +5252,7 @@ function valePill(v){return v?'<span class="pill p-arr"><i class="ti ti-check" s
 function priPill(p){const m={Alta:'pri-alta',Mediana:'pri-med',Baja:'pri-baja'};return`<span class="pill ${m[p]||'pri-baja'}">${p||'-'}</span>`;}
 function estPill(e){const m={pendiente:['p-pend','Pendiente'],arribo:['p-arr','Arribó'],faltante:['p-falt','Faltante'],bo:['p-bo','<i class="ti ti-alert-triangle" style="font-size:12px;vertical-align:-1px"></i> B/O']};const[c,l]=m[e]||['p-pend','Pendiente'];return`<span class="pill ${c}">${l}</span>`;}
 function valePill(v){return v?'<span class="pill p-arr"><i class="ti ti-check" style="font-size:11px"></i> Con vale</span>':'<span class="pill p-falt"><i class="ti ti-x" style="font-size:11px"></i> Sin vale</span>';}
-function rolPill(r){const m={admin:'<span class="pill" style="background:#fbeceb;color:#c62a27">Admin</span>',citas:'<span class="pill" style="background:#e6f4ec;color:#1f7a48">Citas</span>',repuestos:'<span class="pill" style="background:#eef0ff;color:#4f46e5">Repuestos</span>',compras:'<span class="pill" style="background:#fbf1de;color:#9a6a08">Compras</span>',supervisor:'<span class="pill" style="background:#e6f1fb;color:#0c447c">Supervisor</span>',jefe_servicio:'<span class="pill" style="background:#f3e8ff;color:#7c3aed">Jefe de Servicio</span>'};return m[r]||`<span style="font-size:11px">${r}</span>`;}
+function rolPill(r){const m={admin:'<span class="pill" style="background:#fbeceb;color:#c62a27">Admin</span>',citas:'<span class="pill" style="background:#e6f4ec;color:#1f7a48">Citas</span>',repuestos:'<span class="pill" style="background:#eef0ff;color:#4f46e5">Repuestos</span>',compras:'<span class="pill" style="background:#fbf1de;color:#9a6a08">Compras</span>',supervisor:'<span class="pill" style="background:#e6f1fb;color:#0c447c">Supervisor</span>',jefe_servicio:'<span class="pill" style="background:#f3e8ff;color:#7c3aed">Jefe de Servicio</span>',equip_stock:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Stock</span>',equip_turnos:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Turnos</span>'};return m[r]||`<span style="font-size:11px">${r}</span>`;}
 
 function renderGroups(cid,items,fn,horizFilt){
   // Cachear el grupo de cada item una sola vez (diffHabil puede ser lento con muchos turnos)
@@ -5667,7 +5863,7 @@ function convertirAgente(id){
 function llenarRolesUsr(){
   const sel=document.getElementById('f-usr-rol');
   const roles = (RP_ROLES && RP_ROLES.length) ? RP_ROLES
-    : [{id:'admin',label:'Admin'},{id:'supervisor',label:'Supervisor'},{id:'citas',label:'Citas'},{id:'repuestos',label:'Repuestos'},{id:'compras',label:'Compras'},{id:'asesor',label:'Asesor'},{id:'jefe_servicio',label:'Jefe de Servicio'},{id:'seguridad',label:'Seguridad e Higiene'}];
+    : [{id:'admin',label:'Admin'},{id:'supervisor',label:'Supervisor'},{id:'citas',label:'Citas'},{id:'repuestos',label:'Repuestos'},{id:'compras',label:'Compras'},{id:'asesor',label:'Asesor'},{id:'jefe_servicio',label:'Jefe de Servicio'},{id:'seguridad',label:'Seguridad e Higiene'},{id:'equip_stock',label:'Equipamiento · Stock'},{id:'equip_turnos',label:'Equipamiento · Turnos'}];
   const actual = sel.value;
   sel.innerHTML='<option value="">Seleccionar...</option>'+roles.map(r=>`<option value="${r.id}">${escapeHtml(r.label)}</option>`).join('');
   if(actual) sel.value=actual;
@@ -7110,6 +7306,425 @@ async function subirAdjuntosDrawer(){
 function renderDrawerAdjuntos(){const cont=document.getElementById("dr-adj-lista");if(!cont)return;cont.innerHTML=drawerAdjuntos.map((a,i)=>{const esImg=(a.tipo||"").startsWith("image/");return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface-sub);border-radius:8px;font-size:12px"><i class="ti ti-${esImg?"photo":"file"}" style="font-size:13px;flex-shrink:0"></i><a href="${a.url}" target="_blank" style="flex:1;color:#1f5fa8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.nombre}</a><button type="button" onclick="quitarAdjuntoDrawer(${i})" style="background:none;border:none;color:#c62a27;cursor:pointer"><i class="ti ti-x" style="font-size:12px"></i></button></div>`;}).join("");}
 
 function quitarAdjuntoDrawer(i){drawerAdjuntos.splice(i,1);renderDrawerAdjuntos();}
+
+
+// ============================================================
+//  MÓDULO EQUIPAMIENTO
+//  Circuito: venta -> prioridad -> control de stock -> turno
+//  Tablas: equip_pedidos, equip_comentarios
+// ============================================================
+let eqPedidos = [];
+let eqVista = 'espera';
+let eqAbierto = null, eqTmpPrio = null, eqTmpStock = null;
+
+// ── permisos ──
+const eqPuedeVender    = () => can('equipamiento.vender');
+const eqPuedePrioridad = () => can('equipamiento.prioridad');
+const eqPuedeTurnar    = () => can('equipamiento.turnar');
+const eqPuedeStock     = () => can('equipamiento.stock');
+
+// ── helpers ──
+function eqEsc(s){ return escapeHtml(String(s ?? '')); }
+function eqHoy(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function eqFmtTs(t){ if(!t) return ''; const d=new Date(t);
+  return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function eqDiasDesde(ts){ if(!ts) return 0; return Math.floor((Date.now()-new Date(ts))/86400000); }
+function eqFmtDia(f){ const d=new Date(f+'T00:00:00');
+  const D=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'], M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return D[d.getDay()]+' '+d.getDate()+' '+M[d.getMonth()]; }
+
+// convierte "2HS", "30MIN", "1HS 30" a horas decimales, para sumar carga del día
+function eqAHoras(t){
+  if(!t) return 0;
+  const s=String(t).toUpperCase().replace(/\s+/g,'');
+  let h=0;
+  const mh=s.match(/(\d+(?:[.,]\d+)?)HS?/);  if(mh) h+=parseFloat(mh[1].replace(',','.'));
+  const mm=s.match(/(\d+)MIN/);               if(mm) h+=parseInt(mm[1],10)/60;
+  if(mh && !mm){ const r=s.match(/HS?(\d+)$/); if(r) h+=parseInt(r[1],10)/60; }
+  return h;
+}
+function eqFmtHoras(h){
+  if(!h) return '—';
+  const H=Math.floor(h), M=Math.round((h-H)*60);
+  return ((H?H+'h':'')+(M?(H?' ':'')+M+'min':'')) || '—';
+}
+
+// en qué paso del circuito está el pedido
+function eqPaso(p){
+  if(p.anulado) return 'anulado';
+  if(p.fecha) return 'turnado';
+  if(p.estado_stock==='disponible') return 'listo';
+  // pedida con fecha de arribo conocida: ya se puede turnar
+  if(p.estado_stock==='pedido' && p.eta_pieza) return 'listo';
+  if(p.estado_stock==='faltante' || p.estado_stock==='pedido') return 'sin';
+  return 'espera';
+}
+// desde cuándo se puede turnar: si la pieza está pedida, no antes de que llegue
+function eqDesdeCuando(p){
+  return (p.estado_stock==='pedido' && p.eta_pieza) ? p.eta_pieza : null;
+}
+
+// ── carga ──
+async function cargarEquip(){
+  const btn=document.getElementById('eq-btn-nueva');
+  if(btn) btn.style.display = eqPuedeVender() ? '' : 'none';
+
+  const fs=document.getElementById('eq-fs');
+  if(fs && fs.options.length<=1){
+    fs.innerHTML='<option value="">Todas las sucursales</option>'+SUCURSALES.map(s=>'<option>'+s+'</option>').join('');
+  }
+  if(cu && cu.sucursalFija && fs){ fs.value=cu.sucursalFija; fs.disabled=true; }
+
+  const {data,error}=await sb.from('equip_pedidos')
+    .select('*, equip_comentarios(*)').eq('anulado',false).order('creado_en');
+  if(error){ console.error(error); showToast('No se pudieron cargar los pedidos de equipamiento'); return; }
+  eqPedidos = data || [];
+  eqRender();
+}
+
+function eqVer(v){
+  eqVista=v;
+  ['espera','listo','sin','turnado'].forEach(x=>{
+    const el=document.getElementById('eq-s-'+x);
+    if(el) el.classList.toggle('act', x===v);
+  });
+  eqRender();
+}
+
+const EQ_SUB={
+  espera :'Ventas cargadas que control de stock todavía no revisó.',
+  listo  :'Tienen la pieza confirmada (o pedida con fecha de arribo). Ya se pueden turnar.',
+  sin    :'No hay stock o está pedida sin fecha. No se pueden turnar todavía.',
+  turnado:'Ya tienen fecha y hora asignada.'
+};
+const EQ_VACIO={
+  espera :'No hay ventas esperando revisión de stock.',
+  listo  :'Todavía no hay pedidos con pieza confirmada.',
+  sin    :'No hay pedidos trabados por falta de pieza.',
+  turnado:'Todavía no se turnó ningún pedido.'
+};
+
+function eqRender(){
+  const cont=document.getElementById('eq-cont');
+  if(!cont) return;
+
+  const c={espera:0,listo:0,sin:0,turnado:0};
+  eqPedidos.forEach(p=>{ const k=eqPaso(p); if(c[k]!==undefined) c[k]++; });
+  Object.keys(c).forEach(k=>{ const el=document.getElementById('eq-v-'+k); if(el) el.textContent=c[k]; });
+  const sSin=document.getElementById('eq-s-sin');
+  if(sSin) sSin.classList.toggle('alerta', c.sin>0);
+
+  const sub=document.getElementById('eq-sub');
+  if(sub) sub.textContent=EQ_SUB[eqVista];
+
+  let arr=eqPedidos.filter(p=>eqPaso(p)===eqVista);
+  const q=(document.getElementById('eq-q').value||'').toLowerCase().trim();
+  const fp=document.getElementById('eq-fp').value;
+  const fs=cu&&cu.sucursalFija ? cu.sucursalFija : document.getElementById('eq-fs').value;
+  if(fp) arr=arr.filter(p=>p.prioridad===fp);
+  if(fs) arr=arr.filter(p=>p.sucursal===fs);
+  if(q) arr=arr.filter(p=>[p.cliente,p.dominio,p.nro_prosp,p.preorden,p.trabajo,p.vendedor]
+    .some(v=>String(v||'').toLowerCase().includes(q)));
+
+  const P={urgente:0,alta:1,normal:2};
+  arr.sort(function(a,b){
+    if(eqVista==='turnado'){
+      return String(a.fecha||'').localeCompare(String(b.fecha||''))
+          || String(a.hora||'').localeCompare(String(b.hora||''));
+    }
+    return (P[a.prioridad]-P[b.prioridad]) || String(a.creado_en).localeCompare(String(b.creado_en));
+  });
+
+  if(!arr.length){ cont.innerHTML='<div class="empty"><i class="ti ti-inbox"></i>'+EQ_VACIO[eqVista]+'</div>'; return; }
+  cont.innerHTML = eqVista==='turnado' ? eqPorDia(arr) : eqTabla(arr);
+}
+
+function eqTabla(arr){
+  return '<div class="table-wrap"><table><thead><tr>'+
+    '<th style="width:18%">Cliente</th><th style="width:9%">Dominio</th><th>Qué se vendió</th>'+
+    '<th style="width:9%">Prospecto</th><th style="width:10%">Sucursal</th>'+
+    '<th style="width:10%">Prioridad</th><th style="width:12%">Stock</th><th style="width:9%"></th>'+
+    '</tr></thead><tbody>'+arr.map(eqFila).join('')+'</tbody></table></div>';
+}
+
+function eqPorDia(arr){
+  const g={}; arr.forEach(p=>{ (g[p.fecha]=g[p.fecha]||[]).push(p); });
+  const dias=Object.keys(g).sort();
+  const h=eqHoy();
+
+  const resumen='<div class="eq-resumen">'+dias.map(function(f){
+    const n=g[f].length, hs=g[f].reduce((a,p)=>a+eqAHoras(p.tiempo_trabajo),0);
+    const urg=g[f].filter(p=>p.prioridad==='urgente').length;
+    return '<button class="eq-rdia'+(f===h?' esHoy':'')+'" onclick="eqIrADia(\''+f+'\')">'+
+      '<div class="rf">'+eqFmtDia(f)+(f===h?' · hoy':'')+'</div>'+
+      '<div class="rn">'+n+'</div>'+
+      '<div class="rh">'+(n===1?'turno':'turnos')+' · '+eqFmtHoras(hs)+
+        (urg?' · <span style="color:#c62a27">'+urg+' urg.</span>':'')+'</div></button>';
+  }).join('')+'</div>';
+
+  const total=arr.length, totalHs=arr.reduce((a,p)=>a+eqAHoras(p.tiempo_trabajo),0);
+  const tot='<div class="eq-totales">'+total+' '+(total===1?'turno':'turnos')+' en '+dias.length+' '+
+    (dias.length===1?'día':'días')+' · '+eqFmtHoras(totalHs)+' de trabajo</div>';
+
+  return resumen+tot+dias.map(function(f){
+    const n=g[f].length, hs=g[f].reduce((a,p)=>a+eqAHoras(p.tiempo_trabajo),0);
+    return '<div class="eq-daygroup" id="eq-d-'+f+'">'+eqFmtDia(f)+
+      '<span style="font-weight:400;color:var(--text-5)"> · '+n+' '+(n===1?'turno':'turnos')+' · '+eqFmtHoras(hs)+'</span></div>'+
+      '<div class="table-wrap"><table><thead><tr>'+
+      '<th style="width:6%">Hora</th><th style="width:20%">Cliente</th><th style="width:9%">Dominio</th>'+
+      '<th>Qué se vendió</th><th style="width:10%">Sucursal</th><th style="width:8%">Dur.</th><th style="width:9%"></th>'+
+      '</tr></thead><tbody>'+g[f].map(function(p){
+        return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+'">'+
+        '<td><strong>'+(p.hora?p.hora.slice(0,5):'—')+'</strong></td>'+
+        '<td><strong>'+eqEsc(p.cliente)+'</strong>'+
+          (p.preorden?'<div class="eq-dias">pre-orden '+eqEsc(p.preorden)+'</div>':'')+
+          (p.prioridad!=='normal'?' '+eqPrioPill(p.prioridad):'')+'</td>'+
+        '<td>'+eqEsc(p.dominio||'—')+'</td>'+
+        '<td>'+eqEsc(p.trabajo)+
+          (p.estado_stock==='pedido'?'<div class="eq-dias" style="color:#1f5fa8">pieza en camino · llega '+fmtD(p.eta_pieza)+'</div>':'')+'</td>'+
+        '<td>'+eqEsc(p.sucursal||'—')+'</td>'+
+        '<td>'+eqEsc(p.tiempo_trabajo||'—')+'</td>'+
+        '<td>'+eqBtn(p)+'</td></tr>';
+      }).join('')+'</tbody></table></div>';
+  }).join('');
+}
+function eqIrADia(f){
+  const el=document.getElementById('eq-d-'+f);
+  if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function eqPrioPill(pr){
+  if(pr==='urgente') return '<span class="pill" style="background:#fbeceb;color:#c62a27">Urgente</span>';
+  if(pr==='alta')    return '<span class="pill" style="background:#fbf1de;color:#9a6a08">Alta</span>';
+  return '<span style="color:var(--text-5);font-size:12px">Normal</span>';
+}
+function eqStockPill(e){
+  const M={
+    sin_revisar:['#efeeeb','#7c7873','Sin revisar'],
+    disponible :['#e6f4ec','#0f7b3f','Hay'],
+    faltante   :['#fbeceb','#c62a27','No hay'],
+    pedido     :['#e6f0fb','#1f5fa8','Pedida']
+  };
+  const m=M[e]||M.sin_revisar;
+  return '<span class="pill" style="background:'+m[0]+';color:'+m[1]+'">'+m[2]+'</span>';
+}
+
+function eqFila(p){
+  const d=eqDiasDesde(p.creado_en);
+  const espera = eqPaso(p)==='espera'
+    ? '<div class="eq-dias'+(d>=3?' viejo':'')+'">'+(d===0?'hoy':d+' día'+(d>1?'s':''))+' esperando</div>' : '';
+  const eta = p.eta_pieza ? '<div class="eq-dias">llega '+fmtD(p.eta_pieza)+'</div>' : '';
+  const nc = (p.equip_comentarios||[]).length;
+  return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+'">'+
+    '<td><strong>'+eqEsc(p.cliente)+'</strong>'+
+      (p.contacto?'<div style="font-size:11px;color:var(--text-5)">'+eqEsc(p.contacto)+'</div>':'')+
+      (p.obs_venta?'<div style="font-size:11px;color:var(--text-4);margin-top:2px">'+eqEsc(p.obs_venta)+'</div>':'')+
+      espera+'</td>'+
+    '<td>'+eqEsc(p.dominio||'—')+'</td>'+
+    '<td>'+eqEsc(p.trabajo)+'</td>'+
+    '<td>'+eqEsc(p.nro_prosp||'—')+'</td>'+
+    '<td>'+eqEsc(p.sucursal||'—')+'</td>'+
+    '<td>'+eqPrioPill(p.prioridad)+
+      (p.motivo_prioridad?'<div style="font-size:10.5px;color:var(--text-5);margin-top:3px">'+eqEsc(p.motivo_prioridad)+'</div>':'')+'</td>'+
+    '<td>'+eqStockPill(p.estado_stock)+eta+
+      (nc?'<div class="eq-dias"><i class="ti ti-message" style="font-size:10px"></i> '+nc+'</div>':'')+'</td>'+
+    '<td>'+eqBtn(p)+'</td></tr>';
+}
+
+function eqBtn(p){
+  const pa=eqPaso(p);
+  if(eqPuedeStock() && (pa==='espera'||pa==='sin'))
+    return '<button class="btn-sm btn-rep-mark" onclick="eqAbrir(\''+p.id+'\')"><i class="ti ti-package" style="font-size:12px"></i> Revisar</button>';
+  if(eqPuedeTurnar() && pa==='listo')
+    return '<button class="btn-sm btn-rep-mark" onclick="eqAbrir(\''+p.id+'\')"><i class="ti ti-calendar-plus" style="font-size:12px"></i> Turnar</button>';
+  if(eqPuedePrioridad() && pa==='espera')
+    return '<button class="btn-sm" onclick="eqAbrir(\''+p.id+'\')"><i class="ti ti-flag" style="font-size:12px"></i> Prioridad</button>';
+  return '<button class="btn-sm" onclick="eqAbrir(\''+p.id+'\')">Ver</button>';
+}
+
+// ── alta de venta (vendedor) ──
+function eqAbrirAlta(){
+  ['eqa-cliente','eqa-dominio','eqa-prosp','eqa-contacto','eqa-trabajo','eqa-obs'].forEach(function(id){
+    document.getElementById(id).value='';
+  });
+  document.getElementById('eqa-vendedor').value = (cu && cu.nombre) || '';
+  document.getElementById('eqa-suc').value = (cu && cu.sucursalFija) || '';
+  document.getElementById('eqa-err').style.display='none';
+  document.getElementById('eq-mov-alta').classList.add('open');
+}
+function eqCerrarAlta(){ document.getElementById('eq-mov-alta').classList.remove('open'); }
+
+async function eqGuardarAlta(){
+  const err=document.getElementById('eqa-err'); err.style.display='none';
+  const cliente=document.getElementById('eqa-cliente').value.trim();
+  const trabajo=document.getElementById('eqa-trabajo').value.trim();
+  if(!cliente){ err.textContent='Falta el cliente.'; err.style.display='block'; return; }
+  if(!trabajo){ err.textContent='Falta indicar qué se vendió.'; err.style.display='block'; return; }
+
+  const btn=document.getElementById('eqa-btn');
+  btn.disabled=true; btn.textContent='Guardando...';
+  try{
+    const {error}=await sb.from('equip_pedidos').insert([{
+      cliente: cliente,
+      trabajo: trabajo.toUpperCase(),
+      dominio: document.getElementById('eqa-dominio').value.trim().toUpperCase() || null,
+      nro_prosp: document.getElementById('eqa-prosp').value.trim() || null,
+      contacto: document.getElementById('eqa-contacto').value.trim() || null,
+      vendedor: document.getElementById('eqa-vendedor').value.trim() || null,
+      sucursal: document.getElementById('eqa-suc').value || null,
+      obs_venta: document.getElementById('eqa-obs').value.trim() || null,
+      creado_por: cu.nombre
+    }]);
+    if(error) throw error;
+    eqCerrarAlta();
+    await cargarEquip();
+    showToast('Venta cargada. Control de stock la va a revisar.');
+  }catch(e){
+    err.textContent='Error: '+e.message; err.style.display='block';
+  }finally{
+    btn.disabled=false; btn.textContent='Guardar venta';
+  }
+}
+
+// ── modal de gestión ──
+function eqAbrir(id){
+  const p=eqPedidos.find(x=>x.id===id); if(!p) return;
+  eqAbierto=p; eqTmpPrio=p.prioridad; eqTmpStock=p.estado_stock;
+  const pa=eqPaso(p);
+
+  document.getElementById('eq-mo-cli').textContent=p.cliente;
+  document.getElementById('eq-mo-sub').innerHTML =
+    eqEsc(p.trabajo)+'<br>'+eqEsc(p.dominio||'sin dominio')+' · prospecto '+eqEsc(p.nro_prosp||'—')+' · '+eqEsc(p.sucursal||'—')+
+    (p.obs_venta?'<br><span style="color:var(--text-3)">'+eqEsc(p.obs_venta)+'</span>':'');
+  document.getElementById('eq-mo-err').style.display='none';
+
+  const verPrio = eqPuedePrioridad() && pa!=='turnado';
+  document.getElementById('eq-bx-prio').style.display = verPrio?'block':'none';
+  if(verPrio){ eqPintarPrio(); document.getElementById('eq-mo-motivo').value = p.motivo_prioridad||''; }
+
+  const verStock = eqPuedeStock() && pa!=='turnado';
+  document.getElementById('eq-bx-stock').style.display = verStock?'block':'none';
+  if(verStock){ eqPintarStock(); document.getElementById('eq-mo-eta').value = p.eta_pieza||''; }
+
+  const verTurno = eqPuedeTurnar() && (pa==='listo'||pa==='turnado');
+  document.getElementById('eq-bx-turno').style.display = verTurno?'block':'none';
+  if(verTurno){
+    const min=eqDesdeCuando(p);
+    const fEl=document.getElementById('eq-mo-fecha');
+    if(min) fEl.min=min; else fEl.removeAttribute('min');
+    const av=document.getElementById('eq-mo-aviso');
+    if(min){
+      av.textContent='La pieza está pedida y llega el '+fmtD(min)+'. El turno tiene que ser de esa fecha en adelante.';
+      av.style.display='block';
+    } else av.style.display='none';
+    fEl.value=p.fecha||'';
+    document.getElementById('eq-mo-preorden').value=p.preorden||'';
+    document.getElementById('eq-mo-hora').value=p.hora?p.hora.slice(0,5):'';
+    document.getElementById('eq-mo-tiempo').value=p.tiempo_trabajo||'';
+    document.getElementById('eq-mo-cod').value=p.codigo_turno||'';
+  }
+
+  const cs=(p.equip_comentarios||[]).slice().sort((a,b)=>String(a.creado_en).localeCompare(String(b.creado_en)));
+  const OL={venta:'Vendedor',turnos:'Turnos',stock:'Control de stock'};
+  document.getElementById('eq-mo-hist').innerHTML = cs.length
+    ? cs.map(c=>'<div class="eq-cit">'+eqEsc(c.texto)+'<div class="cm">'+eqEsc(c.autor||OL[c.origen]||'')+' · '+eqFmtTs(c.creado_en)+'</div></div>').join('')
+    : '<div style="font-size:12px;color:var(--text-5)">Sin comentarios.</div>';
+  document.getElementById('eq-mo-com').value='';
+  document.getElementById('eq-mov').classList.add('open');
+}
+function eqCerrar(){ document.getElementById('eq-mov').classList.remove('open'); eqAbierto=null; }
+
+function eqSetPrio(v){ eqTmpPrio=v; eqPintarPrio(); }
+function eqPintarPrio(){
+  const M={normal:'on-gris',alta:'on-amar',urgente:'on-rojo'};
+  ['normal','alta','urgente'].forEach(function(k){
+    const b=document.getElementById('eq-prio-'+k);
+    b.className='eq-seg'+(eqTmpPrio===k?' '+M[k]:'');
+  });
+  document.getElementById('eq-bx-motivo').style.display = eqTmpPrio==='normal'?'none':'block';
+}
+function eqSetStock(v){ eqTmpStock=v; eqPintarStock(); }
+function eqPintarStock(){
+  const M={disponible:'on-verde',faltante:'on-rojo',pedido:'on-azul'};
+  ['disponible','faltante','pedido'].forEach(function(k){
+    const b=document.getElementById('eq-stk-'+k);
+    b.className='eq-seg'+(eqTmpStock===k?' '+M[k]:'');
+  });
+  document.getElementById('eq-bx-eta').style.display = eqTmpStock==='pedido'?'block':'none';
+}
+
+async function eqGuardarModal(){
+  if(!eqAbierto) return;
+  const err=document.getElementById('eq-mo-err'); err.style.display='none';
+  const upd={}, ahora=new Date().toISOString();
+
+  if(eqPuedePrioridad() && document.getElementById('eq-bx-prio').style.display!=='none'){
+    if(eqTmpPrio!==eqAbierto.prioridad){
+      upd.prioridad=eqTmpPrio; upd.prioridad_por=cu.nombre; upd.prioridad_en=ahora;
+    }
+    const m = eqTmpPrio==='normal' ? null : (document.getElementById('eq-mo-motivo').value.trim()||null);
+    if(m!==eqAbierto.motivo_prioridad) upd.motivo_prioridad=m;
+  }
+
+  if(eqPuedeStock() && document.getElementById('eq-bx-stock').style.display!=='none'){
+    if(eqTmpStock!==eqAbierto.estado_stock){
+      upd.estado_stock=eqTmpStock; upd.stock_por=cu.nombre; upd.stock_en=ahora;
+    }
+    const e = eqTmpStock==='pedido' ? (document.getElementById('eq-mo-eta').value||null) : null;
+    if(e!==eqAbierto.eta_pieza) upd.eta_pieza=e;
+  }
+
+  if(eqPuedeTurnar() && document.getElementById('eq-bx-turno').style.display!=='none'){
+    const f=document.getElementById('eq-mo-fecha').value;
+    if(f){
+      const po=document.getElementById('eq-mo-preorden').value.trim();
+      if(!po){
+        err.textContent='Falta el N° de pre-orden. Es obligatorio para turnar.';
+        err.style.display='block';
+        document.getElementById('eq-mo-preorden').focus();
+        return;
+      }
+      const min=eqDesdeCuando(eqAbierto);
+      if(min && f<min){
+        err.textContent='La pieza llega el '+fmtD(min)+'. Elegí una fecha de ese día en adelante.';
+        err.style.display='block';
+        return;
+      }
+      upd.preorden=po;
+      upd.fecha=f;
+      upd.hora=document.getElementById('eq-mo-hora').value||null;
+      upd.tiempo_trabajo=document.getElementById('eq-mo-tiempo').value||null;
+      upd.codigo_turno=document.getElementById('eq-mo-cod').value||null;
+      if(!eqAbierto.fecha){ upd.turnado_por=cu.nombre; upd.turnado_en=ahora; }
+    }
+  }
+
+  try{
+    if(Object.keys(upd).length){
+      const {error}=await sb.from('equip_pedidos').update(upd).eq('id',eqAbierto.id);
+      if(error) throw error;
+    }
+    const com=document.getElementById('eq-mo-com').value.trim();
+    if(com){
+      const origen = eqPuedeStock() ? 'stock' : (eqPuedeTurnar()||eqPuedePrioridad() ? 'turnos' : 'venta');
+      const {error}=await sb.from('equip_comentarios')
+        .insert([{pedido_id:eqAbierto.id, texto:com, autor:cu.nombre, origen:origen}]);
+      if(error) throw error;
+    }
+    eqCerrar();
+    await cargarEquip();
+    showToast('Guardado');
+  }catch(e){
+    const msg=String(e.message||'');
+    err.textContent =
+      msg.indexOf('N° de pre-orden')>=0 ? 'Falta el N° de pre-orden. Es obligatorio para turnar.' :
+      msg.indexOf('todavía no está confirmada')>=0 ? 'No se puede turnar: la pieza no está confirmada como disponible.' :
+      msg.indexOf('anterior a la llegada')>=0 ? 'El turno no puede ser anterior a la llegada de la pieza.' :
+      msg.indexOf('falta la fecha estimada')>=0 ? 'La pieza está pedida: cargá la fecha estimada de arribo para poder turnar.' :
+      'Error: '+msg;
+    err.style.display='block';
+  }
+}
 
 function showToast(msg){const t=document.getElementById("toast");const m=document.getElementById("toast-msg");if(!t||!m)return;m.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200);}
 
