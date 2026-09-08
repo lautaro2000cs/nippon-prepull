@@ -1148,6 +1148,10 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
             <select id="eq-fs" onchange="eqRender()" class="filter-sel">
               <option value="">Todas las sucursales</option>
             </select>
+            <select id="eq-orden" onchange="eqRender()" class="filter-sel" title="Orden de la lista">
+              <option value="prio">Urgentes primero</option>
+              <option value="antig">Más antiguo primero</option>
+            </select>
           </div>
 
           <div id="eq-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
@@ -2289,16 +2293,6 @@ async function cargarTodo(){
   const fab=document.getElementById('fab-nuevo');
   if(fab) fab.style.display=puedeGestionarTurnos()?'flex':'none';
 }
-// ¿Puede crear/editar turnos? Citas y admin siempre; además, quien tenga
-// el permiso extra 'prepull.turnos.editar' (ej. Analía, supervisora).
-function puedeGestionarTurnos(){
-  return !!(cu && (cu.rol==='citas' || cu.rol==='admin' || can('prepull.turnos.editar')));
-}
-async function cargarTurnos(){
-  const {data,error}=await sb.from('turnos').select('*').order('fecha',{ascending:true}).order('id',{ascending:true});
-  if(error){console.error('Error al cargar turnos:',error);turnos=[];return;}
-  turnos=data;
-}
 // Quiénes aparecen en el select "Cargado por".
 // Por defecto, los usuarios con rol 'citas'. Además, personas que cargan
 // citas pero tienen otro rol (ej. una supervisora con permiso extra):
@@ -2309,6 +2303,25 @@ const CARGAN_CITAS_EXTRA = [
 function _normNom(s){
   return String(s||'').trim().toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+
+// ¿Puede crear/editar turnos? Citas y admin siempre; quien tenga el permiso
+// extra 'prepull.turnos.editar'; y las personas de CARGAN_CITAS_EXTRA, que
+// cargan citas con otro rol y aparecen en el select "Cargado por".
+function puedeGestionarTurnos(){
+  if(!cu) return false;
+  if(cu.rol==='citas' || cu.rol==='admin') return true;
+  if(can('prepull.turnos.editar')) return true;
+  return cargaCitasPorNombre(cu.nombre);
+}
+// ¿Está esta persona en la lista de quienes cargan citas con otro rol?
+function cargaCitasPorNombre(nombre){
+  return CARGAN_CITAS_EXTRA.map(_normNom).includes(_normNom(nombre));
+}
+async function cargarTurnos(){
+  const {data,error}=await sb.from('turnos').select('*').order('fecha',{ascending:true}).order('id',{ascending:true});
+  if(error){console.error('Error al cargar turnos:',error);turnos=[];return;}
+  turnos=data;
 }
 function usuariosQueCarganCitas(){
   const extra = CARGAN_CITAS_EXTRA.map(_normNom);
@@ -7368,6 +7381,12 @@ function eqHoy(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMon
 function eqFmtTs(t){ if(!t) return ''; const d=new Date(t);
   return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
 function eqDiasDesde(ts){ if(!ts) return 0; return Math.floor((Date.now()-new Date(ts))/86400000); }
+// fecha corta dd/mm a partir de un timestamp (para "Cargado")
+function eqFmtFechaTs(ts){
+  if(!ts) return '—';
+  const d=new Date(ts);
+  return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');
+}
 function eqFmtDia(f){ const d=new Date(f+'T00:00:00');
   const D=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'], M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   return D[d.getDay()]+' '+d.getDate()+' '+M[d.getMonth()]; }
@@ -7470,14 +7489,16 @@ function eqRender(){
     .some(v=>String(v||'').toLowerCase().includes(q)));
 
   const P={urgente:0,alta:1,normal:2};
+  const porAntig = (document.getElementById('eq-orden')||{}).value === 'antig';
   arr.sort(function(a,b){
+    const antig = String(a.creado_en).localeCompare(String(b.creado_en));
     if(eqVista==='turnado'){
-      // sin hora: dentro del día, primero los urgentes y después por antigüedad
+      // los turnados van por fecha del turno; dentro del día, urgentes primero
       return String(a.fecha||'').localeCompare(String(b.fecha||''))
-          || (P[a.prioridad]-P[b.prioridad])
-          || String(a.creado_en).localeCompare(String(b.creado_en));
+          || (P[a.prioridad]-P[b.prioridad]) || antig;
     }
-    return (P[a.prioridad]-P[b.prioridad]) || String(a.creado_en).localeCompare(String(b.creado_en));
+    // 'antig' = puro orden de llegada; por defecto, urgentes primero y después llegada
+    return porAntig ? antig : ((P[a.prioridad]-P[b.prioridad]) || antig);
   });
 
   if(!arr.length){
@@ -7494,9 +7515,10 @@ function eqRender(){
 
 function eqTabla(arr){
   return '<div class="table-wrap"><table><thead><tr>'+
-    '<th style="width:22%">Cliente</th><th style="width:11%">Vehículo</th><th>Qué se vendió</th>'+
-    '<th style="width:11%">Sucursal</th>'+
-    '<th style="width:11%">Prioridad</th><th style="width:12%">Stock</th><th style="width:10%"></th>'+
+    '<th style="width:9%">Cargado</th>'+
+    '<th style="width:20%">Cliente</th><th style="width:10%">Vehículo</th><th>Qué se vendió</th>'+
+    '<th style="width:10%">Sucursal</th>'+
+    '<th style="width:10%">Prioridad</th><th style="width:11%">Stock</th><th style="width:9%"></th>'+
     '</tr></thead><tbody>'+arr.map(eqFila).join('')+'</tbody></table></div>';
 }
 
@@ -7563,17 +7585,18 @@ function eqStockPill(e){
 
 function eqFila(p){
   const d=eqDiasDesde(p.creado_en);
-  const espera = eqPaso(p)==='espera'
-    ? '<div class="eq-dias'+(d>=3?' viejo':'')+'">'+(d===0?'cargado hoy':'esperando hace '+d+' día'+(d>1?'s':''))+'</div>' : '';
+  const espera = '<div class="eq-dias'+(eqPaso(p)==='espera'&&d>=3?' viejo':'')+'">'+
+    (d===0?'hoy':'hace '+d+' día'+(d>1?'s':''))+'</div>';
   const eta = p.eta_pieza ? '<div class="eq-dias">llega '+fmtD(p.eta_pieza)+'</div>' : '';
   const nc = (p.equip_comentarios||[]).length;
   const dur = p.tiempo_trabajo ? '<span class="eq-chip">'+eqEsc(p.tiempo_trabajo)+'</span>' : '';
   const cod = p.codigo_turno ? '<span class="eq-chip">'+eqEsc(p.codigo_turno)+'</span>' : '';
   return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+'">'+
+    '<td><strong>'+eqFmtFechaTs(p.creado_en)+'</strong>'+espera+'</td>'+
     '<td><strong>'+eqEsc(p.cliente)+'</strong>'+
       (p.nro_prosp?'<div class="eq-dias">prospecto '+eqEsc(p.nro_prosp)+'</div>':'')+
       (p.contacto?'<div style="font-size:11px;color:var(--text-5)">'+eqEsc(p.contacto)+'</div>':'')+
-      espera+'</td>'+
+      '</td>'+
     '<td><strong>'+eqEsc(p.dominio||'—')+'</strong>'+
       (p.vendedor?'<div style="font-size:11px;color:var(--text-5)">'+eqEsc(p.vendedor)+'</div>':'')+'</td>'+
     '<td>'+eqEsc(p.trabajo)+
@@ -7660,6 +7683,10 @@ function eqAbrir(id){
   if(p.sucursal)  meta.push(eqEsc(p.sucursal));
   if(p.tiempo_trabajo) meta.push(eqEsc(p.tiempo_trabajo));
   if(p.codigo_turno)   meta.push(eqEsc(p.codigo_turno));
+  if(p.creado_en){
+    const dd=eqDiasDesde(p.creado_en);
+    meta.push('cargado '+eqFmtFechaTs(p.creado_en)+(dd>0?' · hace '+dd+' día'+(dd>1?'s':''):' · hoy'));
+  }
   document.getElementById('eq-mo-sub').innerHTML =
     '<div style="font-weight:600;color:var(--text-2);font-size:13px">'+eqEsc(p.trabajo)+'</div>'+
     (meta.length?'<div style="margin-top:2px">'+meta.join(' · ')+'</div>':'')+
