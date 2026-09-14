@@ -591,6 +591,31 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
 .eq-empty .s{font-size:12.5px;color:var(--text-5);line-height:1.55;max-width:380px;margin:0 auto}
 .eq-cit{background:var(--surface-sub,#faf9f7);border-radius:8px;padding:7px 9px;font-size:12.5px}
 .eq-cit .cm{font-size:10.5px;color:var(--text-5);margin-top:2px}
+
+/* ── SERVICE PACK ─────────────────────────────────────── */
+.tsp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.tsp-kpi{background:#fff;border:1px solid var(--border-1);border-radius:12px;padding:12px 14px}
+.tsp-kpi .k{font-size:11px;font-weight:700;color:var(--text-4);text-transform:uppercase;letter-spacing:.4px}
+.tsp-kpi .v{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--text-1);line-height:1.1;margin-top:4px}
+.tsp-kpi .d{font-size:11px;color:var(--text-5);margin-top:2px}
+@media (max-width:820px){.tsp-kpis{grid-template-columns:repeat(2,1fr)}}
+
+/* barra de progreso del pack */
+.tsp-prog{display:flex;gap:3px;margin-top:5px}
+.tsp-dot{flex:1;height:6px;border-radius:3px;background:var(--track,#eae8e3)}
+.tsp-dot.on{background:#0f7b3f}
+.tsp-frac{font-family:var(--mono);font-size:11px;color:var(--text-4);margin-top:3px}
+.tsp-frac.full{color:#0f7b3f;font-weight:700}
+
+/* lista de servicios en el detalle */
+.tsp-serv{display:flex;align-items:center;gap:11px;padding:9px 11px;border:1px solid var(--border-1);border-radius:10px;margin-bottom:6px;background:#fff}
+.tsp-serv.hecho{background:#f6faf7;border-color:#cfe6d8}
+.tsp-serv .n{width:27px;height:27px;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-size:12px;font-weight:700;background:var(--track,#eae8e3);color:var(--text-3);flex:none}
+.tsp-serv.hecho .n{background:#0f7b3f;color:#fff}
+.tsp-serv .info{flex:1;min-width:0}
+.tsp-serv .km{font-size:13.5px;font-weight:700;color:var(--text-1)}
+.tsp-serv .det{font-size:11.5px;color:var(--text-5);margin-top:1px}
+.tsp-chip-km{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--text-4);background:var(--surface-sub,#faf9f7);border:1px solid var(--border-1);border-radius:6px;padding:1px 6px}
 </style>
 </head>
 <body>
@@ -726,6 +751,10 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
         <button class="nav-item" id="tab-proc" style="display:none" onclick="swTab('proc',this)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4a2 2 0 0 1 2-2h5l2 3h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>
           Procedimientos
+        </button>
+        <button class="nav-item" id="tab-tsp" style="display:none" onclick="swTab('tsp',this)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+          Service Pack
         </button>
         <button class="nav-item" id="tab-equip" style="display:none" onclick="swTab('equip',this)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
@@ -1095,6 +1124,47 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
           <div id="proc-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
         </div>
 
+        <!-- TOYOTA SERVICE PACK -->
+        <div class="tc" id="tc-tsp">
+          <div class="sec-hdr">
+            <div class="sec-hdr-left">
+              <div class="sec-eyebrow">Posventa · Toyota Service Pack</div>
+              <h2>Service Pack</h2>
+              <div class="tb-sub" id="tsp-sub" style="margin-top:4px"></div>
+            </div>
+            <div class="hdr-actions" style="display:flex;gap:8px;align-items:center">
+              <button class="btn-sm" id="tsp-btn-nuevo" onclick="tspAbrirAlta()" style="display:none">
+                <i class="ti ti-plus" style="font-size:13px;vertical-align:-2px"></i> Nuevo contrato
+              </button>
+              <button class="btn-sm" onclick="cargarTsp()" title="Actualizar">
+                <i class="ti ti-refresh" style="font-size:13px;vertical-align:-2px"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="tsp-kpis">
+            <div class="tsp-kpi"><div class="k">Contratos</div><div class="v" id="tsp-k-total">0</div><div class="d">packs vendidos</div></div>
+            <div class="tsp-kpi"><div class="k">Servicios usados</div><div class="v" id="tsp-k-usados">0</div><div class="d">de <span id="tsp-k-tot-serv">0</span> incluidos</div></div>
+            <div class="tsp-kpi"><div class="k">Pendientes</div><div class="v" id="tsp-k-pend">0</div><div class="d">por realizar</div></div>
+            <div class="tsp-kpi"><div class="k">Completos</div><div class="v" id="tsp-k-full">0</div><div class="d">packs agotados</div></div>
+          </div>
+
+          <div class="filters-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <input type="text" class="search-input" id="tsp-q" style="flex:1;min-width:220px"
+                   placeholder="Buscar por cliente, dominio, chasis o modelo..." oninput="tspRender()">
+            <select id="tsp-fs" onchange="tspRender()" class="filter-sel">
+              <option value="">Todas las sucursales</option>
+            </select>
+            <select id="tsp-fe" onchange="tspRender()" class="filter-sel">
+              <option value="">Todos los estados</option>
+              <option value="activo">Con servicios pendientes</option>
+              <option value="completo">Pack completo</option>
+            </select>
+          </div>
+
+          <div id="tsp-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
+        </div>
+
         <!-- EQUIPAMIENTO -->
         <div class="tc" id="tc-equip">
           <div class="sec-hdr">
@@ -1348,6 +1418,61 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
       </div>
     </div>
     <div class="mfooter"><button class="btn-cancel" onclick="closeModal()">Cancelar</button><button class="btn-save" id="btn-guardar-turno" onclick="guardar()">Guardar</button></div>
+  </div>
+</div>
+
+<div class="modal-ov" id="tsp-mov-alta">
+  <div class="modal">
+    <h3><i class="ti ti-shield-check" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#b8860b"></i><span id="tspa-titulo">Nuevo contrato</span></h3>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem">Los servicios del pack se generan solos según la cantidad elegida.</div>
+    <div class="mgrid">
+      <div><label>Cliente <span style="color:var(--accent)">*</span></label><input type="text" id="tspa-cliente" placeholder="Apellido, Nombre"/></div>
+      <div><label>Dominio</label><input type="text" id="tspa-dominio" placeholder="AB 123 CD"/></div>
+      <div><label>Chasis</label><input type="text" id="tspa-chasis" placeholder="N° de chasis"/></div>
+      <div><label>Modelo</label><input type="text" id="tspa-modelo" placeholder="Hilux, Corolla Cross..."/></div>
+      <div><label>Sucursal</label><select id="tspa-suc"><option value="">Seleccionar...</option></select></div>
+      <div><label>Cantidad de servicios <span style="color:var(--accent)">*</span></label>
+        <select id="tspa-cant"><option value="6">6 servicios · hasta 60.000 km</option><option value="8">8 servicios · hasta 80.000 km</option></select></div>
+      <div><label>Fecha del contrato</label><input type="date" id="tspa-fecha"/></div>
+      <div><label>Observaciones</label><input type="text" id="tspa-obs" placeholder="Opcional"/></div>
+    </div>
+    <p class="login-err" id="tspa-err" style="display:none"></p>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="tspCerrarAlta()">Cancelar</button>
+      <button class="btn-save" id="tspa-btn" onclick="tspGuardarAlta()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-ov" id="tsp-mov">
+  <div class="modal">
+    <h3><i class="ti ti-list-check" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#b8860b"></i><span id="tsp-mo-cli"></span></h3>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem;line-height:1.5" id="tsp-mo-sub"></div>
+    <div id="tsp-mo-serv"></div>
+    <p class="login-err" id="tsp-mo-err" style="display:none"></p>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="tspCerrar()">Cerrar</button>
+      <button class="btn-save" id="tsp-mo-edit" onclick="tspEditarDesdeDetalle()" style="display:none">Editar contrato</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-ov" id="tsp-mov-serv">
+  <div class="modal sm">
+    <h3><i class="ti ti-tool" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#b8860b"></i><span id="tsps-titulo">Servicio</span></h3>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem" id="tsps-sub"></div>
+    <div class="mgrid">
+      <div><label>Fecha</label><input type="date" id="tsps-fecha"/></div>
+      <div><label>N° de orden</label><input type="text" id="tsps-orden"/></div>
+      <div><label>Km del vehículo</label><input type="number" id="tsps-km" placeholder="Ej: 10250"/></div>
+      <div><label>Sucursal</label><select id="tsps-suc"><option value="">Seleccionar...</option></select></div>
+    </div>
+    <p class="login-err" id="tsps-err" style="display:none"></p>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="tspCerrarServ()">Cancelar</button>
+      <button class="btn-save" id="tsps-desmarcar" onclick="tspDesmarcar()" style="display:none;background:none;border:1.5px solid var(--border-2);color:var(--text-2)">Desmarcar</button>
+      <button class="btn-save" onclick="tspGuardarServ()">Marcar como realizado</button>
+    </div>
   </div>
 </div>
 
@@ -2028,6 +2153,13 @@ const MODULOS = {
     color: '#b45309',
     icono: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>'
   },
+  tsp: {
+    id: 'tsp',
+    nombre: 'Service Pack',
+    desc: 'Registro de clientes con Toyota Service Pack y seguimiento de los servicios usados.',
+    color: '#b8860b',
+    icono: '<path d="M9 12l2 2 4-4"/><path d="M12 3a9 9 0 1 0 9 9"/><path d="M16 3h5v5"/>'
+  },
   equipamiento: {
     id: 'equipamiento',
     nombre: 'Equipamiento',
@@ -2070,12 +2202,12 @@ function canFallback(p){
   if(!cu) return false;
   if(cu.rol === 'admin') return true;
   const M = {
-    supervisor:   ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','encuestas.sincronizar','minutas.ver','procedimientos.ver','procedimientos.subir'],
+    supervisor:   ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','encuestas.sincronizar','minutas.ver','procedimientos.ver','procedimientos.subir','tsp.ver','tsp.cargar','tsp.marcar'],
     citas:        ['prepull.ver','prepull.turnos.ver','procedimientos.ver','encuestas.fir.crear','encuestas.desestimacion.pedir','equipamiento.ver','equipamiento.vender'],
     repuestos:    ['prepull.ver','prepull.repuestos.ver','prepull.repuestos.marcar','procedimientos.ver'],
     compras:      ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar','procedimientos.ver'],
     asesor:       ['encuestas.ver','encuestas.desestimaciones.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
-    jefe_servicio:['prepull.ver','prepull.turnos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
+    jefe_servicio:['prepull.ver','prepull.turnos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','procedimientos.ver','encuestas.desestimacion.pedir','tsp.ver','tsp.cargar','tsp.marcar'],
     seguridad:    ['minutas.ver','procedimientos.ver','procedimientos.subir'],
     ambiente:     ['minutas.ver','procedimientos.ver','procedimientos.subir'],
     equip_stock:  ['equipamiento.ver','equipamiento.stock','procedimientos.ver'],
@@ -2094,6 +2226,7 @@ function puedeAcceder(moduloId){
   if(moduloId === 'procedimientos') return can('procedimientos.ver');
   if(moduloId === 'detenidos') return can('detenidos.gestionar');
   if(moduloId === 'equipamiento') return can('equipamiento.ver');
+  if(moduloId === 'tsp') return can('tsp.ver');
   return can(moduloId + '.ver');
 }
 
@@ -2185,6 +2318,7 @@ async function showApp(){
   const enProc = cu.modulo === 'procedimientos';
   const enDetenidos = cu.modulo === 'detenidos';
   const enEquip = cu.modulo === 'equipamiento';
+  const enTsp = cu.modulo === 'tsp';
 
   document.getElementById('tab-dash').style.display=(enPrepull && can('prepull.dashboard.ver'))?'':'none';
   document.getElementById('tab-turnos').style.display=(enPrepull && can('prepull.turnos.ver'))?'':'none';
@@ -2201,6 +2335,8 @@ async function showApp(){
   if(tabDet) tabDet.style.display=enDetenidos?'':'none';
   const tabEq = document.getElementById('tab-equip');
   if(tabEq) tabEq.style.display=enEquip?'':'none';
+  const tabTsp = document.getElementById('tab-tsp');
+  if(tabTsp) tabTsp.style.display=enTsp?'':'none';
   // el botón flotante "+" es de Pre Pull (crear turno): ocultarlo en otros módulos
   const fab = document.getElementById('fab-nuevo');
   if(fab && !enPrepull) fab.style.display='none';
@@ -2218,6 +2354,8 @@ async function showApp(){
     startTab = 'detenidos';
   } else if(enEquip){
     startTab = 'equip';
+  } else if(enTsp){
+    startTab = 'tsp';
   } else if(enAdmin){
     startTab = 'usuarios';
   } else {
@@ -5174,6 +5312,7 @@ function swTab(t,el){
   if(t==='desest') cargarBandejaDesest();
   if(t==='minutas') cargarMinutas();
   if(t==='equip') cargarEquip();
+  if(t==='tsp') cargarTsp();
 }
 function swSubTab(t,el){const cont=document.getElementById('tc-turnos');cont.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('act'));cont.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));el.classList.add('act');document.getElementById('subtc-'+t).classList.add('act');if(t==='noshow')renderNoShow();if(t==='historico')renderHistorico();}
 function swSubTabRep(t,el){
@@ -7813,6 +7952,297 @@ async function eqGuardarModal(){
       msg.indexOf('falta la fecha estimada')>=0 ? 'La pieza está pedida: cargá la fecha estimada de arribo para poder turnar.' :
       'Error: '+msg;
     err.style.display='block';
+  }
+}
+
+
+// ============================================================
+//  MÓDULO TOYOTA SERVICE PACK
+//  Registro de contratos y seguimiento de los servicios usados.
+//  Tablas: tsp_contratos, tsp_servicios
+// ============================================================
+let tspContratos = [];
+let tspAbierto = null, tspServAbierto = null, tspEditId = null;
+
+const tspPuedeCargar = () => can('tsp.cargar');
+const tspPuedeMarcar = () => can('tsp.marcar');
+
+function tspEsc(s){ return escapeHtml(String(s ?? '')); }
+function tspHoy(){ const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function tspKm(n){ return n ? Number(n).toLocaleString('es-AR') : '—'; }
+
+async function cargarTsp(){
+  const btn=document.getElementById('tsp-btn-nuevo');
+  if(btn) btn.style.display = tspPuedeCargar() ? '' : 'none';
+
+  const fs=document.getElementById('tsp-fs');
+  if(fs && fs.options.length<=1){
+    fs.innerHTML='<option value="">Todas las sucursales</option>'+SUCURSALES.map(s=>'<option>'+s+'</option>').join('');
+  }
+  ['tspa-suc','tsps-suc'].forEach(function(id){
+    const el=document.getElementById(id);
+    if(el && el.options.length<=1)
+      el.innerHTML='<option value="">Seleccionar...</option>'+SUCURSALES.map(s=>'<option>'+s+'</option>').join('');
+  });
+  if(cu && cu.sucursalFija && fs){ fs.value=cu.sucursalFija; fs.disabled=true; }
+
+  const {data,error}=await sb.from('tsp_contratos')
+    .select('*, tsp_servicios(*)').order('creado_en',{ascending:false});
+  if(error){ console.error(error); showToast('No se pudo cargar el registro de Service Pack'); return; }
+  tspContratos = data || [];
+  tspRender();
+}
+
+// servicios ordenados por número
+function tspServicios(c){
+  return (c.tsp_servicios||[]).slice().sort((a,b)=>a.numero-b.numero);
+}
+function tspUsados(c){ return tspServicios(c).filter(s=>s.realizado).length; }
+
+function tspRender(){
+  const cont=document.getElementById('tsp-cont');
+  if(!cont) return;
+
+  // KPIs sobre el total, no sobre lo filtrado
+  let totServ=0, usados=0, full=0;
+  tspContratos.forEach(function(c){
+    const ss=tspServicios(c), u=ss.filter(s=>s.realizado).length;
+    totServ+=ss.length; usados+=u;
+    if(ss.length && u===ss.length) full++;
+  });
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.textContent=v; };
+  set('tsp-k-total', tspContratos.length);
+  set('tsp-k-usados', usados);
+  set('tsp-k-tot-serv', totServ);
+  set('tsp-k-pend', totServ-usados);
+  set('tsp-k-full', full);
+
+  const sub=document.getElementById('tsp-sub');
+  if(sub) sub.textContent = tspContratos.length
+    ? tspContratos.length+' contrato'+(tspContratos.length>1?'s':'')+' · '+usados+' de '+totServ+' servicios realizados'
+    : '';
+
+  let arr=tspContratos.slice();
+  const q=(document.getElementById('tsp-q').value||'').toLowerCase().trim();
+  const fs=cu&&cu.sucursalFija ? cu.sucursalFija : document.getElementById('tsp-fs').value;
+  const fe=document.getElementById('tsp-fe').value;
+  if(fs) arr=arr.filter(c=>c.sucursal===fs);
+  if(fe){
+    arr=arr.filter(function(c){
+      const ss=tspServicios(c), u=ss.filter(s=>s.realizado).length;
+      const completo = ss.length && u===ss.length;
+      return fe==='completo' ? completo : !completo;
+    });
+  }
+  if(q) arr=arr.filter(c=>[c.cliente,c.dominio,c.chasis,c.modelo]
+    .some(v=>String(v||'').toLowerCase().includes(q)));
+
+  if(!arr.length){
+    const filtrando = q || fe || (fs && !(cu&&cu.sucursalFija));
+    cont.innerHTML = filtrando
+      ? '<div class="eq-empty"><i class="ti ti-search-off"></i><div class="t">Ningún contrato coincide</div>'+
+        '<div class="s">Probá con otro texto o quitá los filtros.</div></div>'
+      : '<div class="eq-empty"><i class="ti ti-shield-check"></i><div class="t">Todavía no hay contratos cargados</div>'+
+        '<div class="s">Cargá el primer Service Pack con el botón de arriba. Los servicios del pack se generan solos.</div></div>';
+    return;
+  }
+
+  cont.innerHTML = '<div class="table-wrap"><table><thead><tr>'+
+    '<th style="width:20%">Cliente</th><th style="width:10%">Dominio</th>'+
+    '<th style="width:13%">Chasis</th><th style="width:13%">Modelo</th>'+
+    '<th style="width:11%">Sucursal</th><th style="width:16%">Pack</th>'+
+    '<th style="width:9%">Próximo</th><th style="width:8%"></th>'+
+    '</tr></thead><tbody>'+arr.map(tspFila).join('')+'</tbody></table></div>';
+}
+
+function tspFila(c){
+  const ss=tspServicios(c), u=ss.filter(s=>s.realizado).length, n=ss.length;
+  const completo = n>0 && u===n;
+  const puntos = ss.map(s=>'<span class="tsp-dot'+(s.realizado?' on':'')+'"></span>').join('');
+  const prox = ss.find(s=>!s.realizado);
+  return '<tr>'+
+    '<td><strong>'+tspEsc(c.cliente)+'</strong>'+
+      (c.fecha_contrato?'<div class="eq-dias">desde '+fmtD(c.fecha_contrato)+'</div>':'')+'</td>'+
+    '<td><strong>'+tspEsc(c.dominio||'—')+'</strong></td>'+
+    '<td>'+tspEsc(c.chasis||'—')+'</td>'+
+    '<td>'+tspEsc(c.modelo||'—')+'</td>'+
+    '<td>'+tspEsc(c.sucursal||'—')+'</td>'+
+    '<td><div class="tsp-prog">'+puntos+'</div>'+
+      '<div class="tsp-frac'+(completo?' full':'')+'">'+u+' de '+n+(completo?' · completo':'')+'</div></td>'+
+    '<td>'+(prox?'<span class="tsp-chip-km">'+tspKm(prox.km)+' km</span>':'<span style="color:#0f7b3f;font-size:12px">—</span>')+'</td>'+
+    '<td><button class="btn-sm" onclick="tspAbrir(\''+c.id+'\')">Ver</button></td></tr>';
+}
+
+// ── alta / edición del contrato ──
+function tspAbrirAlta(id){
+  tspEditId = id || null;
+  const c = id ? tspContratos.find(x=>x.id===id) : null;
+  document.getElementById('tspa-titulo').textContent = c ? 'Editar contrato' : 'Nuevo contrato';
+  document.getElementById('tspa-cliente').value = c ? (c.cliente||'') : '';
+  document.getElementById('tspa-dominio').value = c ? (c.dominio||'') : '';
+  document.getElementById('tspa-chasis').value  = c ? (c.chasis||'')  : '';
+  document.getElementById('tspa-modelo').value  = c ? (c.modelo||'')  : '';
+  document.getElementById('tspa-suc').value     = c ? (c.sucursal||'') : ((cu&&cu.sucursalFija)||'');
+  document.getElementById('tspa-cant').value    = c ? String(c.cantidad) : '6';
+  document.getElementById('tspa-fecha').value   = c ? (c.fecha_contrato||'') : tspHoy();
+  document.getElementById('tspa-obs').value     = c ? (c.observaciones||'') : '';
+  document.getElementById('tspa-err').style.display='none';
+  document.getElementById('tsp-mov-alta').classList.add('open');
+}
+function tspCerrarAlta(){ document.getElementById('tsp-mov-alta').classList.remove('open'); tspEditId=null; }
+
+async function tspGuardarAlta(){
+  const err=document.getElementById('tspa-err'); err.style.display='none';
+  const cliente=document.getElementById('tspa-cliente').value.trim();
+  const dominio=document.getElementById('tspa-dominio').value.trim().toUpperCase();
+  const chasis =document.getElementById('tspa-chasis').value.trim().toUpperCase();
+  if(!cliente){ err.textContent='Falta el nombre del cliente.'; err.style.display='block'; return; }
+  if(!dominio && !chasis){
+    err.textContent='Cargá al menos el dominio o el chasis, para poder identificar el vehículo.';
+    err.style.display='block'; return;
+  }
+
+  const datos={
+    cliente: cliente,
+    dominio: dominio||null,
+    chasis: chasis||null,
+    modelo: document.getElementById('tspa-modelo').value.trim()||null,
+    sucursal: document.getElementById('tspa-suc').value||null,
+    cantidad: parseInt(document.getElementById('tspa-cant').value,10),
+    fecha_contrato: document.getElementById('tspa-fecha').value||tspHoy(),
+    observaciones: document.getElementById('tspa-obs').value.trim()||null
+  };
+
+  const btn=document.getElementById('tspa-btn');
+  btn.disabled=true; btn.textContent='Guardando...';
+  try{
+    if(tspEditId){
+      const {error}=await sb.from('tsp_contratos').update(datos).eq('id',tspEditId);
+      if(error) throw error;
+    }else{
+      datos.creado_por = cu.nombre;
+      const {error}=await sb.from('tsp_contratos').insert([datos]);
+      if(error) throw error;
+    }
+    tspCerrarAlta();
+    await cargarTsp();
+    showToast(tspEditId?'Contrato actualizado':'Contrato cargado');
+  }catch(e){
+    const m=String(e.message||'');
+    err.textContent =
+      m.indexOf('tsp_dominio_unico')>=0 ? 'Ya hay un Service Pack cargado para ese dominio.' :
+      m.indexOf('tsp_chasis_unico')>=0  ? 'Ya hay un Service Pack cargado para ese chasis.' :
+      m.indexOf('No se puede reducir')>=0 ? m.replace(/^.*?:\s*/,'') :
+      'Error: '+m;
+    err.style.display='block';
+  }finally{
+    btn.disabled=false; btn.textContent='Guardar';
+  }
+}
+
+// ── detalle del contrato ──
+function tspAbrir(id){
+  const c=tspContratos.find(x=>x.id===id); if(!c) return;
+  tspAbierto=c;
+  const ss=tspServicios(c), u=ss.filter(s=>s.realizado).length;
+
+  document.getElementById('tsp-mo-cli').textContent=c.cliente;
+  const meta=[];
+  if(c.dominio)  meta.push(tspEsc(c.dominio));
+  if(c.chasis)   meta.push('chasis '+tspEsc(c.chasis));
+  if(c.modelo)   meta.push(tspEsc(c.modelo));
+  if(c.sucursal) meta.push(tspEsc(c.sucursal));
+  document.getElementById('tsp-mo-sub').innerHTML =
+    '<div style="font-weight:600;color:var(--text-2);font-size:13px">Pack de '+c.cantidad+' servicios · '+u+' realizados</div>'+
+    (meta.length?'<div style="margin-top:2px">'+meta.join(' · ')+'</div>':'')+
+    (c.observaciones?'<div style="margin-top:4px;color:var(--text-3)">'+tspEsc(c.observaciones)+'</div>':'');
+
+  document.getElementById('tsp-mo-serv').innerHTML = ss.map(function(s){
+    const det = s.realizado
+      ? [s.fecha?fmtD(s.fecha):null, s.nro_orden?'orden '+tspEsc(s.nro_orden):null,
+         s.km_real?tspKm(s.km_real)+' km reales':null, s.sucursal?tspEsc(s.sucursal):null,
+         s.marcado_por?'· '+tspEsc(s.marcado_por):null].filter(Boolean).join(' · ')
+      : 'Pendiente';
+    const clic = tspPuedeMarcar() ? ' onclick="tspAbrirServ(\''+s.id+'\')" style="cursor:pointer"' : '';
+    return '<div class="tsp-serv'+(s.realizado?' hecho':'')+'"'+clic+'>'+
+      '<div class="n">'+(s.realizado?'<i class="ti ti-check" style="font-size:14px"></i>':s.numero)+'</div>'+
+      '<div class="info"><div class="km">Servicio '+s.numero+' · '+tspKm(s.km)+' km</div>'+
+      '<div class="det">'+det+'</div></div>'+
+      (tspPuedeMarcar()?'<i class="ti ti-chevron-right" style="color:var(--text-5);font-size:15px"></i>':'')+
+      '</div>';
+  }).join('');
+
+  const be=document.getElementById('tsp-mo-edit');
+  be.style.display = tspPuedeCargar() ? '' : 'none';
+  document.getElementById('tsp-mo-err').style.display='none';
+  document.getElementById('tsp-mov').classList.add('open');
+}
+function tspCerrar(){ document.getElementById('tsp-mov').classList.remove('open'); tspAbierto=null; }
+function tspEditarDesdeDetalle(){
+  const id = tspAbierto && tspAbierto.id; if(!id) return;
+  tspCerrar(); tspAbrirAlta(id);
+}
+
+// ── marcar un servicio ──
+function tspAbrirServ(id){
+  if(!tspPuedeMarcar()) return;
+  const c=tspAbierto; if(!c) return;
+  const s=tspServicios(c).find(x=>x.id===id); if(!s) return;
+  tspServAbierto=s;
+
+  document.getElementById('tsps-titulo').textContent='Servicio '+s.numero;
+  document.getElementById('tsps-sub').textContent=
+    c.cliente+' · '+(c.dominio||c.chasis||'')+' · '+tspKm(s.km)+' km previstos';
+  document.getElementById('tsps-fecha').value = s.fecha || tspHoy();
+  document.getElementById('tsps-orden').value = s.nro_orden || '';
+  document.getElementById('tsps-km').value    = s.km_real || '';
+  document.getElementById('tsps-suc').value   = s.sucursal || c.sucursal || '';
+  document.getElementById('tsps-desmarcar').style.display = s.realizado ? '' : 'none';
+  document.getElementById('tsps-err').style.display='none';
+  document.getElementById('tsp-mov-serv').classList.add('open');
+}
+function tspCerrarServ(){ document.getElementById('tsp-mov-serv').classList.remove('open'); tspServAbierto=null; }
+
+async function tspGuardarServ(){
+  if(!tspServAbierto) return;
+  const err=document.getElementById('tsps-err'); err.style.display='none';
+  const km=document.getElementById('tsps-km').value;
+  try{
+    const {error}=await sb.from('tsp_servicios').update({
+      realizado:true,
+      fecha: document.getElementById('tsps-fecha').value || tspHoy(),
+      nro_orden: document.getElementById('tsps-orden').value.trim()||null,
+      km_real: km?parseInt(km,10):null,
+      sucursal: document.getElementById('tsps-suc').value||null,
+      marcado_por: cu.nombre
+    }).eq('id',tspServAbierto.id);
+    if(error) throw error;
+    const cid = tspAbierto && tspAbierto.id;
+    tspCerrarServ();
+    await cargarTsp();
+    if(cid) tspAbrir(cid);
+    showToast('Servicio registrado');
+  }catch(e){
+    err.textContent='Error: '+(e.message||e); err.style.display='block';
+  }
+}
+
+async function tspDesmarcar(){
+  if(!tspServAbierto) return;
+  if(!confirm('¿Desmarcar este servicio? Se borran la fecha, la orden y los km cargados.')) return;
+  const err=document.getElementById('tsps-err'); err.style.display='none';
+  try{
+    const {error}=await sb.from('tsp_servicios')
+      .update({realizado:false}).eq('id',tspServAbierto.id);
+    if(error) throw error;
+    const cid = tspAbierto && tspAbierto.id;
+    tspCerrarServ();
+    await cargarTsp();
+    if(cid) tspAbrir(cid);
+    showToast('Servicio desmarcado');
+  }catch(e){
+    err.textContent='Error: '+(e.message||e); err.style.display='block';
   }
 }
 
