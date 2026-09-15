@@ -1349,11 +1349,18 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
         </select>
       </div>
       <div><label class="drawer-label">Tipo de turno</label>
-        <select class="drawer-input" id="dr-tipo">
+        <select class="drawer-input" id="dr-tipo" onchange="toggleParte('dr')">
           <option value="">Seleccionar...</option>
           <option>Campaña</option><option>Pedido especial</option><option>Reparación</option>
           <option>Servicio</option><option>Cristales</option><option>Siniestros</option><option>Accesorios</option>
         </select>
+      </div>
+    </div>
+    <div class="drawer-field full" id="dr-parte-wrap" style="display:none">
+      <label class="drawer-label">N° de parte <span style="color:var(--accent)">· obligatorio en campañas</span></label>
+      <input class="drawer-input" type="text" id="dr-parte" placeholder="Ej: 04007-08112">
+      <div style="font-size:11px;color:var(--text-4);margin-top:4px">
+        El código de parte a cambiar, no el N° de ABI. Repuestos necesita este dato para pedir la pieza.
       </div>
     </div>
     <div class="drawer-field full">
@@ -1404,10 +1411,17 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
       </div>
       <div><label>Sucursal</label><select id="f-suc"><option value="">Seleccionar...</option><option>Roca</option><option>Perticone</option><option>Aguado</option><option>Añelo</option><option>Bariloche</option></select></div>
       <div><label>Tipo de turno</label>
-        <select id="f-tipo"><option value="">Seleccionar...</option><option>Campaña</option><option>Pedido especial</option><option>Reparación</option><option>Servicio</option><option>Cristales</option><option>Siniestros</option><option>Accesorios</option></select>
+        <select id="f-tipo" onchange="toggleParte('f')"><option value="">Seleccionar...</option><option>Campaña</option><option>Pedido especial</option><option>Reparación</option><option>Servicio</option><option>Cristales</option><option>Siniestros</option><option>Accesorios</option></select>
       </div>
       <div><label>Prioridad</label><select id="f-pri"><option value="">Seleccionar...</option><option>Alta</option><option>Mediana</option><option>Baja</option></select></div>
       <div><label>Cargado por</label><select id="f-quien"><option value="">Seleccionar...</option></select></div>
+      <div class="full" id="f-parte-wrap" style="display:none">
+        <label>N° de parte <span style="color:var(--accent)">· obligatorio en campañas</span></label>
+        <input type="text" id="f-parte" placeholder="Ej: 04007-08112"/>
+        <div style="font-size:11px;color:var(--text-4);margin-top:4px">
+          El código de parte a cambiar, no el N° de ABI. Repuestos necesita este dato para pedir la pieza.
+        </div>
+      </div>
       <div class="full" id="f-repr-wrap" style="display:none"><label>Motivo de reprogramación</label><input type="text" id="f-repr-mot" placeholder="Ej: cliente no disponible"/></div>
       <div class="full"><label>Agregar comentario <span style="font-weight:400;color:var(--text-4)">(queda con fecha; no edita los anteriores)</span></label><textarea id="f-obs" placeholder="Nuevo comentario..."></textarea></div>
       <div class="full" id="f-adj-wrap" style="display:none">
@@ -2447,6 +2461,21 @@ const CARGAN_CITAS_EXTRA = [
 function _normNom(s){
   return String(s||'').trim().toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+
+// El N° de parte sólo aplica a campañas: Repuestos necesita el código de la
+// pieza a cambiar, no el N° de ABI. Se muestra y se exige sólo en ese caso.
+function esCampania(v){ return String(v||'').trim().toLowerCase() === 'campaña'; }
+function toggleParte(pref){
+  const tipo = document.getElementById(pref+'-tipo');
+  const wrap = document.getElementById(pref+'-parte-wrap');
+  if(!tipo || !wrap) return;
+  const mostrar = esCampania(tipo.value);
+  wrap.style.display = mostrar ? '' : 'none';
+  if(mostrar){
+    const inp = document.getElementById(pref+'-parte');
+    if(inp && !inp.value) setTimeout(()=>inp.focus(), 60);
+  }
 }
 
 // ¿Puede crear/editar turnos? Citas y admin siempre; quien tenga el permiso
@@ -5368,7 +5397,7 @@ function buildFilters(){
   if(fr){
     const buscadorRep=`<div class="search-wrap">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input type="text" class="search-input" id="search-rep" placeholder="Buscar por dominio, cliente, N° pre-orden o N° de nota/presupuesto (en comentarios)..." value="${searchRepVal||''}" oninput="searchRepVal=this.value;renderRepuestos()">
+      <input type="text" class="search-input" id="search-rep" placeholder="Buscar por dominio, cliente, N° pre-orden, N° de parte o comentarios..." value="${searchRepVal||''}" oninput="searchRepVal=this.value;renderRepuestos()">
     </div>`;
     if(cu.sucursalFija){
       fr.innerHTML=`${buscadorRep}<div class="filter-locked"><i class="ti ti-lock" style="font-size:13px"></i> ${cu.sucursalFija} (fijo)</div>`;
@@ -5381,7 +5410,7 @@ function buildFilters(){
   if(frh){
     const buscadorHist=`<div class="search-wrap">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input type="text" class="search-input" id="search-rephist" placeholder="Buscar por dominio, cliente, N° pre-orden o N° de nota/presupuesto (en comentarios)..." value="${searchRepHistVal||''}" oninput="searchRepHistVal=this.value;renderRepHistorico()">
+      <input type="text" class="search-input" id="search-rephist" placeholder="Buscar por dominio, cliente, N° pre-orden, N° de parte o comentarios..." value="${searchRepHistVal||''}" oninput="searchRepHistVal=this.value;renderRepHistorico()">
     </div>`;
     if(cu.sucursalFija){
       frh.innerHTML=`${buscadorHist}<div class="filter-locked"><i class="ti ti-lock" style="font-size:13px"></i> ${cu.sucursalFija} (fijo)</div>`;
@@ -5625,6 +5654,7 @@ function coincideBusquedaRep(t, qr){
   if((t.dominio||'').toLowerCase().includes(qr)) return true;
   if((t.cliente||'').toLowerCase().includes(qr)) return true;
   if((t.preor||'').toString().toLowerCase().includes(qr)) return true;
+  if((t.nro_parte||'').toLowerCase().includes(qr)) return true;
   const coms = [...comentariosDe(t.id,'citas'), ...comentariosDe(t.id,'repuestos')];
   return coms.some(c => (c.texto||'').toLowerCase().includes(qr));
 }
@@ -5665,7 +5695,7 @@ function renderRepuestos(){
       acc=`<div class="act-group">${estPill(t.estado)}</div>`;
     }
     const nsBadge=t.no_show?'<span class="pill p-noshow" style="margin-left:3px" title="No Show"><i class="ti ti-user-x" style="font-size:10px"></i></span>':'';
-    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}${nsBadge}</td><td>${t.dominio}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${estPill(t.estado)}</td><td><span style="display:inline-flex;gap:3px">${obsCitaTag}${obsTag}</span></td><td>${valePill(t.vale)}</td><td>${acc}</td></tr>`;
+    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}${adjTag}${nsBadge}</td><td>${t.dominio}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}${t.nro_parte?`<div style="font-family:var(--mono);font-size:10.5px;color:var(--text-4);margin-top:3px" title="N° de parte de la campaña">${escapeHtml(t.nro_parte)}</div>`:''}</td><td>${estPill(t.estado)}</td><td><span style="display:inline-flex;gap:3px">${obsCitaTag}${obsTag}</span></td><td>${valePill(t.vale)}</td><td>${acc}</td></tr>`;
   }).join('')}</tbody></table>`,horizFilt);
   actualizarContadoresRep();
 }
@@ -5705,7 +5735,7 @@ function renderRepHistorico(){
   </tr></thead><tbody>${items.map(t=>{
     const nsBadge=t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i></span>':'—';
     const obsTag=`<span class="obs-badge" onclick="verObs('${t.id}','rep')" title="Comentarios de Repuestos"><i class="ti ti-message" style="font-size:11px"></i> ${comentariosDe(t.id,'repuestos').length||'+'}</span>`;
-    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}</td><td>${estPill(t.estado)}</td><td>${nsBadge}</td><td>${obsTag}</td><td>${valePill(t.vale)}</td></tr>`;
+    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}${t.nro_parte?`<div style="font-family:var(--mono);font-size:10.5px;color:var(--text-4);margin-top:3px">${escapeHtml(t.nro_parte)}</div>`:''}</td><td>${estPill(t.estado)}</td><td>${nsBadge}</td><td>${obsTag}</td><td>${valePill(t.vale)}</td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
 
@@ -7221,8 +7251,8 @@ function openModal(id){
   document.getElementById('repr-box').style.display='none';
   document.getElementById('f-repr-wrap').style.display='none';
   document.getElementById('f-adj-wrap').style.display=puedeGestionarTurnos()?'block':'none';
-  if(iE){const t=findTurno(id);document.getElementById('f-preor').value=t.preor;document.getElementById('f-fecha').value=t.fecha;document.getElementById('f-cliente').value=t.cliente;document.getElementById('f-dominio').value=t.dominio;document.getElementById('f-modelo').value=t.modelo||'';document.getElementById('f-suc').value=t.sucursal;document.getElementById('f-tipo').value=t.tipo||'';document.getElementById('f-pri').value=t.prioridad;document.getElementById('f-quien').value=t.quien;document.getElementById('f-obs').value='';currentAdjuntos=Array.isArray(t.adjuntos)?JSON.parse(JSON.stringify(t.adjuntos)):[];}
-  else{['f-preor','f-fecha','f-cliente','f-dominio','f-obs','f-repr-mot'].forEach(id=>document.getElementById(id).value='');['f-modelo','f-suc','f-tipo','f-pri','f-quien'].forEach(id=>document.getElementById(id).value='');currentAdjuntos=[];}
+  if(iE){const t=findTurno(id);document.getElementById('f-preor').value=t.preor;document.getElementById('f-fecha').value=t.fecha;document.getElementById('f-cliente').value=t.cliente;document.getElementById('f-dominio').value=t.dominio;document.getElementById('f-modelo').value=t.modelo||'';document.getElementById('f-suc').value=t.sucursal;document.getElementById('f-tipo').value=t.tipo||'';document.getElementById('f-parte').value=t.nro_parte||'';toggleParte('f');document.getElementById('f-pri').value=t.prioridad;document.getElementById('f-quien').value=t.quien;document.getElementById('f-obs').value='';currentAdjuntos=Array.isArray(t.adjuntos)?JSON.parse(JSON.stringify(t.adjuntos)):[];}
+  else{['f-preor','f-fecha','f-cliente','f-dominio','f-obs','f-repr-mot','f-parte'].forEach(id=>document.getElementById(id).value='');['f-modelo','f-suc','f-tipo','f-pri','f-quien'].forEach(id=>document.getElementById(id).value='');toggleParte('f');currentAdjuntos=[];}
   renderAdjuntosForm();
   document.getElementById('mov').classList.add('open');
 }
@@ -7232,7 +7262,7 @@ function openRepr(id){
   document.getElementById('modal-title').innerHTML=`<i class="ti ti-calendar-event" style="font-size:16px;vertical-align:-3px;margin-right:6px"></i>Reprogramar turno`;
   document.getElementById('repr-box').style.display='block';document.getElementById('f-repr-wrap').style.display='block';
   document.getElementById('f-adj-wrap').style.display='none';
-  document.getElementById('f-preor').value=t.preor;document.getElementById('f-fecha').value=t.fecha;document.getElementById('f-cliente').value=t.cliente;document.getElementById('f-dominio').value=t.dominio;document.getElementById('f-modelo').value=t.modelo||'';document.getElementById('f-suc').value=t.sucursal;document.getElementById('f-tipo').value=t.tipo||'';document.getElementById('f-pri').value=t.prioridad;document.getElementById('f-quien').value=t.quien;document.getElementById('f-obs').value='';document.getElementById('f-repr-mot').value='';
+  document.getElementById('f-preor').value=t.preor;document.getElementById('f-fecha').value=t.fecha;document.getElementById('f-cliente').value=t.cliente;document.getElementById('f-dominio').value=t.dominio;document.getElementById('f-modelo').value=t.modelo||'';document.getElementById('f-suc').value=t.sucursal;document.getElementById('f-tipo').value=t.tipo||'';document.getElementById('f-parte').value=t.nro_parte||'';toggleParte('f');document.getElementById('f-pri').value=t.prioridad;document.getElementById('f-quien').value=t.quien;document.getElementById('f-obs').value='';document.getElementById('f-repr-mot').value='';
   currentAdjuntos=Array.isArray(t.adjuntos)?JSON.parse(JSON.stringify(t.adjuntos)):[]; // se conservan tal cual, no se editan acá
   document.getElementById('mov').classList.add('open');
 }
@@ -7241,7 +7271,7 @@ function closeModal(){document.getElementById('mov').classList.remove('open');}
 async function guardar(){
   const btn=document.getElementById('btn-guardar-turno');
   const preor=document.getElementById('f-preor').value.trim();const fecha=document.getElementById('f-fecha').value;const cliente=document.getElementById('f-cliente').value.trim();const dominio=document.getElementById('f-dominio').value.trim();const modelo=document.getElementById('f-modelo').value;const suc=document.getElementById('f-suc').value;const tipo=document.getElementById('f-tipo').value;const pri=document.getElementById('f-pri').value;const quien=document.getElementById('f-quien').value;const obs=document.getElementById('f-obs').value.trim();const reprMot=document.getElementById('f-repr-mot').value.trim();
-  if(!preor||!fecha||!cliente||!dominio||!modelo||!suc||!tipo||!pri||!quien){alert('Completá todos los campos obligatorios, incluyendo el modelo.');return;}
+  const nroParte=document.getElementById('f-parte').value.trim();if(!preor||!fecha||!cliente||!dominio||!modelo||!suc||!tipo||!pri||!quien){alert('Completá todos los campos obligatorios, incluyendo el modelo.');return;}if(esCampania(tipo)&&!nroParte){alert('En campañas el N° de parte es obligatorio.\n\nCargá el código de la pieza a cambiar, no el N° de ABI.');document.getElementById('f-parte').focus();return;}
 
   btn.disabled=true;btn.textContent='Guardando...';
 
@@ -7253,12 +7283,12 @@ async function guardar(){
       if(error) throw error;
       closeModal();showAlert('Turno reprogramado',`El turno de ${cliente} (${preor}) fue reprogramado al ${fmtD(fecha)} en ${suc}. Motivo: ${reprMot}.`);
     } else if(editId!==null){
-      const {error}=await sb.from('turnos').update({preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad:pri,quien,adjuntos:currentAdjuntos}).eq('id',editId);
+      const {error}=await sb.from('turnos').update({preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad:pri,quien,nro_parte:(esCampania(tipo)?nroParte:null),adjuntos:currentAdjuntos}).eq('id',editId);
       if(error) throw error;
       closeModal();
     } else {
       const d=diff(fecha);
-      const {data:ins,error}=await sb.from('turnos').insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad:pri,quien,estado:'pendiente',reprogramado:false,motivo_repr:'',no_show:false,vale:false,adjuntos:currentAdjuntos}]).select('id').single();
+      const {data:ins,error}=await sb.from('turnos').insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad:pri,quien,nro_parte:(esCampania(tipo)?nroParte:null),estado:'pendiente',reprogramado:false,motivo_repr:'',no_show:false,vale:false,adjuntos:currentAdjuntos}]).select('id').single();
       if(error) throw error;
       turnoIdParaComentario = ins?.id;
       if(d===1||d===2)showAlert('Turno urgente',`El turno de ${cliente} (${preor}) está agendado para ${d===1?'mañana':'en 2 días'}. Avisá a repuestos de inmediato.`);
@@ -7461,8 +7491,9 @@ function openDrawer(){
   const inp=document.getElementById("dr-adj-input");
   if(inp)inp.value="";
   // Limpiar campos del formulario
-  ["dr-preor","dr-fecha","dr-cliente","dr-dominio","dr-obs"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+  ["dr-preor","dr-fecha","dr-cliente","dr-dominio","dr-obs","dr-parte"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
   ["dr-modelo","dr-suc","dr-tipo","dr-quien"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+  toggleParte("dr");
   document.getElementById("drawer-err").style.display="none";
   document.getElementById("drawer-ov").classList.add("open");
   document.getElementById("drawer").style.display="flex";
@@ -7476,7 +7507,7 @@ function setDrawerPri(val,btn){
   document.getElementById("dr-pri-seg").dataset.val=val;
 }
 
-async function crearTurnoDrawer(){const errEl=document.getElementById("drawer-err");errEl.style.display="none";const btn=document.querySelector('.drawer-btn-create');if(btn&&btn.dataset.saving==='1')return;const preor=document.getElementById("dr-preor").value.trim();const fecha=document.getElementById("dr-fecha").value;const cliente=document.getElementById("dr-cliente").value.trim();const dominio=document.getElementById("dr-dominio").value.trim();const modelo=document.getElementById("dr-modelo").value;const suc=document.getElementById("dr-suc").value;const tipo=document.getElementById("dr-tipo").value;const prioridad=document.getElementById("dr-pri-seg").dataset.val||"Mediana";const quien=document.getElementById("dr-quien").value;const obs=document.getElementById("dr-obs").value.trim();if(!preor){errEl.textContent="El N° de Pre-Or es obligatorio.";errEl.style.display="block";document.getElementById("dr-preor").focus();return;}if(!cliente||!dominio){errEl.textContent="Completá al menos Cliente y Dominio.";errEl.style.display="block";return;}if(btn){btn.dataset.saving='1';btn.disabled=true;btn.textContent='Guardando…';}try{const{data:ins,error}=await sb.from("turnos").insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad,quien,estado:"pendiente",reprogramado:false,motivo_repr:"",no_show:false,vale:false,adjuntos:drawerAdjuntos}]).select('id').single();if(error)throw error;if(obs&&ins?.id){await agregarComentario(ins.id,'citas',obs);}closeDrawer();await cargarTurnos();await cargarComentariosTurnos();renderTurnos();renderRepuestos();renderDash();showToast("Turno creado correctamente");}catch(err){errEl.textContent="Error: "+err.message;errEl.style.display="block";}finally{if(btn){btn.dataset.saving='0';btn.disabled=false;btn.textContent='Crear turno';}}}
+async function crearTurnoDrawer(){const errEl=document.getElementById("drawer-err");errEl.style.display="none";const btn=document.querySelector('.drawer-btn-create');if(btn&&btn.dataset.saving==='1')return;const preor=document.getElementById("dr-preor").value.trim();const fecha=document.getElementById("dr-fecha").value;const cliente=document.getElementById("dr-cliente").value.trim();const dominio=document.getElementById("dr-dominio").value.trim();const modelo=document.getElementById("dr-modelo").value;const suc=document.getElementById("dr-suc").value;const tipo=document.getElementById("dr-tipo").value;const prioridad=document.getElementById("dr-pri-seg").dataset.val||"Mediana";const quien=document.getElementById("dr-quien").value;const obs=document.getElementById("dr-obs").value.trim();const nroParte=document.getElementById("dr-parte").value.trim();if(!preor){errEl.textContent="El N° de Pre-Or es obligatorio.";errEl.style.display="block";document.getElementById("dr-preor").focus();return;}if(esCampania(tipo)&&!nroParte){errEl.textContent="En campañas el N° de parte es obligatorio. Cargá el código de la pieza a cambiar, no el N° de ABI.";errEl.style.display="block";document.getElementById("dr-parte").focus();return;}if(!cliente||!dominio){errEl.textContent="Completá al menos Cliente y Dominio.";errEl.style.display="block";return;}if(btn){btn.dataset.saving='1';btn.disabled=true;btn.textContent='Guardando…';}try{const{data:ins,error}=await sb.from("turnos").insert([{preor,fecha,cliente,dominio,modelo,sucursal:suc,tipo,prioridad,quien,nro_parte:(esCampania(tipo)?nroParte:null),estado:"pendiente",reprogramado:false,motivo_repr:"",no_show:false,vale:false,adjuntos:drawerAdjuntos}]).select('id').single();if(error)throw error;if(obs&&ins?.id){await agregarComentario(ins.id,'citas',obs);}closeDrawer();await cargarTurnos();await cargarComentariosTurnos();renderTurnos();renderRepuestos();renderDash();showToast("Turno creado correctamente");}catch(err){errEl.textContent="Error: "+err.message;errEl.style.display="block";}finally{if(btn){btn.dataset.saving='0';btn.disabled=false;btn.textContent='Crear turno';}}}
 
 async function subirAdjuntosDrawer(){
   const input=document.getElementById("dr-adj-input");
