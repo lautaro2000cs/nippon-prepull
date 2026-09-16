@@ -2203,10 +2203,14 @@ const ROLES_SIN_MATRIZ = ['ambiente','equip_stock','equip_turnos'];
 function can(p){
   // El admin siempre tiene acceso a todo, sin depender de la matriz de la base.
   if(cu && cu.rol === 'admin') return true;
-  if(cu && ROLES_SIN_MATRIZ.includes(cu.rol)) return canFallback(p);
   if(cu && cu.permisos instanceof Set){
+    // Primero lo que dice la base: ahí vienen los permisos del rol Y los
+    // extra que el admin tilda usuario por usuario. Va SIEMPRE primero, para
+    // que un permiso extra alcance aunque el rol no lo traiga.
     if(cu.permisos.has(p)) return true;
-    // Permisos nuevos que todavía no están sembrados en la base.
+    // Después el respaldo por rol, para los roles y permisos nuevos que
+    // todavía no están sembrados en la base.
+    if(ROLES_SIN_MATRIZ.includes(cu.rol)) return canFallback(p);
     if(p.indexOf('equipamiento.') === 0) return canFallback(p);
     return false;
   }
