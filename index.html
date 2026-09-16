@@ -1465,6 +1465,9 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
     <div id="tsp-mo-serv"></div>
     <p class="login-err" id="tsp-mo-err" style="display:none"></p>
     <div class="mfooter">
+      <button class="btn-cancel" id="tsp-mo-borrar" onclick="tspBorrar()" style="display:none;margin-right:auto;color:var(--accent);border-color:rgba(224,50,47,.35)">
+        <i class="ti ti-trash" style="font-size:13px;vertical-align:-2px"></i> Eliminar
+      </button>
       <button class="btn-cancel" onclick="tspCerrar()">Cerrar</button>
       <button class="btn-save" id="tsp-mo-edit" onclick="tspEditarDesdeDetalle()" style="display:none">Editar contrato</button>
     </div>
@@ -2201,7 +2204,7 @@ const MODULOS = {
 // Roles creados después de la matriz de permisos de la base: todavía no tienen
 // filas en rol_permiso, así que se resuelven por la tabla de canFallback().
 // Cuando se siembren en la base, se los saca de acá y nada más cambia.
-const ROLES_SIN_MATRIZ = ['ambiente','equip_stock','equip_turnos'];
+const ROLES_SIN_MATRIZ = ['ambiente','equip_venta','equip_stock','equip_turnos'];
 
 function can(p){
   // El admin siempre tiene acceso a todo, sin depender de la matriz de la base.
@@ -2231,6 +2234,7 @@ function canFallback(p){
     jefe_servicio:['prepull.ver','prepull.turnos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','procedimientos.ver','encuestas.desestimacion.pedir','tsp.ver','tsp.cargar','tsp.marcar'],
     seguridad:    ['minutas.ver','procedimientos.ver','procedimientos.subir'],
     ambiente:     ['minutas.ver','procedimientos.ver','procedimientos.subir'],
+    equip_venta:  ['equipamiento.ver','equipamiento.vender','procedimientos.ver'],
     equip_stock:  ['equipamiento.ver','equipamiento.stock','procedimientos.ver'],
     equip_turnos: ['equipamiento.ver','equipamiento.turnar','equipamiento.prioridad','procedimientos.ver'],
   };
@@ -2320,7 +2324,7 @@ async function showApp(){
   document.getElementById('s-login').classList.remove('active');
   document.getElementById('s-app').classList.add('active');
   document.getElementById('tb-user').textContent=cu.nombre;
-  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene',ambiente:'Ambiente',equip_stock:'Equipamiento · Stock',equip_turnos:'Equipamiento · Turnos',jefe_servicio:'Jefe de Servicio'}[cu.rol]||cu.rol;
+  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene',ambiente:'Ambiente',equip_venta:'Equipamiento · Ventas',equip_stock:'Equipamiento · Stock',equip_turnos:'Equipamiento · Turnos',jefe_servicio:'Jefe de Servicio'}[cu.rol]||cu.rol;
   const sucEl=document.getElementById('tb-suc');
   if(cu.sucursalFija){sucEl.style.display='inline-flex';sucEl.innerHTML=`<i class="ti ti-map-pin" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${cu.sucursalFija}`;}
   else sucEl.style.display='none';
@@ -5511,7 +5515,7 @@ function valePill(v){return v?'<span class="pill p-arr"><i class="ti ti-check" s
 function priPill(p){const m={Alta:'pri-alta',Mediana:'pri-med',Baja:'pri-baja'};return`<span class="pill ${m[p]||'pri-baja'}">${p||'-'}</span>`;}
 function estPill(e){const m={pendiente:['p-pend','Pendiente'],arribo:['p-arr','Arribó'],faltante:['p-falt','Faltante'],bo:['p-bo','<i class="ti ti-alert-triangle" style="font-size:12px;vertical-align:-1px"></i> B/O']};const[c,l]=m[e]||['p-pend','Pendiente'];return`<span class="pill ${c}">${l}</span>`;}
 function valePill(v){return v?'<span class="pill p-arr"><i class="ti ti-check" style="font-size:11px"></i> Con vale</span>':'<span class="pill p-falt"><i class="ti ti-x" style="font-size:11px"></i> Sin vale</span>';}
-function rolPill(r){const m={admin:'<span class="pill" style="background:#fbeceb;color:#c62a27">Admin</span>',citas:'<span class="pill" style="background:#e6f4ec;color:#1f7a48">Citas</span>',repuestos:'<span class="pill" style="background:#eef0ff;color:#4f46e5">Repuestos</span>',compras:'<span class="pill" style="background:#fbf1de;color:#9a6a08">Compras</span>',supervisor:'<span class="pill" style="background:#e6f1fb;color:#0c447c">Supervisor</span>',jefe_servicio:'<span class="pill" style="background:#f3e8ff;color:#7c3aed">Jefe de Servicio</span>',equip_stock:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Stock</span>',equip_turnos:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Turnos</span>',ambiente:'<span class="pill" style="background:#e8f3e8;color:#2c5f2d">Ambiente</span>'};return m[r]||`<span style="font-size:11px">${r}</span>`;}
+function rolPill(r){const m={admin:'<span class="pill" style="background:#fbeceb;color:#c62a27">Admin</span>',citas:'<span class="pill" style="background:#e6f4ec;color:#1f7a48">Citas</span>',repuestos:'<span class="pill" style="background:#eef0ff;color:#4f46e5">Repuestos</span>',compras:'<span class="pill" style="background:#fbf1de;color:#9a6a08">Compras</span>',supervisor:'<span class="pill" style="background:#e6f1fb;color:#0c447c">Supervisor</span>',jefe_servicio:'<span class="pill" style="background:#f3e8ff;color:#7c3aed">Jefe de Servicio</span>',equip_venta:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Ventas</span>',equip_stock:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Stock</span>',equip_turnos:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Turnos</span>',ambiente:'<span class="pill" style="background:#e8f3e8;color:#2c5f2d">Ambiente</span>'};return m[r]||`<span style="font-size:11px">${r}</span>`;}
 
 function renderGroups(cid,items,fn,horizFilt){
   // Cachear el grupo de cada item una sola vez (diffHabil puede ser lento con muchos turnos)
@@ -6123,7 +6127,7 @@ function convertirAgente(id){
 function llenarRolesUsr(){
   const sel=document.getElementById('f-usr-rol');
   const roles = (RP_ROLES && RP_ROLES.length) ? RP_ROLES
-    : [{id:'admin',label:'Admin'},{id:'supervisor',label:'Supervisor'},{id:'citas',label:'Citas'},{id:'repuestos',label:'Repuestos'},{id:'compras',label:'Compras'},{id:'asesor',label:'Asesor'},{id:'jefe_servicio',label:'Jefe de Servicio'},{id:'seguridad',label:'Seguridad e Higiene'},{id:'equip_stock',label:'Equipamiento · Stock'},{id:'equip_turnos',label:'Equipamiento · Turnos'},{id:'ambiente',label:'Ambiente'}];
+    : [{id:'admin',label:'Admin'},{id:'supervisor',label:'Supervisor'},{id:'citas',label:'Citas'},{id:'repuestos',label:'Repuestos'},{id:'compras',label:'Compras'},{id:'asesor',label:'Asesor'},{id:'jefe_servicio',label:'Jefe de Servicio'},{id:'seguridad',label:'Seguridad e Higiene'},{id:'equip_venta',label:'Equipamiento · Ventas'},{id:'equip_stock',label:'Equipamiento · Stock'},{id:'equip_turnos',label:'Equipamiento · Turnos'},{id:'ambiente',label:'Ambiente'}];
   const actual = sel.value;
   sel.innerHTML='<option value="">Seleccionar...</option>'+roles.map(r=>`<option value="${r.id}">${escapeHtml(r.label)}</option>`).join('');
   if(actual) sel.value=actual;
@@ -8180,7 +8184,43 @@ function tspFila(c){
     '<td><div class="tsp-prog">'+puntos+'</div>'+
       '<div class="tsp-frac'+(completo?' full':'')+'">'+u+' de '+n+(completo?' · completo':'')+'</div></td>'+
     '<td>'+(prox?'<span class="tsp-chip-km">'+tspKm(prox.km)+' km</span>':'<span style="color:#0f7b3f;font-size:12px">—</span>')+'</td>'+
-    '<td><button class="btn-sm" onclick="tspAbrir(\''+c.id+'\')">Ver</button></td></tr>';
+    '<td style="white-space:nowrap"><button class="btn-sm" onclick="tspAbrir(\''+c.id+'\')">Ver</button>'+tspDel(c)+'</td></tr>';
+}
+
+// Papelera al final de cada fila, sólo para el admin.
+function tspDel(c){
+  if(!esAdmin()) return '';
+  return ' <button class="btn-sm" onclick="tspBorrarId(\''+c.id+'\')" title="Eliminar este contrato"'+
+         ' style="color:var(--accent);border-color:rgba(224,50,47,.35);padding:5px 8px">'+
+         '<i class="ti ti-trash" style="font-size:12px"></i></button>';
+}
+
+// Borra un contrato. Sus servicios se van solos (on delete cascade).
+async function tspBorrarId(id){
+  if(!esAdmin()) return;
+  const c = tspContratos.find(x => x.id === id);
+  if(!c) return;
+  const usados = tspUsados(c);
+  const quien = c.cliente + (c.dominio ? ' · ' + c.dominio : '');
+  let msg = '¿Eliminar el Service Pack de '+quien+'?\n\nSe borra el contrato y sus servicios. No se puede deshacer.';
+  if(usados > 0) msg = 'ATENCIÓN: este pack tiene '+usados+' servicio(s) ya realizados.\n\n'+msg;
+  if(!confirm(msg)) return;
+  try{
+    const { error } = await sb.from('tsp_contratos').delete().eq('id', id);
+    if(error) throw error;
+    await cargarTsp();
+    showToast('Contrato eliminado');
+  }catch(e){
+    showToast('No se pudo eliminar: '+(e.message||e));
+  }
+}
+
+// Eliminar desde el detalle abierto.
+async function tspBorrar(){
+  if(!esAdmin() || !tspAbierto) return;
+  const id = tspAbierto.id;
+  tspCerrar();
+  await tspBorrarId(id);
 }
 
 // ── alta / edición del contrato ──
@@ -8282,6 +8322,8 @@ function tspAbrir(id){
       '</div>';
   }).join('');
 
+  const bd=document.getElementById('tsp-mo-borrar');
+  if(bd) bd.style.display = esAdmin() ? '' : 'none';
   const be=document.getElementById('tsp-mo-edit');
   be.style.display = tspPuedeCargar() ? '' : 'none';
   document.getElementById('tsp-mo-err').style.display='none';
