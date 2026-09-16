@@ -1177,6 +1177,9 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
               <button class="btn-sm" id="eq-btn-nueva" onclick="eqAbrirAlta()" style="display:none">
                 <i class="ti ti-plus" style="font-size:13px;vertical-align:-2px"></i> Cargar venta
               </button>
+              <button class="btn-sm" id="eq-btn-limpiar" onclick="eqBorrarVista()" style="display:none;color:var(--accent);border-color:rgba(224,50,47,.35)" title="Eliminar todos los pedidos de esta vista">
+                <i class="ti ti-trash" style="font-size:13px;vertical-align:-2px"></i> Borrar lo que veo
+              </button>
               <button class="btn-sm" onclick="cargarEquip()" title="Actualizar">
                 <i class="ti ti-refresh" style="font-size:13px;vertical-align:-2px"></i>
               </button>
@@ -1565,6 +1568,9 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
     </div>
     <p class="login-err" id="eq-mo-err" style="display:none"></p>
     <div class="mfooter">
+      <button class="btn-cancel" id="eq-mo-borrar" onclick="eqBorrar()" style="display:none;margin-right:auto;color:var(--accent);border-color:rgba(224,50,47,.35)">
+        <i class="ti ti-trash" style="font-size:13px;vertical-align:-2px"></i> Eliminar
+      </button>
       <button class="btn-cancel" onclick="eqCerrar()">Cancelar</button>
       <button class="btn-save" onclick="eqGuardarModal()">Guardar</button>
     </div>
@@ -5000,9 +5006,35 @@ function renderMinutas(){
       </div>
       <div style="display:flex;gap:8px">
         ${m.pdf_path ? `<a href="${urlMinutaPdf(m.pdf_path)}" target="_blank" class="btn-sm" style="text-decoration:none">📄 Ver PDF</a>` : ''}
+        ${esAdmin() ? `<button class="btn-sm" onclick="borrarMinuta('${m.id}')" title="Eliminar minuta" style="color:var(--accent);border-color:rgba(224,50,47,.35)"><i class="ti ti-trash" style="font-size:13px"></i></button>` : ''}
       </div>
     </div>`;
   }).join('');
+}
+
+// ¿Es admin? Sólo el admin puede borrar registros.
+function esAdmin(){ return !!(cu && cu.rol === 'admin'); }
+
+// Borra una minuta y, si tenía, su PDF del storage.
+async function borrarMinuta(id){
+  if(!esAdmin()) return;
+  const m = minutas.find(x => String(x.id) === String(id));
+  if(!m) return;
+  const nombre = m.asunto || '(sin asunto)';
+  if(!confirm('¿Eliminar la minuta "'+nombre+'"?\n\nEsta acción no se puede deshacer.')) return;
+  try{
+    if(m.pdf_path){
+      // si falla el borrado del PDF no frenamos: el registro igual se elimina
+      const { error: eSt } = await sb.storage.from('minutas').remove([m.pdf_path]);
+      if(eSt) console.warn('No se pudo borrar el PDF:', eSt);
+    }
+    const { error } = await sb.from('minutas').delete().eq('id', id);
+    if(error) throw error;
+    await cargarMinutas();
+    showToast('Minuta eliminada');
+  }catch(e){
+    showToast('No se pudo eliminar: ' + (e.message || e));
+  }
 }
 
 function urlMinutaPdf(path){
@@ -7546,6 +7578,7 @@ function quitarAdjuntoDrawer(i){drawerAdjuntos.splice(i,1);renderDrawerAdjuntos(
 //  Tablas: equip_pedidos, equip_comentarios
 // ============================================================
 let eqPedidos = [];
+let eqVisibles = [];   // lo que se está viendo ahora, con filtros aplicados
 let eqVista = 'espera';
 let eqAbierto = null, eqTmpPrio = null, eqTmpStock = null;
 
@@ -7680,6 +7713,10 @@ function eqRender(){
     // 'antig' = puro orden de llegada; por defecto, urgentes primero y después llegada
     return porAntig ? antig : ((P[a.prioridad]-P[b.prioridad]) || antig);
   });
+
+  eqVisibles = arr;
+  const btnLimpiar=document.getElementById('eq-btn-limpiar');
+  if(btnLimpiar) btnLimpiar.style.display = (esAdmin() && arr.length) ? '' : 'none';
 
   if(!arr.length){
     const v=EQ_VACIO[eqVista];
@@ -7906,6 +7943,8 @@ function eqAbrir(id){
     ? cs.map(c=>'<div class="eq-cit">'+eqEsc(c.texto)+'<div class="cm">'+eqEsc(c.autor||OL[c.origen]||'')+' · '+eqFmtTs(c.creado_en)+'</div></div>').join('')
     : '<div style="font-size:12px;color:var(--text-5)">Sin comentarios.</div>';
   document.getElementById('eq-mo-com').value='';
+  const bb=document.getElementById('eq-mo-borrar');
+  if(bb) bb.style.display = esAdmin() ? '' : 'none';
   document.getElementById('eq-mov').classList.add('open');
 }
 function eqCerrar(){ document.getElementById('eq-mov').classList.remove('open'); eqAbierto=null; }
@@ -7927,6 +7966,45 @@ function eqPintarStock(){
     b.className='eq-seg'+(eqTmpStock===k?' '+M[k]:'');
   });
   document.getElementById('eq-bx-eta').style.display = eqTmpStock==='pedido'?'block':'none';
+}
+
+// Borra el pedido abierto. Los comentarios se van solos (on delete cascade).
+async function eqBorrar(){
+  if(!esAdmin() || !eqAbierto) return;
+  const p = eqAbierto;
+  const quien = p.cliente + (p.dominio ? ' · ' + p.dominio : '');
+  if(!confirm('¿Eliminar el pedido de '+quien+'?\n\nSe borran también sus comentarios. No se puede deshacer.')) return;
+  try{
+    const { error } = await sb.from('equip_pedidos').delete().eq('id', p.id);
+    if(error) throw error;
+    eqCerrar();
+    await cargarEquip();
+    showToast('Pedido eliminado');
+  }catch(e){
+    const err=document.getElementById('eq-mo-err');
+    err.textContent='No se pudo eliminar: '+(e.message||e); err.style.display='block';
+  }
+}
+
+// Borra de una vez todo lo que se ve en la solapa actual, con los filtros
+// aplicados. Pensado para limpiar las cargas de prueba.
+async function eqBorrarVista(){
+  if(!esAdmin()) return;
+  const ids = eqVisibles.map(x => x.id);
+  if(!ids.length){ showToast('No hay pedidos en esta vista'); return; }
+  const cual = ({espera:'Esperando stock',listo:'Listos para turnar',
+                 sin:'Sin pieza',turnado:'Turnados'})[eqVista];
+  if(!confirm('¿Eliminar los '+ids.length+' pedido(s) que estás viendo en "'+cual+'"?\n\n'+
+              'Se borran también sus comentarios. No se puede deshacer.')) return;
+  if(!confirm('Confirmá una vez más: se eliminan '+ids.length+' pedido(s).')) return;
+  try{
+    const { error } = await sb.from('equip_pedidos').delete().in('id', ids);
+    if(error) throw error;
+    await cargarEquip();
+    showToast(ids.length+' pedido(s) eliminados');
+  }catch(e){
+    showToast('No se pudo eliminar: '+(e.message||e));
+  }
 }
 
 async function eqGuardarModal(){
