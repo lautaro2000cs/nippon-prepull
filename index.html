@@ -5007,6 +5007,7 @@ function renderMinutas(){
       </div>
       <div style="display:flex;gap:8px">
         ${m.pdf_path ? `<a href="${urlMinutaPdf(m.pdf_path)}" target="_blank" class="btn-sm" style="text-decoration:none">📄 Ver PDF</a>` : ''}
+        ${esAdmin() ? `<button class="btn-sm" onclick="regenerarPdfMinuta('${m.id}')" title="Volver a generar el PDF con los datos guardados"><i class="ti ti-refresh" style="font-size:13px"></i> Regenerar PDF</button>` : ''}
         ${esAdmin() ? `<button class="btn-sm" onclick="borrarMinuta('${m.id}')" title="Eliminar minuta" style="color:var(--accent);border-color:rgba(224,50,47,.35)"><i class="ti ti-trash" style="font-size:13px"></i></button>` : ''}
       </div>
     </div>`;
@@ -5015,6 +5016,38 @@ function renderMinutas(){
 
 // ¿Es admin? Sólo el admin puede borrar registros.
 function esAdmin(){ return !!(cu && cu.rol === 'admin'); }
+
+// Vuelve a armar el PDF de una minuta ya cargada, usando los datos que están
+// guardados en la tabla. Sirve para las minutas viejas, cuyo PDF se generó
+// cuando los cargos largos se cortaban.
+async function regenerarPdfMinuta(id){
+  if(!esAdmin()) return;
+  const m = minutas.find(x => String(x.id) === String(id));
+  if(!m) return;
+  if(!confirm('¿Volver a generar el PDF de "'+(m.asunto||'(sin asunto)')+'"?\n\n'+
+              'Se rehace con los datos guardados y reemplaza al archivo actual.')) return;
+  try{
+    const blob = generarPdfMinuta(m);
+    const nombreArch = 'minuta_' + Date.now() + '.pdf';
+    const { data: up, error: upErr } = await sb.storage
+      .from('minutas').upload(nombreArch, blob, { contentType:'application/pdf', upsert:false });
+    if(upErr) throw new Error('Al subir el PDF: ' + upErr.message);
+
+    const anterior = m.pdf_path;
+    const { error } = await sb.from('minutas').update({ pdf_path: up.path }).eq('id', id);
+    if(error) throw error;
+
+    // recién ahora borramos el viejo: si algo falla antes, no perdemos nada
+    if(anterior && anterior !== up.path){
+      const { error: eDel } = await sb.storage.from('minutas').remove([anterior]);
+      if(eDel) console.warn('No se pudo borrar el PDF anterior:', eDel);
+    }
+    await cargarMinutas();
+    showToast('PDF regenerado');
+  }catch(e){
+    alert('No se pudo regenerar: ' + (e.message || e));
+  }
+}
 
 // Borra una minuta y, si tenía, su PDF del storage.
 async function borrarMinuta(id){
