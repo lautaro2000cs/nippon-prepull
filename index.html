@@ -5272,25 +5272,59 @@ function generarPdfMinuta(m){
   };
   y = drawHeadPart(y);
   const parts = m.participantes || [];
+
+  // Ajusta el texto al ancho real de la celda: primero intenta entrar en una
+  // línea, después achica un poco la letra y, si hace falta, parte en dos
+  // renglones. Antes se cortaba a una cantidad fija de caracteres y los
+  // cargos largos quedaban truncados ("Subgerente Abastecimient").
+  const ajustarCelda = (txt, maxW) => {
+    const s = String(txt || '').trim();
+    if(!s) return { lineas: [''], size: 7 };
+    for(const size of [7, 6.4, 5.9]){
+      doc.setFontSize(size);
+      const l = doc.splitTextToSize(s, maxW);
+      if(l.length === 1) return { lineas: l, size };
+    }
+    doc.setFontSize(5.9);
+    const l = doc.splitTextToSize(s, maxW);
+    return { lineas: l.slice(0, 2), size: 5.9 };   // dos renglones como tope
+  };
+
   for(let i=0;i<parts.length;i+=2){
     const a = parts[i], b = parts[i+1];
-    const rowH = 6;
+    doc.setFont('helvetica','normal');
+
+    // se mide todo antes de dibujar, para saber cuánto tiene que medir la fila
+    const celdas = [];
+    const medir = (persona, offset) => {
+      if(!persona){ celdas.push(null,null,null); return; }
+      celdas.push(
+        { ...ajustarCelda(persona.nombre,    wNom-4), x: margin+offset+2 },
+        { ...ajustarCelda(persona.cargo,     wCar-4), x: margin+offset+wNom+2 },
+        { ...ajustarCelda(persona.iniciales, wIni-3), x: margin+offset+wNom+wCar+2 }
+      );
+    };
+    medir(a, 0); medir(b, half);
+
+    const maxLineas = Math.max(1, ...celdas.filter(Boolean).map(c=>c.lineas.length));
+    const rowH = maxLineas > 1 ? 9 : 6;
+
     doc.setDrawColor(120); doc.setLineWidth(0.2);
     let xx = margin;
     [wNom,wCar,wIni,wNom,wCar,wIni].forEach(w=>{ doc.rect(xx, y, w, rowH); xx+=w; });
-    doc.setFont('helvetica','normal'); doc.setFontSize(7);
-    if(a){
-      doc.text(String(a.nombre||'').substring(0,32), margin+2, y+4);
-      doc.text(String(a.cargo||'').substring(0,26), margin+wNom+2, y+4);
-      doc.text(String(a.iniciales||''), margin+wNom+wCar+2, y+4);
-    }
-    if(b){
-      doc.text(String(b.nombre||'').substring(0,32), margin+half+2, y+4);
-      doc.text(String(b.cargo||'').substring(0,26), margin+half+wNom+2, y+4);
-      doc.text(String(b.iniciales||''), margin+half+wNom+wCar+2, y+4);
-    }
+
+    celdas.forEach(c=>{
+      if(!c) return;
+      doc.setFontSize(c.size);
+      // centrado vertical según cuántos renglones tenga la celda
+      const alto = c.lineas.length * (c.size * 0.42);
+      let ty = y + (rowH - alto)/2 + c.size*0.36;
+      c.lineas.forEach(l=>{ doc.text(l, c.x, ty); ty += c.size*0.42; });
+    });
+
     y += rowH;
   }
+  doc.setFontSize(7);
 
   // --- DESCRIPCIÓN ---
   y = barraSeccion(doc, margin, y, contentW, 'DESCRIPCIÓN');
