@@ -1177,9 +1177,6 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
               <button class="btn-sm" id="eq-btn-nueva" onclick="eqAbrirAlta()" style="display:none">
                 <i class="ti ti-plus" style="font-size:13px;vertical-align:-2px"></i> Cargar venta
               </button>
-              <button class="btn-sm" id="eq-btn-limpiar" onclick="eqBorrarVista()" style="display:none;color:var(--accent);border-color:rgba(224,50,47,.35)" title="Eliminar todos los pedidos de esta vista">
-                <i class="ti ti-trash" style="font-size:13px;vertical-align:-2px"></i> Borrar lo que veo
-              </button>
               <button class="btn-sm" onclick="cargarEquip()" title="Actualizar">
                 <i class="ti ti-refresh" style="font-size:13px;vertical-align:-2px"></i>
               </button>
@@ -7578,7 +7575,6 @@ function quitarAdjuntoDrawer(i){drawerAdjuntos.splice(i,1);renderDrawerAdjuntos(
 //  Tablas: equip_pedidos, equip_comentarios
 // ============================================================
 let eqPedidos = [];
-let eqVisibles = [];   // lo que se está viendo ahora, con filtros aplicados
 let eqVista = 'espera';
 let eqAbierto = null, eqTmpPrio = null, eqTmpStock = null;
 
@@ -7714,10 +7710,6 @@ function eqRender(){
     return porAntig ? antig : ((P[a.prioridad]-P[b.prioridad]) || antig);
   });
 
-  eqVisibles = arr;
-  const btnLimpiar=document.getElementById('eq-btn-limpiar');
-  if(btnLimpiar) btnLimpiar.style.display = (esAdmin() && arr.length) ? '' : 'none';
-
   if(!arr.length){
     const v=EQ_VACIO[eqVista];
     const filtrando = q || fp || (fs && !(cu&&cu.sucursalFija));
@@ -7775,7 +7767,7 @@ function eqPorDia(arr){
           (p.estado_stock==='pedido'?'<div class="eq-dias" style="color:#1f5fa8">pieza en camino · llega '+fmtD(p.eta_pieza)+'</div>':'')+'</td>'+
         '<td>'+eqEsc(p.sucursal||'—')+'</td>'+
         '<td>'+(p.tiempo_trabajo?'<span class="eq-chip">'+eqEsc(p.tiempo_trabajo)+'</span>':'—')+'</td>'+
-        '<td>'+eqBtn(p)+'</td></tr>';
+        '<td style="white-space:nowrap">'+eqBtn(p)+eqDel(p)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   }).join('');
 }
@@ -7824,7 +7816,15 @@ function eqFila(p){
       (p.motivo_prioridad?'<div style="font-size:10.5px;color:var(--text-5);margin-top:3px">'+eqEsc(p.motivo_prioridad)+'</div>':'')+'</td>'+
     '<td>'+eqStockPill(p.estado_stock)+eta+
       (nc?'<div class="eq-dias"><i class="ti ti-message" style="font-size:10px"></i> '+nc+'</div>':'')+'</td>'+
-    '<td>'+eqBtn(p)+'</td></tr>';
+    '<td style="white-space:nowrap">'+eqBtn(p)+eqDel(p)+'</td></tr>';
+}
+
+// Papelera al final de cada fila, sólo para el admin.
+function eqDel(p){
+  if(!esAdmin()) return '';
+  return ' <button class="btn-sm" onclick="eqBorrarId(\''+p.id+'\')" title="Eliminar este pedido"'+
+         ' style="color:var(--accent);border-color:rgba(224,50,47,.35);padding:5px 8px">'+
+         '<i class="ti ti-trash" style="font-size:12px"></i></button>';
 }
 
 function eqBtn(p){
@@ -7968,7 +7968,24 @@ function eqPintarStock(){
   document.getElementById('eq-bx-eta').style.display = eqTmpStock==='pedido'?'block':'none';
 }
 
-// Borra el pedido abierto. Los comentarios se van solos (on delete cascade).
+// Borra un pedido desde la papelera de la fila, sin abrir el detalle.
+async function eqBorrarId(id){
+  if(!esAdmin()) return;
+  const p = eqPedidos.find(x => x.id === id);
+  if(!p) return;
+  const quien = p.cliente + (p.dominio ? ' · ' + p.dominio : '');
+  if(!confirm('¿Eliminar el pedido de '+quien+'?\n\nSe borran también sus comentarios. No se puede deshacer.')) return;
+  try{
+    const { error } = await sb.from('equip_pedidos').delete().eq('id', id);
+    if(error) throw error;
+    await cargarEquip();
+    showToast('Pedido eliminado');
+  }catch(e){
+    showToast('No se pudo eliminar: '+(e.message||e));
+  }
+}
+
+// Borra el pedido abierto en el detalle. Los comentarios se van solos (cascade).
 async function eqBorrar(){
   if(!esAdmin() || !eqAbierto) return;
   const p = eqAbierto;
@@ -7983,27 +8000,6 @@ async function eqBorrar(){
   }catch(e){
     const err=document.getElementById('eq-mo-err');
     err.textContent='No se pudo eliminar: '+(e.message||e); err.style.display='block';
-  }
-}
-
-// Borra de una vez todo lo que se ve en la solapa actual, con los filtros
-// aplicados. Pensado para limpiar las cargas de prueba.
-async function eqBorrarVista(){
-  if(!esAdmin()) return;
-  const ids = eqVisibles.map(x => x.id);
-  if(!ids.length){ showToast('No hay pedidos en esta vista'); return; }
-  const cual = ({espera:'Esperando stock',listo:'Listos para turnar',
-                 sin:'Sin pieza',turnado:'Turnados'})[eqVista];
-  if(!confirm('¿Eliminar los '+ids.length+' pedido(s) que estás viendo en "'+cual+'"?\n\n'+
-              'Se borran también sus comentarios. No se puede deshacer.')) return;
-  if(!confirm('Confirmá una vez más: se eliminan '+ids.length+' pedido(s).')) return;
-  try{
-    const { error } = await sb.from('equip_pedidos').delete().in('id', ids);
-    if(error) throw error;
-    await cargarEquip();
-    showToast(ids.length+' pedido(s) eliminados');
-  }catch(e){
-    showToast('No se pudo eliminar: '+(e.message||e));
   }
 }
 
