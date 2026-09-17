@@ -7865,7 +7865,7 @@ function eqPorDia(arr){
           (p.estado_stock==='pedido'?'<div class="eq-dias" style="color:#1f5fa8">pieza en camino · llega '+fmtD(p.eta_pieza)+'</div>':'')+'</td>'+
         '<td>'+eqEsc(p.sucursal||'—')+'</td>'+
         '<td>'+(p.tiempo_trabajo?'<span class="eq-chip">'+eqEsc(p.tiempo_trabajo)+'</span>':'—')+'</td>'+
-        '<td style="white-space:nowrap">'+eqBtn(p)+eqDel(p)+'</td></tr>';
+        '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqDel(p)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   }).join('');
 }
@@ -7914,7 +7914,7 @@ function eqFila(p){
       (p.motivo_prioridad?'<div style="font-size:10.5px;color:var(--text-5);margin-top:3px">'+eqEsc(p.motivo_prioridad)+'</div>':'')+'</td>'+
     '<td>'+eqStockPill(p.estado_stock)+eta+
       (nc?'<div class="eq-dias"><i class="ti ti-message" style="font-size:10px"></i> '+nc+'</div>':'')+'</td>'+
-    '<td style="white-space:nowrap">'+eqBtn(p)+eqDel(p)+'</td></tr>';
+    '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqDel(p)+'</td></tr>';
 }
 
 // Papelera al final de cada fila, sólo para el admin.
@@ -7923,6 +7923,16 @@ function eqDel(p){
   return ' <button class="btn-sm" onclick="eqBorrarId(\''+p.id+'\')" title="Eliminar este pedido"'+
          ' style="color:var(--accent);border-color:rgba(224,50,47,.35);padding:5px 8px">'+
          '<i class="ti ti-trash" style="font-size:12px"></i></button>';
+}
+
+// Lápiz de edición en la fila, para quien carga ventas (no admin, que ya
+// tiene sus botones y el "Editar datos" dentro de la ficha). Así el vendedor
+// no tiene que abrir "Ver" para encontrar la edición.
+function eqEditFila(p){
+  if(esAdmin() || !eqPuedeVender()) return '';
+  if(eqPaso(p)==='anulado') return '';
+  return ' <button class="btn-sm" onclick="eqAbrirAlta(\''+p.id+'\')" title="Editar los datos de esta venta"'+
+         ' style="padding:5px 8px"><i class="ti ti-pencil" style="font-size:12px"></i></button>';
 }
 
 function eqBtn(p){
