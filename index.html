@@ -7895,7 +7895,16 @@ function eqFila(p){
   const espera = '<div class="eq-dias'+(eqPaso(p)==='espera'&&d>=3?' viejo':'')+'">'+
     (d===0?'hoy':'hace '+d+' día'+(d>1?'s':''))+'</div>';
   const eta = p.eta_pieza ? '<div class="eq-dias">llega '+fmtD(p.eta_pieza)+'</div>' : '';
-  const nc = (p.equip_comentarios||[]).length;
+  const coms = (p.equip_comentarios||[]).slice().sort((a,b)=>String(a.creado_en).localeCompare(String(b.creado_en)));
+  const nc = coms.length;
+  // Último comentario mostrado en la misma fila, para no tener que abrir la ficha.
+  const ult = nc ? coms[nc-1] : null;
+  const comHtml = nc
+    ? '<div class="eq-dias" style="white-space:normal;max-width:220px;color:var(--text-3)">'+
+        '<i class="ti ti-message" style="font-size:10px"></i> '+eqEsc(ult.texto)+
+        (nc>1?' <span style="color:var(--text-5)">(+'+(nc-1)+')</span>':'')+
+      '</div>'
+    : '';
   const dur = p.tiempo_trabajo ? '<span class="eq-chip">'+eqEsc(p.tiempo_trabajo)+'</span>' : '';
   const cod = p.codigo_turno ? '<span class="eq-chip">'+eqEsc(p.codigo_turno)+'</span>' : '';
   return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+'">'+
@@ -7912,8 +7921,7 @@ function eqFila(p){
     '<td>'+eqEsc(p.sucursal||'—')+'</td>'+
     '<td>'+eqPrioPill(p.prioridad)+
       (p.motivo_prioridad?'<div style="font-size:10.5px;color:var(--text-5);margin-top:3px">'+eqEsc(p.motivo_prioridad)+'</div>':'')+'</td>'+
-    '<td>'+eqStockPill(p.estado_stock)+eta+
-      (nc?'<div class="eq-dias"><i class="ti ti-message" style="font-size:10px"></i> '+nc+'</div>':'')+'</td>'+
+    '<td>'+eqStockPill(p.estado_stock)+eta+comHtml+'</td>'+
     '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqDel(p)+'</td></tr>';
 }
 
