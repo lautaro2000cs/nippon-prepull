@@ -8012,8 +8012,20 @@ async function eqGuardarAlta(){
   }
 }
 
+// Dibuja la lista de comentarios en la ficha. Se usa dos veces al abrir:
+// primero con lo que ya trajo la bandeja (instantáneo) y después con lo que
+// devuelve la consulta directa, por si el embed de la lista vino vacío.
+function eqRenderComentarios(lista){
+  const cont=document.getElementById('eq-mo-hist'); if(!cont) return;
+  const cs=(lista||[]).slice().sort((a,b)=>String(a.creado_en).localeCompare(String(b.creado_en)));
+  const OL={venta:'Vendedor',turnos:'Turnos',stock:'Control de stock'};
+  cont.innerHTML = cs.length
+    ? cs.map(c=>'<div class="eq-cit">'+eqEsc(c.texto)+'<div class="cm">'+eqEsc(c.autor||OL[c.origen]||'')+' · '+eqFmtTs(c.creado_en)+'</div></div>').join('')
+    : '<div style="font-size:12px;color:var(--text-5)">Sin comentarios.</div>';
+}
+
 // ── modal de gestión ──
-function eqAbrir(id){
+async function eqAbrir(id){
   const p=eqPedidos.find(x=>x.id===id); if(!p) return;
   eqAbierto=p; eqTmpPrio=p.prioridad; eqTmpStock=p.estado_stock;
   const pa=eqPaso(p);
@@ -8063,11 +8075,8 @@ function eqAbrir(id){
     fEl.value=p.fecha||'';
   }
 
-  const cs=(p.equip_comentarios||[]).slice().sort((a,b)=>String(a.creado_en).localeCompare(String(b.creado_en)));
-  const OL={venta:'Vendedor',turnos:'Turnos',stock:'Control de stock'};
-  document.getElementById('eq-mo-hist').innerHTML = cs.length
-    ? cs.map(c=>'<div class="eq-cit">'+eqEsc(c.texto)+'<div class="cm">'+eqEsc(c.autor||OL[c.origen]||'')+' · '+eqFmtTs(c.creado_en)+'</div></div>').join('')
-    : '<div style="font-size:12px;color:var(--text-5)">Sin comentarios.</div>';
+  // 1) lo que ya trajo la bandeja, para que se vea al instante
+  eqRenderComentarios(p.equip_comentarios);
   document.getElementById('eq-mo-com').value='';
   const bb=document.getElementById('eq-mo-borrar');
   if(bb) bb.style.display = esAdmin() ? '' : 'none';
@@ -8075,6 +8084,17 @@ function eqAbrir(id){
   const be=document.getElementById('eq-mo-editar');
   if(be) be.style.display = ((eqPuedeVender()||esAdmin()) && pa!=='anulado') ? '' : 'none';
   document.getElementById('eq-mov').classList.add('open');
+
+  // 2) traigo los comentarios directo de la base y re-dibujo, por si el
+  //    join de la bandeja llegó vacío o quedó viejo. Si el usuario ya cerró
+  //    o abrió otro pedido, no piso nada.
+  try{
+    const {data}=await sb.from('equip_comentarios').select('*').eq('pedido_id',id).order('creado_en');
+    if(data && eqAbierto && eqAbierto.id===id){
+      p.equip_comentarios=data;
+      eqRenderComentarios(data);
+    }
+  }catch(e){ console.error('No se pudieron traer los comentarios', e); }
 }
 function eqCerrar(){ document.getElementById('eq-mov').classList.remove('open'); eqAbierto=null; }
 
