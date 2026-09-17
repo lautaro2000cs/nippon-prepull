@@ -2421,6 +2421,11 @@ async function showApp(){
   } else if(enDetenidos){
     detVista='sucursales'; detSucSel=null; detCardFilter='todos';
     cargarDetenidos();
+  } else if(enEquip){
+    cargarEquip();
+    iniciarRealtimeEquip();
+  } else if(enTsp){
+    cargarTsp();
   } else if(enAdmin){
     await cargarUsuariosParaSelect();
     renderUsers();
@@ -2446,6 +2451,22 @@ function iniciarRealtime(){
 }
 function detenerRealtime(){
   if(realtimeChannel){sb.removeChannel(realtimeChannel);realtimeChannel=null;}
+  detenerRealtimeEquip();
+}
+
+// Realtime propio del módulo de equipamiento: la bandeja se refresca sola
+// cuando alguien carga, edita, cambia stock, turna o comenta un pedido.
+let equipChannel=null;
+function iniciarRealtimeEquip(){
+  if(equipChannel) return; // ya está escuchando
+  equipChannel=sb
+    .channel('equip-cambios')
+    .on('postgres_changes',{event:'*',schema:'public',table:'equip_pedidos'},()=>{ cargarEquip(); })
+    .on('postgres_changes',{event:'*',schema:'public',table:'equip_comentarios'},()=>{ cargarEquip(); })
+    .subscribe();
+}
+function detenerRealtimeEquip(){
+  if(equipChannel){sb.removeChannel(equipChannel);equipChannel=null;}
 }
 function doLogout(){detenerRealtime();sb.auth.signOut().catch(()=>{});cu=null;filtroSucursales.clear();document.getElementById('s-app').classList.remove('active');document.getElementById('s-selector').classList.remove('active');document.getElementById('s-login').classList.add('active');['lu','lp'].forEach(id=>document.getElementById(id).value='');document.getElementById('lr').value='';onLoginUserInput();}
 
@@ -5447,7 +5468,7 @@ function swTab(t,el){
   if(t==='encuestas') cargarEncuestas();
   if(t==='desest') cargarBandejaDesest();
   if(t==='minutas') cargarMinutas();
-  if(t==='equip') cargarEquip();
+  if(t==='equip'){ cargarEquip(); iniciarRealtimeEquip(); }
   if(t==='tsp') cargarTsp();
 }
 function swSubTab(t,el){const cont=document.getElementById('tc-turnos');cont.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('act'));cont.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));el.classList.add('act');document.getElementById('subtc-'+t).classList.add('act');if(t==='noshow')renderNoShow();if(t==='historico')renderHistorico();}
