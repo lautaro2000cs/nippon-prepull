@@ -1495,8 +1495,8 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
 
 <div class="modal-ov" id="eq-mov-alta">
   <div class="modal">
-    <h3><i class="ti ti-shopping-cart" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0f766e"></i>Cargar venta de equipamiento</h3>
-    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem">Cargá todo lo que sepas de la venta. La fecha del turno se asigna después, cuando stock confirma la pieza.</div>
+    <h3><i class="ti ti-shopping-cart" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0f766e"></i><span id="eqa-titulo">Cargar venta de equipamiento</span></h3>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem" id="eqa-sub">Cargá todo lo que sepas de la venta. La fecha del turno se asigna después, cuando stock confirma la pieza.</div>
     <div class="mgrid">
       <div><label>Cliente <span style="color:var(--accent)">*</span></label><input type="text" id="eqa-cliente" placeholder="Apellido, Nombre"/></div>
       <div><label>Dominio / chasis</label><input type="text" id="eqa-dominio" placeholder="AB 123 CD"/></div>
@@ -1568,8 +1568,11 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
     </div>
     <p class="login-err" id="eq-mo-err" style="display:none"></p>
     <div class="mfooter">
-      <button class="btn-cancel" id="eq-mo-borrar" onclick="eqBorrar()" style="display:none;margin-right:auto;color:var(--accent);border-color:rgba(224,50,47,.35)">
+      <button class="btn-cancel" id="eq-mo-borrar" onclick="eqBorrar()" style="display:none;color:var(--accent);border-color:rgba(224,50,47,.35)">
         <i class="ti ti-trash" style="font-size:13px;vertical-align:-2px"></i> Eliminar
+      </button>
+      <button class="btn-cancel" id="eq-mo-editar" onclick="eqEditarDesdeDetalle()" style="display:none;margin-right:auto">
+        <i class="ti ti-pencil" style="font-size:13px;vertical-align:-2px"></i> Editar datos
       </button>
       <button class="btn-cancel" onclick="eqCerrar()">Cancelar</button>
       <button class="btn-save" onclick="eqGuardarModal()">Guardar</button>
@@ -7910,18 +7913,41 @@ function eqBtn(p){
 }
 
 // ── alta de venta (vendedor) ──
-function eqAbrirAlta(){
-  ['eqa-cliente','eqa-dominio','eqa-prosp','eqa-contacto','eqa-trabajo','eqa-obs'].forEach(function(id){
-    document.getElementById(id).value='';
-  });
-  document.getElementById('eqa-vendedor').value = (cu && cu.nombre) || '';
-  document.getElementById('eqa-suc').value = (cu && cu.sucursalFija) || '';
-  document.getElementById('eqa-tiempo').value='';
-  document.getElementById('eqa-cod').value='';
+// Guarda el id del pedido que se está editando. Null = alta nueva.
+let eqEditId = null;
+
+function eqAbrirAlta(id){
+  eqEditId = id || null;
+  const p = eqEditId ? eqPedidos.find(x=>x.id===eqEditId) : null;
+  if(eqEditId && !p) return;
+
+  const V = (campo) => p ? (p[campo] || '') : '';
+  document.getElementById('eqa-cliente').value  = V('cliente');
+  document.getElementById('eqa-dominio').value  = V('dominio');
+  document.getElementById('eqa-prosp').value    = V('nro_prosp');
+  document.getElementById('eqa-contacto').value = V('contacto');
+  document.getElementById('eqa-trabajo').value  = V('trabajo');
+  document.getElementById('eqa-obs').value      = V('obs_venta');
+  document.getElementById('eqa-vendedor').value = p ? V('vendedor') : ((cu && cu.nombre) || '');
+  document.getElementById('eqa-suc').value      = p ? V('sucursal') : ((cu && cu.sucursalFija) || '');
+  document.getElementById('eqa-tiempo').value   = V('tiempo_trabajo');
+  document.getElementById('eqa-cod').value      = V('codigo_turno');
+
+  document.getElementById('eqa-titulo').textContent = p ? 'Editar venta de equipamiento' : 'Cargar venta de equipamiento';
+  document.getElementById('eqa-sub').textContent = p
+    ? 'Corregí los datos de la venta. La prioridad, el stock y la fecha del turno se cambian desde la ficha del pedido.'
+    : 'Cargá todo lo que sepas de la venta. La fecha del turno se asigna después, cuando stock confirma la pieza.';
+  const bg=document.getElementById('eqa-btn'); if(bg) bg.textContent = p ? 'Guardar cambios' : 'Guardar venta';
+
   document.getElementById('eqa-err').style.display='none';
   document.getElementById('eq-mov-alta').classList.add('open');
 }
-function eqCerrarAlta(){ document.getElementById('eq-mov-alta').classList.remove('open'); }
+// Desde la ficha del pedido: cierra el detalle y reabre el formulario con los datos cargados.
+function eqEditarDesdeDetalle(){
+  const id = eqAbierto && eqAbierto.id; if(!id) return;
+  eqCerrar(); eqAbrirAlta(id);
+}
+function eqCerrarAlta(){ eqEditId=null; document.getElementById('eq-mov-alta').classList.remove('open'); }
 
 async function eqGuardarAlta(){
   const err=document.getElementById('eqa-err'); err.style.display='none';
@@ -7930,10 +7956,11 @@ async function eqGuardarAlta(){
   if(!cliente){ err.textContent='Falta el cliente.'; err.style.display='block'; return; }
   if(!trabajo){ err.textContent='Falta indicar qué se vendió.'; err.style.display='block'; return; }
 
+  const editando = !!eqEditId;
   const btn=document.getElementById('eqa-btn');
   btn.disabled=true; btn.textContent='Guardando...';
   try{
-    const {error}=await sb.from('equip_pedidos').insert([{
+    const datos={
       cliente: cliente,
       trabajo: trabajo.toUpperCase(),
       dominio: document.getElementById('eqa-dominio').value.trim().toUpperCase() || null,
@@ -7943,17 +7970,24 @@ async function eqGuardarAlta(){
       sucursal: document.getElementById('eqa-suc').value || null,
       obs_venta: document.getElementById('eqa-obs').value.trim() || null,
       tiempo_trabajo: document.getElementById('eqa-tiempo').value || null,
-      codigo_turno: document.getElementById('eqa-cod').value || null,
-      creado_por: cu.nombre
-    }]);
-    if(error) throw error;
+      codigo_turno: document.getElementById('eqa-cod').value || null
+    };
+    if(editando){
+      const {error}=await sb.from('equip_pedidos').update(datos).eq('id', eqEditId);
+      if(error) throw error;
+    }else{
+      datos.creado_por = cu.nombre;
+      const {error}=await sb.from('equip_pedidos').insert([datos]);
+      if(error) throw error;
+    }
+    eqEditId=null;
     eqCerrarAlta();
     await cargarEquip();
-    showToast('Venta cargada. Control de stock la va a revisar.');
+    showToast(editando ? 'Venta actualizada.' : 'Venta cargada. Control de stock la va a revisar.');
   }catch(e){
     err.textContent='Error: '+e.message; err.style.display='block';
   }finally{
-    btn.disabled=false; btn.textContent='Guardar venta';
+    btn.disabled=false; btn.textContent = editando ? 'Guardar cambios' : 'Guardar venta';
   }
 }
 
@@ -8016,6 +8050,9 @@ function eqAbrir(id){
   document.getElementById('eq-mo-com').value='';
   const bb=document.getElementById('eq-mo-borrar');
   if(bb) bb.style.display = esAdmin() ? '' : 'none';
+  // Quien carga ventas puede corregir lo que cargó, mientras el pedido no esté anulado.
+  const be=document.getElementById('eq-mo-editar');
+  if(be) be.style.display = ((eqPuedeVender()||esAdmin()) && pa!=='anulado') ? '' : 'none';
   document.getElementById('eq-mov').classList.add('open');
 }
 function eqCerrar(){ document.getElementById('eq-mov').classList.remove('open'); eqAbierto=null; }
