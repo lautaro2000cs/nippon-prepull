@@ -1215,9 +1215,6 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
               <option value="alta">Alta</option>
               <option value="normal">Normal</option>
             </select>
-            <select id="eq-fs" onchange="eqRender()" class="filter-sel">
-              <option value="">Todas las sucursales</option>
-            </select>
             <select id="eq-orden" onchange="eqRender()" class="filter-sel" title="Orden de la lista">
               <option value="prio">Urgentes primero</option>
               <option value="antig">Más antiguo primero</option>
@@ -1504,7 +1501,6 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
       <div><label>Contacto</label><input type="text" id="eqa-contacto" placeholder="Teléfono"/></div>
       <div class="full"><label>Qué se vendió <span style="color:var(--accent)">*</span></label>
         <input type="text" id="eqa-trabajo" placeholder="Ej: COBERTOR + BARRA DE TRABAJO + LANZA"/></div>
-      <div><label>Sucursal</label><select id="eqa-suc"><option value="">Seleccionar...</option><option>Roca</option><option>Perticone</option><option>Aguado</option><option>Añelo</option><option>Bariloche</option></select></div>
       <div><label>Vendedor</label><input type="text" id="eqa-vendedor"/></div>
       <div><label>Duración estimada</label>
         <select id="eqa-tiempo"><option value="">Seleccionar...</option><option>15MIN</option><option>30MIN</option><option>45MIN</option><option>1HS</option><option>2HS</option><option>3HS</option><option>4HS</option><option>5HS</option><option>6HS</option></select></div>
@@ -7734,12 +7730,6 @@ async function cargarEquip(){
   const btn=document.getElementById('eq-btn-nueva');
   if(btn) btn.style.display = eqPuedeVender() ? '' : 'none';
 
-  const fs=document.getElementById('eq-fs');
-  if(fs && fs.options.length<=1){
-    fs.innerHTML='<option value="">Todas las sucursales</option>'+SUCURSALES.map(s=>'<option>'+s+'</option>').join('');
-  }
-  if(cu && cu.sucursalFija && fs){ fs.value=cu.sucursalFija; fs.disabled=true; }
-
   const {data,error}=await sb.from('equip_pedidos')
     .select('*, equip_comentarios(*)').eq('anulado',false).order('creado_en');
   if(error){ console.error(error); showToast('No se pudieron cargar los pedidos de equipamiento'); return; }
@@ -7789,9 +7779,7 @@ function eqRender(){
   let arr=eqPedidos.filter(p=>eqPaso(p)===eqVista);
   const q=(document.getElementById('eq-q').value||'').toLowerCase().trim();
   const fp=document.getElementById('eq-fp').value;
-  const fs=cu&&cu.sucursalFija ? cu.sucursalFija : document.getElementById('eq-fs').value;
   if(fp) arr=arr.filter(p=>p.prioridad===fp);
-  if(fs) arr=arr.filter(p=>p.sucursal===fs);
   if(q) arr=arr.filter(p=>[p.cliente,p.dominio,p.nro_prosp,p.trabajo,p.vendedor]
     .some(v=>String(v||'').toLowerCase().includes(q)));
 
@@ -7810,10 +7798,10 @@ function eqRender(){
 
   if(!arr.length){
     const v=EQ_VACIO[eqVista];
-    const filtrando = q || fp || (fs && !(cu&&cu.sucursalFija));
+    const filtrando = q || fp;
     cont.innerHTML = filtrando
       ? '<div class="eq-empty"><i class="ti ti-search-off"></i><div class="t">Ningún pedido coincide</div>'+
-        '<div class="s">Probá con otro texto o quitá los filtros de prioridad y sucursal.</div></div>'
+        '<div class="s">Probá con otro texto o quitá el filtro de prioridad.</div></div>'
       : '<div class="eq-empty"><i class="ti ti-'+v[0]+'"></i><div class="t">'+v[1]+'</div><div class="s">'+v[2]+'</div></div>';
     return;
   }
@@ -7823,9 +7811,8 @@ function eqRender(){
 function eqTabla(arr){
   return '<div class="table-wrap"><table><thead><tr>'+
     '<th style="width:9%">Cargado</th>'+
-    '<th style="width:20%">Cliente</th><th style="width:10%">Vehículo</th><th>Qué se vendió</th>'+
-    '<th style="width:10%">Sucursal</th>'+
-    '<th style="width:10%">Prioridad</th><th style="width:11%">Stock</th><th style="width:9%"></th>'+
+    '<th style="width:22%">Cliente</th><th style="width:11%">Vehículo</th><th>Qué se vendió</th>'+
+    '<th style="width:10%">Prioridad</th><th style="width:12%">Stock</th><th style="width:9%"></th>'+
     '</tr></thead><tbody>'+arr.map(eqFila).join('')+'</tbody></table></div>';
 }
 
@@ -7854,7 +7841,7 @@ function eqPorDia(arr){
       '<span style="font-weight:400;color:var(--text-5)"> · '+n+' '+(n===1?'turno':'turnos')+' · '+eqFmtHoras(hs)+'</span></div>'+
       '<div class="table-wrap"><table><thead><tr>'+
       '<th style="width:24%">Cliente</th><th style="width:12%">Vehículo</th>'+
-      '<th>Qué se vendió</th><th style="width:12%">Sucursal</th><th style="width:9%">Dur.</th><th style="width:10%"></th>'+
+      '<th>Qué se vendió</th><th style="width:9%">Dur.</th><th style="width:10%"></th>'+
       '</tr></thead><tbody>'+g[f].map(function(p){
         return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+'">'+
         '<td><strong>'+eqEsc(p.cliente)+'</strong>'+
@@ -7863,7 +7850,6 @@ function eqPorDia(arr){
           (p.codigo_turno?'<div class="eq-dias">'+eqEsc(p.codigo_turno)+'</div>':'')+'</td>'+
         '<td>'+eqEsc(p.trabajo)+
           (p.estado_stock==='pedido'?'<div class="eq-dias" style="color:#1f5fa8">pieza en camino · llega '+fmtD(p.eta_pieza)+'</div>':'')+'</td>'+
-        '<td>'+eqEsc(p.sucursal||'—')+'</td>'+
         '<td>'+(p.tiempo_trabajo?'<span class="eq-chip">'+eqEsc(p.tiempo_trabajo)+'</span>':'—')+'</td>'+
         '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqDel(p)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
@@ -7918,7 +7904,6 @@ function eqFila(p){
     '<td>'+eqEsc(p.trabajo)+
       ((dur||cod)?'<div style="margin-top:4px">'+dur+cod+'</div>':'')+
       (p.obs_venta?'<div style="font-size:11px;color:var(--text-4);margin-top:3px">'+eqEsc(p.obs_venta)+'</div>':'')+'</td>'+
-    '<td>'+eqEsc(p.sucursal||'—')+'</td>'+
     '<td>'+eqPrioPill(p.prioridad)+
       (p.motivo_prioridad?'<div style="font-size:10.5px;color:var(--text-5);margin-top:3px">'+eqEsc(p.motivo_prioridad)+'</div>':'')+'</td>'+
     '<td>'+eqStockPill(p.estado_stock)+eta+comHtml+'</td>'+
@@ -7971,7 +7956,6 @@ function eqAbrirAlta(id){
   document.getElementById('eqa-trabajo').value  = V('trabajo');
   document.getElementById('eqa-obs').value      = V('obs_venta');
   document.getElementById('eqa-vendedor').value = p ? V('vendedor') : ((cu && cu.nombre) || '');
-  document.getElementById('eqa-suc').value      = p ? V('sucursal') : ((cu && cu.sucursalFija) || '');
   document.getElementById('eqa-tiempo').value   = V('tiempo_trabajo');
   document.getElementById('eqa-cod').value      = V('codigo_turno');
 
@@ -8009,7 +7993,6 @@ async function eqGuardarAlta(){
       nro_prosp: document.getElementById('eqa-prosp').value.trim() || null,
       contacto: document.getElementById('eqa-contacto').value.trim() || null,
       vendedor: document.getElementById('eqa-vendedor').value.trim() || null,
-      sucursal: document.getElementById('eqa-suc').value || null,
       obs_venta: document.getElementById('eqa-obs').value.trim() || null,
       tiempo_trabajo: document.getElementById('eqa-tiempo').value || null,
       codigo_turno: document.getElementById('eqa-cod').value || null
@@ -8056,7 +8039,6 @@ async function eqAbrir(id){
   const meta=[];
   if(p.dominio)   meta.push(eqEsc(p.dominio));
   if(p.nro_prosp) meta.push('prospecto '+eqEsc(p.nro_prosp));
-  if(p.sucursal)  meta.push(eqEsc(p.sucursal));
   if(p.tiempo_trabajo) meta.push(eqEsc(p.tiempo_trabajo));
   if(p.codigo_turno)   meta.push(eqEsc(p.codigo_turno));
   if(p.creado_en){
