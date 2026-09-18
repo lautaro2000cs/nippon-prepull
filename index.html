@@ -760,6 +760,10 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
           Equipamiento
         </button>
+        <button class="nav-item" id="tab-garantias" style="display:none" onclick="swTab('garantias',this)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          Garantías
+        </button>
         <button class="nav-item" id="tab-detenidos" style="display:none" onclick="swTab('detenidos',this)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
           Vehículos Detenidos
@@ -1224,6 +1228,24 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
           <div id="eq-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
         </div>
 
+        <!-- GARANTÍAS -->
+        <div class="tc" id="tc-garantias">
+          <div class="sec-hdr">
+            <div class="sec-hdr-left">
+              <div class="sec-eyebrow">Posventa · Documentación de garantía</div>
+              <h2>Garantías</h2>
+              <div class="tb-sub" id="gar-sub" style="margin-top:4px"></div>
+            </div>
+            <div class="hdr-actions" style="display:flex;gap:8px;align-items:center">
+              <button id="gar-nuevo-btn" onclick="garAbrirModal()" style="display:none;align-items:center;gap:6px;padding:9px 16px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:600;font-size:13px;cursor:pointer"><i class="ti ti-upload" style="font-size:15px"></i> Cargar archivo</button>
+              <button class="btn-sm" onclick="cargarGarantias()" title="Actualizar">
+                <i class="ti ti-refresh" style="font-size:13px;vertical-align:-2px"></i>
+              </button>
+            </div>
+          </div>
+          <div id="gar-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
+        </div>
+
         <!-- VEHÍCULOS DETENIDOS -->
         <div class="tc" id="tc-detenidos">
           <div class="sec-hdr">
@@ -1682,6 +1704,17 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
     <div style="margin-top:12px"><label>Archivo</label><input type="file" id="f-proc-file" style="font-size:13px"><div style="font-size:11.5px;color:var(--text-4);margin-top:4px">PDF, Word, imágenes, etc. Se sube como borrador; después lo confirmás para dejarlo definitivo.</div></div>
     <p class="login-err" id="proc-err" style="display:none"></p>
     <div class="mfooter"><button class="btn-cancel" onclick="cerrarProcModal()">Cancelar</button><button class="btn-save" id="proc-save-btn" onclick="guardarProc()">Subir borrador</button></div>
+  </div>
+</div>
+
+<div class="modal-ov" id="garov">
+  <div class="modal">
+    <h3 id="gar-modal-title"><i class="ti ti-upload" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#1d4ed8"></i>Cargar archivo</h3>
+    <div><label>Título <span style="color:var(--accent)">*</span></label><input type="text" id="f-gar-titulo" placeholder="Ej: Póliza de garantía / Manual"/></div>
+    <div style="margin-top:12px"><label>Descripción</label><textarea id="f-gar-descripcion" rows="2" placeholder="Breve detalle (opcional)…" style="width:100%;padding:9px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit"></textarea></div>
+    <div style="margin-top:12px"><label>Archivo</label><input type="file" id="f-gar-file" style="font-size:13px"><div id="gar-file-hint" style="font-size:11.5px;color:var(--text-4);margin-top:4px">PDF, Word, imágenes, etc.</div></div>
+    <p class="login-err" id="gar-err" style="display:none"></p>
+    <div class="mfooter"><button class="btn-cancel" onclick="garCerrarModal()">Cancelar</button><button class="btn-save" id="gar-save-btn" onclick="garGuardar()">Subir archivo</button></div>
   </div>
 </div>
 
@@ -2188,6 +2221,13 @@ const MODULOS = {
     color: '#0f766e',
     icono: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'
   },
+  garantias: {
+    id: 'garantias',
+    nombre: 'Garantías',
+    desc: 'Documentación de garantía por modelo. Carga el garantista; el resto consulta.',
+    color: '#1d4ed8',
+    icono: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>'
+  },
   admin: {
     id: 'admin',
     nombre: 'Administración',
@@ -2205,11 +2245,14 @@ const MODULOS = {
 // Roles creados después de la matriz de permisos de la base: todavía no tienen
 // filas en rol_permiso, así que se resuelven por la tabla de canFallback().
 // Cuando se siembren en la base, se los saca de acá y nada más cambia.
-const ROLES_SIN_MATRIZ = ['ambiente','equip_venta','equip_stock','equip_turnos','equip_ver'];
+const ROLES_SIN_MATRIZ = ['ambiente','equip_venta','equip_stock','equip_turnos','equip_ver','garantista'];
 
 function can(p){
   // El admin siempre tiene acceso a todo, sin depender de la matriz de la base.
   if(cu && cu.rol === 'admin') return true;
+  // Garantías: leer es para todos los usuarios logueados; sólo cargar/actualizar
+  // queda restringido (garantista o admin). Así "el resto" ve pero no toca.
+  if(p === 'garantias.ver' && cu) return true;
   if(cu && cu.permisos instanceof Set){
     // Primero lo que dice la base: ahí vienen los permisos del rol Y los
     // extra que el admin tilda usuario por usuario. Va SIEMPRE primero, para
@@ -2219,6 +2262,7 @@ function can(p){
     // todavía no están sembrados en la base.
     if(ROLES_SIN_MATRIZ.includes(cu.rol)) return canFallback(p);
     if(p.indexOf('equipamiento.') === 0) return canFallback(p);
+    if(p.indexOf('garantias.') === 0) return canFallback(p);
     return false;
   }
   return canFallback(p);
@@ -2239,6 +2283,7 @@ function canFallback(p){
     equip_stock:  ['equipamiento.ver','equipamiento.stock','procedimientos.ver'],
     equip_turnos: ['equipamiento.ver','equipamiento.turnar','equipamiento.prioridad','procedimientos.ver'],
     equip_ver:    ['equipamiento.ver'],
+    garantista:   ['garantias.ver','garantias.cargar','procedimientos.ver'],
   };
   const perms = new Set(M[cu.rol] || []);
   // overrides por usuario (mismos que en usuario_permiso)
@@ -2253,6 +2298,7 @@ function puedeAcceder(moduloId){
   if(moduloId === 'procedimientos') return can('procedimientos.ver');
   if(moduloId === 'detenidos') return can('detenidos.gestionar');
   if(moduloId === 'equipamiento') return can('equipamiento.ver');
+  if(moduloId === 'garantias') return can('garantias.ver');
   if(moduloId === 'tsp') return can('tsp.ver');
   return can(moduloId + '.ver');
 }
@@ -2326,7 +2372,7 @@ async function showApp(){
   document.getElementById('s-login').classList.remove('active');
   document.getElementById('s-app').classList.add('active');
   document.getElementById('tb-user').textContent=cu.nombre;
-  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene',ambiente:'Ambiente',equip_venta:'Equipamiento · Ventas',equip_stock:'Equipamiento · Stock',equip_turnos:'Equipamiento · Turnos',equip_ver:'Equipamiento · Consulta',jefe_servicio:'Jefe de Servicio'}[cu.rol]||cu.rol;
+  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene',ambiente:'Ambiente',equip_venta:'Equipamiento · Ventas',equip_stock:'Equipamiento · Stock',equip_turnos:'Equipamiento · Turnos',equip_ver:'Equipamiento · Consulta',garantista:'Garantías',jefe_servicio:'Jefe de Servicio'}[cu.rol]||cu.rol;
   const sucEl=document.getElementById('tb-suc');
   if(cu.sucursalFija){sucEl.style.display='inline-flex';sucEl.innerHTML=`<i class="ti ti-map-pin" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${cu.sucursalFija}`;}
   else sucEl.style.display='none';
@@ -2346,6 +2392,7 @@ async function showApp(){
   const enDetenidos = cu.modulo === 'detenidos';
   const enEquip = cu.modulo === 'equipamiento';
   const enTsp = cu.modulo === 'tsp';
+  const enGarantias = cu.modulo === 'garantias';
 
   document.getElementById('tab-dash').style.display=(enPrepull && can('prepull.dashboard.ver'))?'':'none';
   document.getElementById('tab-turnos').style.display=(enPrepull && can('prepull.turnos.ver'))?'':'none';
@@ -2364,6 +2411,8 @@ async function showApp(){
   if(tabEq) tabEq.style.display=enEquip?'':'none';
   const tabTsp = document.getElementById('tab-tsp');
   if(tabTsp) tabTsp.style.display=enTsp?'':'none';
+  const tabGar = document.getElementById('tab-garantias');
+  if(tabGar) tabGar.style.display=enGarantias?'':'none';
   // el botón flotante "+" es de Pre Pull (crear turno): ocultarlo en otros módulos
   const fab = document.getElementById('fab-nuevo');
   if(fab && !enPrepull) fab.style.display='none';
@@ -2383,6 +2432,8 @@ async function showApp(){
     startTab = 'equip';
   } else if(enTsp){
     startTab = 'tsp';
+  } else if(enGarantias){
+    startTab = 'garantias';
   } else if(enAdmin){
     startTab = 'usuarios';
   } else {
@@ -2425,6 +2476,8 @@ async function showApp(){
     iniciarRealtimeEquip();
   } else if(enTsp){
     cargarTsp();
+  } else if(enGarantias){
+    garModeloVista=null; cargarGarantias();
   } else if(enAdmin){
     await cargarUsuariosParaSelect();
     renderUsers();
@@ -4464,6 +4517,196 @@ async function borrarCategoria(id, nombre){
   }catch(err){ alert('No se pudo borrar: '+(err.message||'error')); }
 }
 
+// ============================================================
+//  MÓDULO GARANTÍAS
+//  Documentación de garantía por modelo. El garantista (y admin)
+//  cargan/actualizan/borran; el resto sólo lee y descarga.
+//  Tabla: garantia_docs · Bucket privado: garantias
+// ============================================================
+const GAR_MODELOS = [
+  {n:'Hilux',         c:'#c8102e'},
+  {n:'Corolla',       c:'#0d9488'},
+  {n:'Corolla Cross', c:'#0f766e'},
+  {n:'SW4',           c:'#334155'},
+  {n:'RAV4',          c:'#b45309'},
+  {n:'Yaris',         c:'#4f46e5'},
+  {n:'Etios',         c:'#9a6a08'},
+  {n:'Yaris Cross',   c:'#7c3aed'},
+];
+let garDocs = [];
+let garModeloVista = null;   // modelo abierto (null = grilla de modelos)
+let garEditId = null;        // doc que se está actualizando (null = alta)
+const garPuedeCargar = () => can('garantias.cargar');
+function garColor(n){ const m=GAR_MODELOS.find(x=>x.n===n); return m?m.c:'#64748b'; }
+
+async function cargarGarantias(){
+  const cont=document.getElementById('gar-cont');
+  try{
+    const {data,error}=await sb.from('garantia_docs').select('*').order('actualizado_en',{ascending:false});
+    if(error) throw error;
+    garDocs=data||[];
+    renderGar();
+  }catch(err){
+    if(cont) cont.innerHTML=`<div class="access-note" style="color:#b91c1c"><i class="ti ti-alert-triangle"></i> No se pudo cargar: ${escapeHtml(err.message||'error')}. ¿Corriste el SQL de Garantías y creaste el bucket?</div>`;
+  }
+}
+
+function renderGar(){
+  const cont=document.getElementById('gar-cont'); if(!cont) return;
+  const sub=document.getElementById('gar-sub');
+  const puede=garPuedeCargar();
+  const nb=document.getElementById('gar-nuevo-btn');
+  if(nb) nb.style.display=(puede && garModeloVista)?'inline-flex':'none';
+
+  const ult=garDocs.reduce((mx,d)=> d.actualizado_en&&d.actualizado_en>mx?d.actualizado_en:mx,'');
+  if(sub) sub.innerHTML=`<b>${garDocs.length}</b> documento(s) · ${GAR_MODELOS.length} modelos${ult?` · última actualización ${new Date(ult).toLocaleDateString('es-AR')}`:''}`;
+
+  // ---- Dentro de un modelo ----
+  if(garModeloVista){
+    const docs=garDocs.filter(d=>d.modelo===garModeloVista);
+    cont.innerHTML=`
+      <div class="proc-back" onclick="garVolver()" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-3);font-size:13px;font-weight:600;margin-bottom:14px"><i class="ti ti-arrow-left"></i> Volver a modelos</div>
+      <div class="proc-cat-hd" style="cursor:default;margin-bottom:14px">
+        <div class="ic" style="background:${garColor(garModeloVista)}"><i class="ti ti-car"></i></div>
+        <h3>${escapeHtml(garModeloVista)}</h3><span class="cnt">${docs.length}</span>
+      </div>
+      ${garTablaHtml(docs)}`;
+    return;
+  }
+
+  // ---- Grilla de modelos ----
+  const conteo={}; garDocs.forEach(d=>{ conteo[d.modelo]=(conteo[d.modelo]||0)+1; });
+  cont.innerHTML=`<div class="proc-cat-grid">`+GAR_MODELOS.map(m=>`
+    <div class="proc-cat-card" onclick="garAbrir('${m.n.replace(/'/g,"\\'")}')">
+      <div class="pcc-ic" style="background:${m.c}"><i class="ti ti-car"></i></div>
+      <div class="pcc-name">${escapeHtml(m.n)}</div>
+      <div class="pcc-count">${conteo[m.n]||0} documento(s)</div>
+      <div class="pcc-go">Ver documentos <i class="ti ti-arrow-right"></i></div>
+    </div>`).join('')+`</div>`;
+}
+
+function garTablaHtml(docs){
+  const puede=garPuedeCargar();
+  if(!docs.length) return `<div class="access-note"><i class="ti ti-info-circle"></i> No hay documentos cargados para este modelo todavía.${puede?' Usá “Cargar archivo” para subir el primero.':''}</div>`;
+  const rows=docs.map(d=>{
+    const fecha=d.actualizado_en?new Date(d.actualizado_en).toLocaleDateString('es-AR'):'—';
+    let acc=`<button class="pc-btn" onclick="garDescargar('${d.id}')" title="Descargar"><i class="ti ti-download"></i></button>`;
+    if(puede){
+      acc+=`<button class="pc-btn" onclick="garEditar('${d.id}')" title="Actualizar"><i class="ti ti-upload"></i></button>`;
+      acc+=`<button class="pc-btn" onclick="garBorrar('${d.id}')" title="Eliminar"><i class="ti ti-trash"></i></button>`;
+    }
+    return `<tr>
+      <td><div class="pdoc-t">${escapeHtml(d.titulo)}</div>${d.descripcion?`<div class="pdoc-d">${escapeHtml(d.descripcion)}</div>`:''}${d.archivo_nombre?`<div class="pdoc-cat">${escapeHtml(d.archivo_nombre)}</div>`:''}</td>
+      <td style="white-space:nowrap;color:var(--text-3)">${fecha}</td>
+      <td style="white-space:nowrap;color:var(--text-4);font-size:11.5px">${escapeHtml(d.subido_por_nombre||'')}</td>
+      <td style="white-space:nowrap"><div style="display:flex;gap:5px;justify-content:flex-end">${acc}</div></td>
+    </tr>`;
+  }).join('');
+  return `<div style="overflow-x:auto;background:#fff;border:1px solid var(--border-1);border-radius:14px">
+    <table class="proc-doc-table">
+      <thead><tr><th>Documento</th><th>Actualizado</th><th>Cargó</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function garAbrir(n){ garModeloVista=n; renderGar(); }
+function garVolver(){ garModeloVista=null; renderGar(); }
+
+// ---- Alta / actualización ----
+function garAbrirModal(){
+  garEditId=null;
+  document.getElementById('gar-modal-title').innerHTML='<i class="ti ti-upload" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#1d4ed8"></i>Cargar archivo · '+escapeHtml(garModeloVista||'');
+  document.getElementById('gar-err').style.display='none';
+  document.getElementById('f-gar-titulo').value='';
+  document.getElementById('f-gar-descripcion').value='';
+  document.getElementById('f-gar-file').value='';
+  document.getElementById('gar-file-hint').textContent='PDF, Word, imágenes, etc.';
+  document.getElementById('gar-save-btn').textContent='Subir archivo';
+  document.getElementById('garov').classList.add('open');
+}
+function garEditar(id){
+  const d=garDocs.find(x=>x.id===id); if(!d) return;
+  garEditId=id;
+  document.getElementById('gar-modal-title').innerHTML='<i class="ti ti-upload" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#1d4ed8"></i>Actualizar · '+escapeHtml(d.titulo);
+  document.getElementById('gar-err').style.display='none';
+  document.getElementById('f-gar-titulo').value=d.titulo||'';
+  document.getElementById('f-gar-descripcion').value=d.descripcion||'';
+  document.getElementById('f-gar-file').value='';
+  document.getElementById('gar-file-hint').textContent='Dejá el archivo vacío para conservar el actual, o elegí uno nuevo para reemplazarlo.';
+  document.getElementById('gar-save-btn').textContent='Guardar cambios';
+  document.getElementById('garov').classList.add('open');
+}
+function garCerrarModal(){ garEditId=null; document.getElementById('garov').classList.remove('open'); }
+
+async function garGuardar(){
+  const err=document.getElementById('gar-err'); err.style.display='none';
+  const btn=document.getElementById('gar-save-btn');
+  const titulo=document.getElementById('f-gar-titulo').value.trim();
+  const descripcion=document.getElementById('f-gar-descripcion').value.trim();
+  const file=document.getElementById('f-gar-file').files[0];
+  const editando=!!garEditId;
+  if(!titulo){ err.textContent='Completá el título.'; err.style.display='block'; return; }
+  if(!editando && !file){ err.textContent='Elegí un archivo.'; err.style.display='block'; return; }
+  try{
+    btn.disabled=true; btn.textContent='Guardando...';
+    if(editando){
+      const d=garDocs.find(x=>x.id===garEditId); if(!d) throw new Error('no encontrado');
+      const upd={titulo, descripcion, actualizado_en:new Date().toISOString()};
+      let viejo=null;
+      if(file){
+        const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+        const path=`${d.modelo}/${Date.now()}_${safe}`;
+        const up=await sb.storage.from('garantias').upload(path,file,{upsert:false});
+        if(up.error) throw up.error;
+        viejo=d.archivo_path;
+        upd.archivo_path=path; upd.archivo_nombre=file.name; upd.archivo_tipo=file.type; upd.tamano_bytes=file.size;
+      }
+      const {error}=await sb.from('garantia_docs').update(upd).eq('id',garEditId);
+      if(error) throw error;
+      if(viejo){ try{ await sb.storage.from('garantias').remove([viejo]); }catch(e){} }
+    }else{
+      const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      const path=`${garModeloVista}/${Date.now()}_${safe}`;
+      const up=await sb.storage.from('garantias').upload(path,file,{upsert:false});
+      if(up.error) throw up.error;
+      const {error}=await sb.from('garantia_docs').insert({
+        modelo:garModeloVista, titulo, descripcion,
+        archivo_path:path, archivo_nombre:file.name, archivo_tipo:file.type, tamano_bytes:file.size,
+        subido_por_username:cu.username, subido_por_nombre:cu.nombre
+      });
+      if(error) throw error;
+    }
+    garCerrarModal();
+    await cargarGarantias();
+    showToast(editando?'Documento actualizado.':'Archivo cargado.');
+  }catch(ex){
+    err.textContent='Error: '+(ex.message||'error'); err.style.display='block';
+  }finally{
+    btn.disabled=false; btn.textContent=editando?'Guardar cambios':'Subir archivo';
+  }
+}
+
+async function garDescargar(id){
+  const d=garDocs.find(x=>x.id===id); if(!d||!d.archivo_path){ alert('Sin archivo.'); return; }
+  try{
+    const {data,error}=await sb.storage.from('garantias').createSignedUrl(d.archivo_path,120);
+    if(error) throw error;
+    window.open(data.signedUrl,'_blank');
+  }catch(err){ alert('No se pudo descargar: '+(err.message||'error')); }
+}
+
+async function garBorrar(id){
+  const d=garDocs.find(x=>x.id===id); if(!d) return;
+  if(!confirm(`¿Eliminar “${d.titulo}”? No se puede deshacer.`)) return;
+  try{
+    const {error}=await sb.from('garantia_docs').delete().eq('id',id);
+    if(error) throw error;
+    if(d.archivo_path){ try{ await sb.storage.from('garantias').remove([d.archivo_path]); }catch(e){} }
+    await cargarGarantias();
+    showToast('Documento eliminado.');
+  }catch(err){ alert('No se pudo eliminar: '+(err.message||'error')); }
+}
+
 // --- Vista: promedio por asesor ---
 function renderEncResumen(){
   const arr = encuestasFiltradas();
@@ -5488,6 +5731,7 @@ function swTab(t,el){
   if(t==='minutas') cargarMinutas();
   if(t==='equip'){ cargarEquip(); iniciarRealtimeEquip(); }
   if(t==='tsp') cargarTsp();
+  if(t==='garantias'){ garModeloVista=null; cargarGarantias(); }
 }
 function swSubTab(t,el){const cont=document.getElementById('tc-turnos');cont.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('act'));cont.querySelectorAll('.sub-tc').forEach(c=>c.classList.remove('act'));el.classList.add('act');document.getElementById('subtc-'+t).classList.add('act');if(t==='noshow')renderNoShow();if(t==='historico')renderHistorico();}
 function swSubTabRep(t,el){
@@ -5624,7 +5868,7 @@ function valePill(v){return v?'<span class="pill p-arr"><i class="ti ti-check" s
 function priPill(p){const m={Alta:'pri-alta',Mediana:'pri-med',Baja:'pri-baja'};return`<span class="pill ${m[p]||'pri-baja'}">${p||'-'}</span>`;}
 function estPill(e){const m={pendiente:['p-pend','Pendiente'],arribo:['p-arr','Arribó'],faltante:['p-falt','Faltante'],bo:['p-bo','<i class="ti ti-alert-triangle" style="font-size:12px;vertical-align:-1px"></i> B/O']};const[c,l]=m[e]||['p-pend','Pendiente'];return`<span class="pill ${c}">${l}</span>`;}
 function valePill(v){return v?'<span class="pill p-arr"><i class="ti ti-check" style="font-size:11px"></i> Con vale</span>':'<span class="pill p-falt"><i class="ti ti-x" style="font-size:11px"></i> Sin vale</span>';}
-function rolPill(r){const m={admin:'<span class="pill" style="background:#fbeceb;color:#c62a27">Admin</span>',citas:'<span class="pill" style="background:#e6f4ec;color:#1f7a48">Citas</span>',repuestos:'<span class="pill" style="background:#eef0ff;color:#4f46e5">Repuestos</span>',compras:'<span class="pill" style="background:#fbf1de;color:#9a6a08">Compras</span>',supervisor:'<span class="pill" style="background:#e6f1fb;color:#0c447c">Supervisor</span>',jefe_servicio:'<span class="pill" style="background:#f3e8ff;color:#7c3aed">Jefe de Servicio</span>',equip_venta:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Ventas</span>',equip_stock:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Stock</span>',equip_turnos:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Turnos</span>',equip_ver:'<span class="pill" style="background:#eef2f1;color:#4b5f5b">Equip · Consulta</span>',ambiente:'<span class="pill" style="background:#e8f3e8;color:#2c5f2d">Ambiente</span>'};return m[r]||`<span style="font-size:11px">${r}</span>`;}
+function rolPill(r){const m={admin:'<span class="pill" style="background:#fbeceb;color:#c62a27">Admin</span>',citas:'<span class="pill" style="background:#e6f4ec;color:#1f7a48">Citas</span>',repuestos:'<span class="pill" style="background:#eef0ff;color:#4f46e5">Repuestos</span>',compras:'<span class="pill" style="background:#fbf1de;color:#9a6a08">Compras</span>',supervisor:'<span class="pill" style="background:#e6f1fb;color:#0c447c">Supervisor</span>',jefe_servicio:'<span class="pill" style="background:#f3e8ff;color:#7c3aed">Jefe de Servicio</span>',equip_venta:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Ventas</span>',equip_stock:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Stock</span>',equip_turnos:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Turnos</span>',equip_ver:'<span class="pill" style="background:#eef2f1;color:#4b5f5b">Equip · Consulta</span>',garantista:'<span class="pill" style="background:#e6effd;color:#1d4ed8">Garantías</span>',ambiente:'<span class="pill" style="background:#e8f3e8;color:#2c5f2d">Ambiente</span>'};return m[r]||`<span style="font-size:11px">${r}</span>`;}
 
 function renderGroups(cid,items,fn,horizFilt){
   // Cachear el grupo de cada item una sola vez (diffHabil puede ser lento con muchos turnos)
@@ -6236,7 +6480,7 @@ function convertirAgente(id){
 function llenarRolesUsr(){
   const sel=document.getElementById('f-usr-rol');
   const roles = (RP_ROLES && RP_ROLES.length) ? RP_ROLES
-    : [{id:'admin',label:'Admin'},{id:'supervisor',label:'Supervisor'},{id:'citas',label:'Citas'},{id:'repuestos',label:'Repuestos'},{id:'compras',label:'Compras'},{id:'asesor',label:'Asesor'},{id:'jefe_servicio',label:'Jefe de Servicio'},{id:'seguridad',label:'Seguridad e Higiene'},{id:'equip_venta',label:'Equipamiento · Ventas'},{id:'equip_stock',label:'Equipamiento · Stock'},{id:'equip_turnos',label:'Equipamiento · Turnos'},{id:'equip_ver',label:'Equipamiento · Consulta'},{id:'ambiente',label:'Ambiente'}];
+    : [{id:'admin',label:'Admin'},{id:'supervisor',label:'Supervisor'},{id:'citas',label:'Citas'},{id:'repuestos',label:'Repuestos'},{id:'compras',label:'Compras'},{id:'asesor',label:'Asesor'},{id:'jefe_servicio',label:'Jefe de Servicio'},{id:'seguridad',label:'Seguridad e Higiene'},{id:'equip_venta',label:'Equipamiento · Ventas'},{id:'equip_stock',label:'Equipamiento · Stock'},{id:'equip_turnos',label:'Equipamiento · Turnos'},{id:'equip_ver',label:'Equipamiento · Consulta'},{id:'garantista',label:'Garantías'},{id:'ambiente',label:'Ambiente'}];
   const actual = sel.value;
   sel.innerHTML='<option value="">Seleccionar...</option>'+roles.map(r=>`<option value="${r.id}">${escapeHtml(r.label)}</option>`).join('');
   if(actual) sel.value=actual;
