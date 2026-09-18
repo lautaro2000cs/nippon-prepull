@@ -616,6 +616,29 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
 .tsp-serv .km{font-size:13.5px;font-weight:700;color:var(--text-1)}
 .tsp-serv .det{font-size:11.5px;color:var(--text-5);margin-top:1px}
 .tsp-chip-km{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--text-4);background:var(--surface-sub,#faf9f7);border:1px solid var(--border-1);border-radius:6px;padding:1px 6px}
+
+/* ── GARANTÍAS · grilla de modelos ───────────────────────── */
+.gar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
+.gar-card{position:relative;text-align:left;cursor:pointer;border:1px solid var(--border-1);
+  border-radius:18px;background:#fff;padding:0;overflow:hidden;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;
+  box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.gar-card:hover{transform:translateY(-4px);box-shadow:0 14px 30px -12px color-mix(in srgb,var(--mc) 55%,transparent);border-color:color-mix(in srgb,var(--mc) 45%,var(--border-1))}
+.gar-card .gar-top{height:88px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--mc) 16%,#fff),color-mix(in srgb,var(--mc) 4%,#fff));
+  border-bottom:1px solid color-mix(in srgb,var(--mc) 14%,var(--border-1))}
+.gar-card .gar-ic{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;color:#fff;
+  background:linear-gradient(135deg,var(--mc),color-mix(in srgb,var(--mc) 72%,#000));
+  box-shadow:0 8px 18px -6px color-mix(in srgb,var(--mc) 70%,transparent)}
+.gar-card .gar-ic i{font-size:26px;line-height:1}
+.gar-card .gar-body{padding:14px 16px 16px}
+.gar-card .gar-name{font-size:16px;font-weight:750;color:var(--text-1);letter-spacing:-.2px}
+.gar-card .gar-count{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--text-4)}
+.gar-card .gar-count .dot{width:7px;height:7px;border-radius:50%;background:var(--mc)}
+.gar-card .gar-count.zero .dot{background:var(--border-2)}
+.gar-card .gar-go{display:flex;align-items:center;gap:6px;margin-top:14px;font-size:12.5px;font-weight:650;
+  color:var(--mc);opacity:.85;transition:gap .18s ease,opacity .18s ease}
+.gar-card:hover .gar-go{gap:10px;opacity:1}
+.gar-card .gar-go i{font-size:15px}
 </style>
 </head>
 <body>
@@ -4576,13 +4599,17 @@ function renderGar(){
 
   // ---- Grilla de modelos ----
   const conteo={}; garDocs.forEach(d=>{ conteo[d.modelo]=(conteo[d.modelo]||0)+1; });
-  cont.innerHTML=`<div class="proc-cat-grid">`+GAR_MODELOS.map(m=>`
-    <div class="proc-cat-card" onclick="garAbrir('${m.n.replace(/'/g,"\\'")}')">
-      <div class="pcc-ic" style="background:${m.c}"><i class="ti ti-car"></i></div>
-      <div class="pcc-name">${escapeHtml(m.n)}</div>
-      <div class="pcc-count">${conteo[m.n]||0} documento(s)</div>
-      <div class="pcc-go">Ver documentos <i class="ti ti-arrow-right"></i></div>
-    </div>`).join('')+`</div>`;
+  cont.innerHTML=`<div class="gar-grid">`+GAR_MODELOS.map(m=>{
+    const n=conteo[m.n]||0;
+    return `<button class="gar-card" style="--mc:${m.c}" onclick="garAbrir('${m.n.replace(/'/g,"\\'")}')">
+      <div class="gar-top"><div class="gar-ic"><i class="ti ti-car"></i></div></div>
+      <div class="gar-body">
+        <div class="gar-name">${escapeHtml(m.n)}</div>
+        <div class="gar-count${n?'':' zero'}"><span class="dot"></span>${n?`${n} documento${n>1?'s':''}`:'Sin documentos aún'}</div>
+        <div class="gar-go">Ver documentos <i class="ti ti-arrow-right"></i></div>
+      </div>
+    </button>`;
+  }).join('')+`</div>`;
 }
 
 function garTablaHtml(docs){
