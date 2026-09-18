@@ -3291,20 +3291,39 @@ function normSucursal(s){
 // La clave se compara con normSucursal(), así que tolera tildes/mayúsculas/espacios.
 // "Neuquén Capital" se integra a NEUQUEN; "San Martín de los Andes" a S.T.M.
 const SUCURSAL_CANON = {
+  // etiquetas oficiales: cada variante (tilde, minúscula, espacios) cae acá
+  'anelo':               'AÑELO',
+  'bariloche':           'BARILOCHE',
+  'cdoyhiace':           'CDO Y HIACE',
+  'ctralflotas':         'CTRAL FLOTAS',
+  'neuquen':             'NEUQUEN',
+  'roca':                'ROCA',
+  'stm':                 'S.T.M.',
+  // fusiones: variantes que pertenecen a otra sucursal
   'neuquencapital':      'NEUQUEN',
   'sucursalneuquen':     'NEUQUEN',
   'cipolletti':          'NEUQUEN',
   'paimun200':           'NEUQUEN',
   'paimun':              'NEUQUEN',
+  'perticone':                'NEUQUEN',
+  'perticone2095':            'NEUQUEN',
+  'perticone2095casacentral': 'NEUQUEN',
   'generalroca':         'ROCA',
   'sucursalroca':        'ROCA',
   'sanmartindelosandes': 'S.T.M.',
 };
-// Devuelve la etiqueta canónica de una sucursal (o la original si no hay fusión)
+// Devuelve la etiqueta canónica de una sucursal.
+// 1) si hay una fusión/etiqueta oficial para su forma normalizada, la usa;
+// 2) cualquier cosa que empiece con "perticone" es NEUQUEN (regla del negocio);
+// 3) si no está en el mapa, al menos la deja EN MAYÚSCULAS, así "Neuquén" y
+//    "NEUQUEN" no quedan como dos grupos distintos en los gráficos.
 function canonSucursal(raw){
   const r = String(raw||'').trim();
   if(!r) return r;
-  return SUCURSAL_CANON[normSucursal(r)] || r;
+  const k = normSucursal(r);
+  if(SUCURSAL_CANON[k]) return SUCURSAL_CANON[k];
+  if(k.indexOf('perticone') === 0) return 'NEUQUEN';
+  return r.toUpperCase();
 }
 // Reescribe en memoria la sucursal de cada encuesta a su forma canónica.
 // (La web solo LEE de Supabase; esto no toca la base, solo lo que se muestra.)
