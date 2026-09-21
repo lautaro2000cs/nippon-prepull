@@ -2635,7 +2635,7 @@ async function cargarUsuariosParaSelect(){
 let encuestas = [];            // filas crudas desde Supabase
 // Columnas que la web realmente usa. Evitamos traer 'raw' (el volcado completo
 // de Wise por fila), que es lo más pesado y no se muestra en ningún lado.
-const ENC_COLS = "id,wise_id,fecha,fecha_respuesta,asesor,asesor_override,telefono,nro_orden,p_amabilidad,p_atencion,p_puntualidad,p_explicacion,p_limpieza,p_turnos,p_espera,p_calidad,p_recomienda,promedio_asesor,comentario,funciono_ok,puntuacion_prom,puntuacion,sucursal,servicio,dominio,empresa,encuesta,anulada,preguntas_desestimadas";
+const ENC_COLS = "id,wise_id,fecha,fecha_respuesta,asesor,asesor_override,telefono,nro_orden,p_amabilidad,p_atencion,p_puntualidad,p_explicacion,p_limpieza,p_turnos,p_espera,p_calidad,p_recomienda,promedio_asesor,comentario,funciono_ok,puntuacion_prom,puntuacion,sucursal,sucursal_override,servicio,dominio,empresa,encuesta,anulada,preguntas_desestimadas";
 // Aplica la corrección manual de asesor (solo admin): si hay override, ese es el asesor efectivo.
 function aplicarAsesorOverride(arr){
   (arr||[]).forEach(e=>{
@@ -2984,6 +2984,33 @@ async function editarAsesorEnc(wiseId){
     renderEncuestas();
   }catch(err){ alert('No se pudo corregir el asesor: '+(err.message||'error')); }
 }
+
+// Corregir manualmente la sucursal de una encuesta (solo admin). Permanente:
+// se guarda en 'sucursal_override' y el sync de Wise no lo pisa.
+async function editarSucursalEnc(wiseId){
+  if(!(cu && cu.rol==='admin')) return;
+  const e = encuestas.find(x=>x.wise_id===wiseId);
+  if(!e) return;
+  const actual = e.sucursal_override || e.sucursal || '';
+  const nuevo = prompt(
+    'Corregir sucursal de esta encuesta.\n\n'+
+    'Sucursal actual: '+actual+'\n\n'+
+    'Sucursales: '+ENC_SUC_OPC.join(' · ')+'\n\n'+
+    'Escribí la sucursal correcta (o dejá vacío para volver a la de Wise):', actual);
+  if(nuevo === null) return; // canceló
+  const val = nuevo.trim();
+  try{
+    const { error } = await sb.from('encuestas')
+      .update({ sucursal_override: val || null })
+      .eq('wise_id', wiseId);
+    if(error) throw error;
+    const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
+    if(data){ encuestas = aplicarAsesorOverride(data); normalizarSucursales(); }
+    renderEncuestas();
+  }catch(err){ alert('No se pudo corregir la sucursal: '+(err.message||'error')); }
+}
+// Opciones oficiales de sucursal para el prompt de corrección.
+const ENC_SUC_OPC = ['NEUQUEN','ROCA','BARILOCHE','AÑELO','S.T.M.','CDO Y HIACE','CTRAL FLOTAS'];
 
 // ============================================================
 //  MÓDULO VEHÍCULOS DETENIDOS
@@ -3405,7 +3432,13 @@ function canonSucursal(raw){
 // (La web solo LEE de Supabase; esto no toca la base, solo lo que se muestra.)
 function normalizarSucursales(){
   if(!Array.isArray(encuestas)) return;
-  encuestas.forEach(e => { if(e && e.sucursal != null) e.sucursal = canonSucursal(e.sucursal); });
+  encuestas.forEach(e => {
+    if(!e) return;
+    // Si el admin corrigió la sucursal a mano, esa gana. El sync de Wise nunca
+    // toca 'sucursal_override', así que la corrección se mantiene.
+    const base = (e.sucursal_override && String(e.sucursal_override).trim()) ? e.sucursal_override : e.sucursal;
+    if(base != null) e.sucursal = canonSucursal(base);
+  });
 }
 
 // sucursales del jefe (sucursales_asignadas + sucursal_fija), normalizadas
@@ -4917,7 +4950,7 @@ function renderEncDetalle(){
       <td style="padding:9px 12px;text-align:center;color:var(--text-4)"><span id="${rid}-arr" style="display:inline-block;transition:transform .15s">▸</span></td>
       <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap;font-family:var(--mono)">${f}</td>
       <td style="padding:9px 12px;font-weight:600;color:var(--text-1);white-space:nowrap">${escapeHtml(e.asesor||'—')}${e.asesor_override?' <span style="font-size:10px;color:#4f46e5" title="Asesor corregido manualmente">✎</span>':''}${(cu&&cu.rol==='admin')?` <button onclick="event.stopPropagation();editarAsesorEnc('${e.wise_id}')" title="Corregir asesor" style="border:none;background:none;color:#4f46e5;cursor:pointer;font-size:12px;padding:0;margin-left:2px"><i class="ti ti-edit"></i></button>`:''}</td>
-      <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap">${escapeHtml(e.sucursal||'—')}</td>
+      <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap">${escapeHtml(e.sucursal||'—')}${e.sucursal_override?' <span style="font-size:10px;color:#4f46e5" title="Sucursal corregida manualmente">✎</span>':''}${(cu&&cu.rol==='admin')?` <button onclick="event.stopPropagation();editarSucursalEnc('${e.wise_id}')" title="Corregir sucursal" style="border:none;background:none;color:#4f46e5;cursor:pointer;font-size:12px;padding:0;margin-left:2px"><i class="ti ti-edit"></i></button>`:''}</td>
       <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap">${escapeHtml(e.servicio||'—')}</td>
       <td style="padding:9px 12px;color:var(--text-3);font-family:var(--mono);white-space:nowrap">${escapeHtml(e.dominio||'—')}</td>
       <td style="padding:9px 12px;color:var(--text-3);font-family:var(--mono);white-space:nowrap">${escapeHtml(e.telefono||'—')}</td>
