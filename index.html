@@ -584,6 +584,7 @@ tbody td{padding:11px 12px;vertical-align:middle}
 .eq-dias{font-family:var(--mono);font-size:10.5px;color:var(--text-5);margin-top:3px}
 .eq-dias.viejo{color:var(--accent);font-weight:700}
 tr.eq-urg{background:rgba(224,50,47,.035)}
+tr.eq-ok{background:rgba(15,123,63,.05)}
 .eq-chip{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--text-4);background:var(--surface-sub,#faf9f7);border:1px solid var(--border-1);border-radius:6px;padding:1px 6px;margin-right:4px}
 .eq-empty{text-align:center;padding:44px 20px}
 .eq-empty i{font-size:26px;color:var(--text-6,#b3afa9);display:block;margin-bottom:10px}
@@ -1542,6 +1543,7 @@ tr.eq-urg{background:rgba(224,50,47,.035)}
     <div class="mgrid">
       <div><label>Cliente <span style="color:var(--accent)">*</span></label><input type="text" id="eqa-cliente" placeholder="Apellido, Nombre"/></div>
       <div><label>Dominio / chasis</label><input type="text" id="eqa-dominio" placeholder="AB 123 CD"/></div>
+      <div><label>N° de Pre-Or <span style="color:var(--accent)">*</span></label><input type="text" id="eqa-preor" placeholder="N° de pre-orden"/></div>
       <div><label>N° prospecto</label><input type="text" id="eqa-prosp"/></div>
       <div><label>Contacto</label><input type="text" id="eqa-contacto" placeholder="Teléfono"/></div>
       <div class="full"><label>Qué se vendió <span style="color:var(--accent)">*</span></label>
@@ -8182,17 +8184,19 @@ function eqPorDia(arr){
     return '<div class="eq-daygroup" id="eq-d-'+f+'">'+eqFmtDia(f)+
       '<span style="font-weight:400;color:var(--text-5)"> · '+n+' '+(n===1?'turno':'turnos')+' · '+eqFmtHoras(hs)+'</span></div>'+
       '<div class="table-wrap"><table><thead><tr>'+
-      '<th style="width:24%">Cliente</th><th style="width:12%">Vehículo</th>'+
-      '<th>Qué se vendió</th><th style="width:9%">Dur.</th><th style="width:10%"></th>'+
+      '<th style="width:20%">Cliente</th><th style="width:12%">Vehículo</th>'+
+      '<th>Qué se vendió</th><th style="width:9%">Dur.</th><th style="width:11%;text-align:center">Equipada</th><th style="width:9%"></th>'+
       '</tr></thead><tbody>'+g[f].map(function(p){
-        return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+'">'+
+        return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+(p.equipada?' eq-ok':'')+'">'+
         '<td><strong>'+eqEsc(p.cliente)+'</strong>'+
-          (p.prioridad!=='normal'?' '+eqPrioPill(p.prioridad):'')+'</td>'+
+          (p.prioridad!=='normal'?' '+eqPrioPill(p.prioridad):'')+
+          (p.nro_preor?'<div class="eq-dias">Pre-Or '+eqEsc(p.nro_preor)+'</div>':'')+'</td>'+
         '<td><strong>'+eqEsc(p.dominio||'—')+'</strong>'+
           (p.codigo_turno?'<div class="eq-dias">'+eqEsc(p.codigo_turno)+'</div>':'')+'</td>'+
         '<td>'+eqEsc(p.trabajo)+
           (p.estado_stock==='pedido'?'<div class="eq-dias" style="color:#1f5fa8">pieza en camino · llega '+fmtD(p.eta_pieza)+'</div>':'')+'</td>'+
         '<td>'+(p.tiempo_trabajo?'<span class="eq-chip">'+eqEsc(p.tiempo_trabajo)+'</span>':'—')+'</td>'+
+        '<td style="text-align:center">'+eqEquipCell(p)+'</td>'+
         '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqDel(p)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   }).join('');
@@ -8270,6 +8274,34 @@ function eqEditFila(p){
          ' style="padding:5px 8px"><i class="ti ti-pencil" style="font-size:12px"></i></button>';
 }
 
+// Tilde de "unidad equipada" en la vista de turnados. La marca el vendedor
+// (o el admin); para el resto queda como sólo lectura.
+function eqEquipCell(p){
+  const puede = eqPuedeVender() || esAdmin();
+  const on = !!p.equipada;
+  const ttl = on && p.equipada_por ? ' title="Equipada por '+eqEsc(p.equipada_por)+(p.equipada_en?' · '+eqFmtFechaTs(p.equipada_en):'')+'"' : '';
+  if(puede){
+    return '<input type="checkbox" '+(on?'checked':'')+ttl+
+           ' onchange="eqToggleEquipada(\''+p.id+'\',this.checked)"'+
+           ' style="width:19px;height:19px;accent-color:#0f7b3f;cursor:pointer;vertical-align:middle">';
+  }
+  return on
+    ? '<span class="pill" style="background:#e6f4ec;color:#0f7b3f"'+ttl+'><i class="ti ti-check" style="font-size:11px;vertical-align:-1px"></i> Sí</span>'
+    : '<span style="color:var(--text-5);font-size:12px">—</span>';
+}
+async function eqToggleEquipada(id, checked){
+  try{
+    const upd = checked
+      ? { equipada:true,  equipada_por:(cu&&cu.nombre)||null, equipada_en:new Date().toISOString() }
+      : { equipada:false, equipada_por:null, equipada_en:null };
+    const {error}=await sb.from('equip_pedidos').update(upd).eq('id',id);
+    if(error) throw error;
+    const p=eqPedidos.find(x=>x.id===id); if(p) Object.assign(p,upd);
+    showToast(checked?'Unidad marcada como equipada.':'Marca de equipada quitada.');
+    eqRender();
+  }catch(err){ alert('No se pudo guardar: '+(err.message||'error')); eqRender(); }
+}
+
 function eqBtn(p){
   const pa=eqPaso(p);
   if(eqPuedeStock() && (pa==='espera'||pa==='sin'))
@@ -8293,6 +8325,7 @@ function eqAbrirAlta(id){
   const V = (campo) => p ? (p[campo] || '') : '';
   document.getElementById('eqa-cliente').value  = V('cliente');
   document.getElementById('eqa-dominio').value  = V('dominio');
+  document.getElementById('eqa-preor').value    = V('nro_preor');
   document.getElementById('eqa-prosp').value    = V('nro_prosp');
   document.getElementById('eqa-contacto').value = V('contacto');
   document.getElementById('eqa-trabajo').value  = V('trabajo');
@@ -8321,7 +8354,9 @@ async function eqGuardarAlta(){
   const err=document.getElementById('eqa-err'); err.style.display='none';
   const cliente=document.getElementById('eqa-cliente').value.trim();
   const trabajo=document.getElementById('eqa-trabajo').value.trim();
+  const preor=document.getElementById('eqa-preor').value.trim();
   if(!cliente){ err.textContent='Falta el cliente.'; err.style.display='block'; return; }
+  if(!preor){ err.textContent='Falta el N° de Pre-Or.'; err.style.display='block'; return; }
   if(!trabajo){ err.textContent='Falta indicar qué se vendió.'; err.style.display='block'; return; }
 
   const editando = !!eqEditId;
@@ -8332,6 +8367,7 @@ async function eqGuardarAlta(){
       cliente: cliente,
       trabajo: trabajo.toUpperCase(),
       dominio: document.getElementById('eqa-dominio').value.trim().toUpperCase() || null,
+      nro_preor: preor || null,
       nro_prosp: document.getElementById('eqa-prosp').value.trim() || null,
       contacto: document.getElementById('eqa-contacto').value.trim() || null,
       vendedor: document.getElementById('eqa-vendedor').value.trim() || null,
@@ -8380,6 +8416,7 @@ async function eqAbrir(id){
   // Ficha del pedido: lo que la persona necesita para decidir, sin repetir el nombre
   const meta=[];
   if(p.dominio)   meta.push(eqEsc(p.dominio));
+  if(p.nro_preor) meta.push('Pre-Or '+eqEsc(p.nro_preor));
   if(p.nro_prosp) meta.push('prospecto '+eqEsc(p.nro_prosp));
   if(p.tiempo_trabajo) meta.push(eqEsc(p.tiempo_trabajo));
   if(p.codigo_turno)   meta.push(eqEsc(p.codigo_turno));
