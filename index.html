@@ -2295,14 +2295,14 @@ function canFallback(p){
   if(cu.rol === 'admin') return true;
   const M = {
     supervisor:   ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','encuestas.sincronizar','minutas.ver','procedimientos.ver','procedimientos.subir','tsp.ver','tsp.cargar','tsp.marcar'],
-    citas:        ['prepull.ver','prepull.turnos.ver','procedimientos.ver','encuestas.fir.crear','encuestas.desestimacion.pedir','equipamiento.ver','equipamiento.vender'],
+    citas:        ['prepull.ver','prepull.turnos.ver','procedimientos.ver','encuestas.fir.crear','encuestas.desestimacion.pedir','equipamiento.ver','equipamiento.vender','equipamiento.prioridad'],
     repuestos:    ['prepull.ver','prepull.repuestos.ver','prepull.repuestos.marcar','procedimientos.ver'],
     compras:      ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar','procedimientos.ver'],
     asesor:       ['encuestas.ver','encuestas.desestimaciones.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
     jefe_servicio:['prepull.ver','prepull.turnos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','procedimientos.ver','encuestas.desestimacion.pedir','tsp.ver','tsp.cargar','tsp.marcar'],
     seguridad:    ['minutas.ver','procedimientos.ver','procedimientos.subir'],
     ambiente:     ['minutas.ver','procedimientos.ver','procedimientos.subir'],
-    equip_venta:  ['equipamiento.ver','equipamiento.vender','procedimientos.ver'],
+    equip_venta:  ['equipamiento.ver','equipamiento.vender','equipamiento.prioridad','procedimientos.ver'],
     equip_stock:  ['equipamiento.ver','equipamiento.stock','procedimientos.ver'],
     equip_turnos: ['equipamiento.ver','equipamiento.turnar','equipamiento.prioridad','procedimientos.ver'],
     equip_ver:    ['equipamiento.ver'],
