@@ -3000,14 +3000,33 @@ async function editarSucursalEnc(wiseId){
   if(nuevo === null) return; // canceló
   const val = nuevo.trim();
   try{
-    const { error } = await sb.from('encuestas')
+    const { data:upd, error } = await sb.from('encuestas')
       .update({ sucursal_override: val || null })
-      .eq('wise_id', wiseId);
+      .eq('wise_id', wiseId)
+      .select('id');
     if(error) throw error;
-    const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
-    if(data){ encuestas = aplicarAsesorOverride(data); normalizarSucursales(); }
+    if(!upd || !upd.length){
+      alert('No se actualizó ninguna encuesta. Puede ser un permiso (RLS) de la tabla o que el identificador no coincida.');
+      return;
+    }
+    // Optimista: reflejo el cambio en memoria al toque, sin depender del refresco.
+    e.sucursal_override = val || null;
+    e.sucursal = canonSucursal(val || e.sucursal);
     renderEncuestas();
-  }catch(err){ alert('No se pudo corregir la sucursal: '+(err.message||'error')); }
+    showToast(val ? 'Sucursal corregida a '+e.sucursal : 'Sucursal vuelta a la de Wise');
+    // Y refresco desde la base para dejar todo consistente.
+    try{
+      const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
+      if(data){ encuestas = aplicarAsesorOverride(data); normalizarSucursales(); renderEncuestas(); }
+    }catch(e2){/* si el refresco falla, ya se ve el cambio optimista */}
+  }catch(err){
+    const m=String(err.message||'error');
+    if(/sucursal_override/.test(m) || /column/.test(m)){
+      alert('Falta la columna en la base. Corré el SQL "encuestas-sucursal-override.sql" en Supabase y volvé a intentar.');
+    }else{
+      alert('No se pudo corregir la sucursal: '+m);
+    }
+  }
 }
 // Opciones oficiales de sucursal para el prompt de corrección.
 const ENC_SUC_OPC = ['NEUQUEN','ROCA','BARILOCHE','AÑELO','S.T.M.','CDO Y HIACE','CTRAL FLOTAS'];
