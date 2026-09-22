@@ -1104,7 +1104,10 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
               <h2>Desestimaciones</h2>
               <div class="tb-sub" id="desest-sub" style="margin-top:4px"></div>
             </div>
-            <div class="hdr-actions">
+            <div class="hdr-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <select id="desest-mes" class="filter-sel" onchange="renderDesest()" title="Mes de la encuesta" style="display:none">
+                <option value="">Todos los meses</option>
+              </select>
               <select id="desest-filtro" class="filter-sel" onchange="renderDesest()">
                 <option value="pendiente">Pendientes</option>
                 <option value="aprobado">Aprobados</option>
@@ -2778,8 +2781,23 @@ function renderDesest(){
     }
   }
 
+  // --- Filtro por mes de estudio (mes de la encuesta) — admin/revisor ---
+  const selMes = document.getElementById('desest-mes');
+  if(selMes){
+    selMes.style.display = esAdmin ? '' : 'none';
+    if(esAdmin){
+      const actual = selMes.value;
+      const meses = [...new Set(mios.map(desestMes).filter(Boolean))].sort().reverse();
+      selMes.innerHTML = '<option value="">Todos los meses</option>' +
+        meses.map(m => `<option value="${m}">${desestMesLabel(m)}</option>`).join('');
+      if(actual && meses.includes(actual)) selMes.value = actual;
+    }
+  }
+  const mesSel = (esAdmin && selMes) ? selMes.value : '';
+
   // --- Lista ---
   let arr = mios.slice();
+  if(mesSel) arr = arr.filter(d => desestMes(d) === mesSel);
   if(esAdmin){
     const filtro = document.getElementById('desest-filtro')?.value || 'pendiente';
     if(filtro !== 'todos') arr = arr.filter(d => d.estado === filtro);
@@ -2787,9 +2805,10 @@ function renderDesest(){
     arr = arr.filter(d => d.estado === desestCardFilter);
   }
 
-  const pend = mios.filter(d=>d.estado==='pendiente').length;
+  const alcance = mesSel ? mios.filter(d => desestMes(d) === mesSel) : mios;
+  const pend = alcance.filter(d=>d.estado==='pendiente').length;
   if(sub) sub.textContent = esAdmin
-    ? `${pend} pendiente${pend===1?'':'s'} · ${mios.length} en total`
+    ? `${pend} pendiente${pend===1?'':'s'} · ${alcance.length} en total${mesSel?' · '+desestMesLabel(mesSel):''}`
     : (cu.rol==='jefe_servicio' ? `Pedidos de tu sucursal · ${mios.length} en total` : `Tus pedidos · ${mios.length} en total`);
 
   if(arr.length === 0){
@@ -2800,6 +2819,19 @@ function renderDesest(){
 
   // El solicitante/jefe "vio" sus pedidos: apagamos la notificación
   if(cu && cu.rol !== 'admin'){ marcarPedidosVistos(); actualizarBadgeDesest(); }
+}
+
+// Mes de estudio de un pedido = mes de la encuesta (fecha de respuesta, o de
+// envío si no la tiene). Si la encuesta no está, se usa la fecha del pedido.
+function desestMes(d){
+  const e = encuestas.find(x => x.wise_id === d.encuesta_id);
+  const f = (e && (e.fecha_respuesta || e.fecha)) || d.creado_en;
+  return f ? String(f).slice(0,7) : null;   // 'YYYY-MM'
+}
+function desestMesLabel(m){
+  const [y,mm] = m.split('-');
+  const n = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][Number(mm)-1];
+  return (n||mm)+' '+y;
 }
 
 function filtrarDesestCard(key){
@@ -2841,6 +2873,11 @@ function tarjetaDesest(d){
       </div>
 
       ${encHtml}
+
+      ${e && e.comentario && String(e.comentario).trim() ? `<div style="margin:12px 0 0;padding:10px 13px;background:#fffbeb;border:1px solid #fde68a;border-radius:9px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#b45309;font-weight:700;margin-bottom:3px"><i class="ti ti-message-circle" style="font-size:12px;vertical-align:-1px"></i> Comentario del cliente</div>
+        <div style="font-size:13px;color:var(--text-2);white-space:pre-wrap;font-style:italic">“${escapeHtml(String(e.comentario).trim())}”</div>
+      </div>` : ''}
 
       <div style="margin:12px 0;padding:10px 13px;background:#f8fafc;border-radius:9px">
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-4);font-weight:700;margin-bottom:3px">Motivo del asesor</div>
