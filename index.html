@@ -3439,8 +3439,8 @@ function puedePedirDesest(e){
   if(cu.rol === 'supervisor') return true; // el supervisor puede pedir sobre cualquier encuesta
   if(cu.rol === 'asesor') return normAsesor(e.asesor) === normAsesor(cu.asesorWise);
   if(cu.rol === 'jefe_servicio'){
-    const mias = misSucursalesNorm();
-    return mias.length > 0 && mias.includes(normSucursal(e.sucursal));
+    // usa las mismas equivalencias (Aguado = CTRAL FLOTAS, Perticone = NEUQUEN)
+    return encuestaEnSucursalDelJefe(e);
   }
   return false;
 }
@@ -3516,13 +3516,19 @@ function sucursalesJefe(){
 // del jefe de servicio sobre ENCUESTAS (no afecta el filtro de Pre Pull).
 const PREPULL_A_ENCUESTA = {
   'perticone': 'neuquen',
+  'aguado':    'ctralflotas',   // Aguado (Pre Pull) = CTRAL FLOTAS (Wise)
 };
-function encuestaEnSucursalDelJefe(e){
+// Sucursales del usuario expresadas como aparecen en las encuestas
+// (las suyas + sus equivalencias de Pre Pull → Wise), normalizadas.
+function sucursalesJefeEnEncuestas(){
   const base = sucursalesJefe(); // ya normalizadas
-  if(!base.length) return false;
-  // sumamos las equivalencias de encuestas
   const sucs = new Set(base);
   base.forEach(s => { if(PREPULL_A_ENCUESTA[s]) sucs.add(PREPULL_A_ENCUESTA[s]); });
+  return sucs;
+}
+function encuestaEnSucursalDelJefe(e){
+  const sucs = sucursalesJefeEnEncuestas();
+  if(!sucs.size) return false;
   return sucs.has(normSucursal(e.sucursal));
 }
 
