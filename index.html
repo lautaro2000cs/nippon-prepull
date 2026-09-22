@@ -1595,11 +1595,16 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
     </div>
 
     <div id="eq-bx-turno" style="display:none;margin-bottom:.85rem">
-      <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:6px">Asignar turno</label>
+      <label id="eq-mo-turno-lbl" style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:6px">Asignar turno</label>
       <div id="eq-mo-aviso" style="display:none;background:#e6f0fb;color:#1f5fa8;border-radius:8px;padding:8px 11px;font-size:12px;margin-bottom:9px"></div>
       <div>
         <label style="display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Fecha del turno</label>
-        <input type="date" id="eq-mo-fecha"/>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="date" id="eq-mo-fecha" style="flex:1"/>
+          <button type="button" class="btn-cancel" id="eq-mo-quitar" onclick="eqQuitarTurno()" style="display:none;white-space:nowrap;color:var(--accent);border-color:rgba(224,50,47,.35)">
+            <i class="ti ti-calendar-x" style="font-size:13px;vertical-align:-2px"></i> Quitar turno
+          </button>
+        </div>
       </div>
     </div>
 
@@ -8308,6 +8313,8 @@ function eqBtn(p){
     return '<button class="btn-sm btn-rep-mark" onclick="eqAbrir(\''+p.id+'\')"><i class="ti ti-package" style="font-size:12px"></i> Revisar</button>';
   if(eqPuedeTurnar() && pa==='listo')
     return '<button class="btn-sm btn-rep-mark" onclick="eqAbrir(\''+p.id+'\')"><i class="ti ti-calendar-plus" style="font-size:12px"></i> Turnar</button>';
+  if(eqPuedeTurnar() && pa==='turnado')
+    return '<button class="btn-sm" onclick="eqAbrir(\''+p.id+'\')" title="Cambiar la fecha o quitar el turno"><i class="ti ti-calendar-cog" style="font-size:12px"></i> Editar turno</button>';
   if(eqPuedePrioridad() && pa==='espera')
     return '<button class="btn-sm" onclick="eqAbrir(\''+p.id+'\')"><i class="ti ti-flag" style="font-size:12px"></i> Prioridad</button>';
   return '<button class="btn-sm" onclick="eqAbrir(\''+p.id+'\')">Ver</button>';
@@ -8455,7 +8462,12 @@ async function eqAbrir(id){
       av.style.display='block';
     } else av.style.display='none';
     fEl.value=p.fecha||'';
+    // Si ya está turnado: se puede cambiar la fecha o quitar el turno.
+    const lbl=document.getElementById('eq-mo-turno-lbl');
+    if(lbl) lbl.textContent = p.fecha ? 'Turno asignado · podés cambiar la fecha o quitarlo' : 'Asignar turno';
   }
+  const qb=document.getElementById('eq-mo-quitar');
+  if(qb) qb.style.display = (verTurno && p.fecha) ? '' : 'none';
 
   // 1) lo que ya trajo la bandeja, para que se vea al instante
   eqRenderComentarios(p.equip_comentarios);
@@ -8489,6 +8501,28 @@ async function eqAbrir(id){
   }catch(e){ console.error('No se pudieron traer los comentarios', e); }
 }
 function eqCerrar(){ document.getElementById('eq-mov').classList.remove('open'); eqAbierto=null; }
+
+// Quitar el turno asignado: el pedido vuelve a "Listos para turnar".
+async function eqQuitarTurno(){
+  const p=eqAbierto; if(!p || !p.fecha) return;
+  if(!confirm('¿Quitar el turno del '+fmtD(p.fecha)+' de '+p.cliente+'?\n\nEl pedido vuelve a "Listos para turnar".')) return;
+  try{
+    const {error}=await sb.from('equip_pedidos')
+      .update({ fecha:null, turnado_por:null, turnado_en:null, equipada:false, equipada_por:null, equipada_en:null })
+      .eq('id',p.id);
+    if(error) throw error;
+    await sb.from('equip_comentarios').insert([{
+      pedido_id:p.id, origen:'turnos', autor:cu.nombre,
+      texto:'Turno del '+fmtD(p.fecha)+' quitado.'
+    }]);
+    eqCerrar();
+    await cargarEquip();
+    showToast('Turno quitado. Volvió a "Listos para turnar".');
+  }catch(err){
+    const e=document.getElementById('eq-mo-err');
+    e.textContent='No se pudo quitar el turno: '+(err.message||'error'); e.style.display='block';
+  }
+}
 
 function eqSetPrio(v){ eqTmpPrio=v; eqPintarPrio(); }
 function eqPintarPrio(){
