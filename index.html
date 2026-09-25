@@ -592,6 +592,7 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
 .eq-empty .s{font-size:12.5px;color:var(--text-5);line-height:1.55;max-width:380px;margin:0 auto}
 .eq-cit{background:var(--surface-sub,#faf9f7);border-radius:8px;padding:7px 9px;font-size:12.5px}
 .eq-cit .cm{font-size:10.5px;color:var(--text-5);margin-top:2px}
+.eq-cit-auto{background:#eef2f6;color:var(--text-3)}
 
 /* ── SERVICE PACK ─────────────────────────────────────── */
 .tsp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
@@ -1545,7 +1546,7 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
     <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem" id="eqa-sub">Cargá todo lo que sepas de la venta. La fecha del turno se asigna después, cuando stock confirma la pieza.</div>
     <div class="mgrid">
       <div><label>Cliente <span style="color:var(--accent)">*</span></label><input type="text" id="eqa-cliente" placeholder="Apellido, Nombre"/></div>
-      <div><label>Dominio / chasis</label><input type="text" id="eqa-dominio" placeholder="AB 123 CD"/></div>
+      <div><label>Últimos números de chasis</label><input type="text" id="eqa-dominio" inputmode="numeric" placeholder="Ej: 5747030" oninput="this.value=this.value.replace(/[^0-9]/g,'')"/></div>
       <div><label>N° de Pre-Or <span style="color:var(--accent)">*</span></label><input type="text" id="eqa-preor" placeholder="N° de pre-orden"/></div>
       <div><label>N° prospecto</label><input type="text" id="eqa-prosp"/></div>
       <div><label>Contacto</label><input type="text" id="eqa-contacto" placeholder="Teléfono"/></div>
@@ -8203,7 +8204,7 @@ function eqRender(){
 function eqTabla(arr){
   return '<div class="table-wrap"><table><thead><tr>'+
     '<th style="width:9%">Cargado</th>'+
-    '<th style="width:22%">Cliente</th><th style="width:11%">Vehículo</th><th>Qué se vendió</th>'+
+    '<th style="width:22%">Cliente</th><th style="width:11%">Chasis</th><th>Qué se vendió</th>'+
     '<th style="width:10%">Prioridad</th><th style="width:12%">Stock</th><th style="width:9%"></th>'+
     '</tr></thead><tbody>'+arr.map(eqFila).join('')+'</tbody></table></div>';
 }
@@ -8232,7 +8233,7 @@ function eqPorDia(arr){
     return '<div class="eq-daygroup" id="eq-d-'+f+'">'+eqFmtDia(f)+
       '<span style="font-weight:400;color:var(--text-5)"> · '+n+' '+(n===1?'turno':'turnos')+' · '+eqFmtHoras(hs)+'</span></div>'+
       '<div class="table-wrap"><table><thead><tr>'+
-      '<th style="width:20%">Cliente</th><th style="width:12%">Vehículo</th>'+
+      '<th style="width:20%">Cliente</th><th style="width:12%">Chasis</th>'+
       '<th>Qué se vendió</th><th style="width:9%">Dur.</th><th style="width:11%;text-align:center">Equipada</th><th style="width:9%"></th>'+
       '</tr></thead><tbody>'+g[f].map(function(p){
         return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+(p.equipada?' eq-ok':'')+'">'+
@@ -8269,6 +8270,9 @@ function eqStockPill(e){
   const m=M[e]||M.sin_revisar;
   return '<span class="pill" style="background:'+m[0]+';color:'+m[1]+'">'+m[2]+'</span>';
 }
+// Etiquetas en texto para el registro de cambios (trazabilidad).
+function eqStockLabel(e){ return ({sin_revisar:'Sin revisar',disponible:'Hay stock',faltante:'No hay',pedido:'Pedida'})[e]||e||'—'; }
+function eqPrioLabel(p){ return ({normal:'Normal',alta:'Alta',urgente:'Urgente'})[p]||p||'—'; }
 
 function eqFila(p){
   const d=eqDiasDesde(p.creado_en);
@@ -8290,6 +8294,7 @@ function eqFila(p){
   return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+'">'+
     '<td><strong>'+eqFmtFechaTs(p.creado_en)+'</strong>'+espera+'</td>'+
     '<td><strong>'+eqEsc(p.cliente)+'</strong>'+
+      (p.nro_preor?'<div class="eq-dias" style="color:var(--text-3)">Pre-Or '+eqEsc(p.nro_preor)+'</div>':'')+
       (p.nro_prosp?'<div class="eq-dias">prospecto '+eqEsc(p.nro_prosp)+'</div>':'')+
       (p.contacto?'<div style="font-size:11px;color:var(--text-5)">'+eqEsc(p.contacto)+'</div>':'')+
       '</td>'+
@@ -8426,8 +8431,22 @@ async function eqGuardarAlta(){
       codigo_turno: document.getElementById('eqa-cod').value || null
     };
     if(editando){
+      // Registro de qué campos se editaron, para trazabilidad.
+      const orig = eqPedidos.find(x=>x.id===eqEditId) || {};
+      const ETI = {cliente:'Cliente',dominio:'Chasis',nro_preor:'N° de Pre-Or',nro_prosp:'N° prospecto',
+                   contacto:'Contacto',vendedor:'Vendedor',obs_venta:'Observaciones',
+                   tiempo_trabajo:'Duración',codigo_turno:'Código de turno',trabajo:'Qué se vendió'};
+      const cambios=[];
+      Object.keys(ETI).forEach(function(k){
+        const nuevo=(datos[k]==null?'':String(datos[k]));
+        const viejo=(orig[k]==null?'':String(orig[k]));
+        if(nuevo!==viejo) cambios.push(ETI[k]+': “'+(viejo||'—')+'” → “'+(nuevo||'—')+'”');
+      });
       const {error}=await sb.from('equip_pedidos').update(datos).eq('id', eqEditId);
       if(error) throw error;
+      if(cambios.length){
+        try{ await sb.from('equip_comentarios').insert([{pedido_id:eqEditId, texto:'Editó la venta · '+cambios.join(' · '), autor:cu.nombre, origen:'venta', automatico:true}]); }catch(e){}
+      }
     }else{
       datos.creado_por = cu.nombre;
       const {error}=await sb.from('equip_pedidos').insert([datos]);
@@ -8447,12 +8466,19 @@ async function eqGuardarAlta(){
 // Dibuja la lista de comentarios en la ficha. Se usa dos veces al abrir:
 // primero con lo que ya trajo la bandeja (instantáneo) y después con lo que
 // devuelve la consulta directa, por si el embed de la lista vino vacío.
+// Los comentarios NO se editan: cada aporte es un registro nuevo con su fecha
+// y hora. El registro automático de cambios se muestra aparte, en gris.
 function eqRenderComentarios(lista){
   const cont=document.getElementById('eq-mo-hist'); if(!cont) return;
   const cs=(lista||[]).slice().sort((a,b)=>String(a.creado_en).localeCompare(String(b.creado_en)));
   const OL={venta:'Vendedor',turnos:'Turnos',stock:'Control de stock'};
   cont.innerHTML = cs.length
-    ? cs.map(c=>'<div class="eq-cit">'+eqEsc(c.texto)+'<div class="cm">'+eqEsc(c.autor||OL[c.origen]||'')+' · '+eqFmtTs(c.creado_en)+'</div></div>').join('')
+    ? cs.map(function(c){
+        const auto=!!c.automatico;
+        const ico=auto?'<i class="ti ti-history" style="font-size:11px;color:var(--text-5);margin-right:4px" title="Registro automático"></i>':'';
+        return '<div class="eq-cit'+(auto?' eq-cit-auto':'')+'">'+ico+eqEsc(c.texto)+
+               '<div class="cm">'+eqEsc(c.autor||OL[c.origen]||'')+' · '+eqFmtTs(c.creado_en)+(auto?' · registro automático':'')+'</div></div>';
+      }).join('')
     : '<div style="font-size:12px;color:var(--text-5)">Sin comentarios.</div>';
 }
 
@@ -8556,7 +8582,7 @@ async function eqQuitarTurno(){
     if(error) throw error;
     await sb.from('equip_comentarios').insert([{
       pedido_id:p.id, origen:'turnos', autor:cu.nombre,
-      texto:'Turno del '+fmtD(p.fecha)+' quitado.'
+      texto:'Turno del '+fmtD(p.fecha)+' quitado.', automatico:true
     }]);
     eqCerrar();
     await cargarEquip();
@@ -8642,6 +8668,7 @@ async function eqGuardarModal(){
     if(e!==eqAbierto.eta_pieza) upd.eta_pieza=e;
   }
 
+  let fechaCambio=false;
   if(eqPuedeTurnar() && document.getElementById('eq-bx-turno').style.display!=='none'){
     const f=document.getElementById('eq-mo-fecha').value;
     if(f){
@@ -8651,21 +8678,34 @@ async function eqGuardarModal(){
         err.style.display='block';
         return;
       }
-      upd.fecha=f;
-      if(!eqAbierto.fecha){ upd.turnado_por=cu.nombre; upd.turnado_en=ahora; }
+      if(f!==eqAbierto.fecha){
+        upd.fecha=f; fechaCambio=true;
+        if(!eqAbierto.fecha){ upd.turnado_por=cu.nombre; upd.turnado_en=ahora; }
+      }
     }
   }
+
+  // Registro automático de cambios (trazabilidad): arma una línea por cada
+  // cosa que se modificó. Queda como comentario con autor, fecha y hora.
+  const cambios=[];
+  if('prioridad' in upd) cambios.push('Prioridad → '+eqPrioLabel(upd.prioridad));
+  if('motivo_prioridad' in upd) cambios.push(upd.motivo_prioridad ? 'Motivo de prioridad: '+upd.motivo_prioridad : 'Quitó el motivo de prioridad');
+  if('estado_stock' in upd) cambios.push('Stock → '+eqStockLabel(upd.estado_stock));
+  if('eta_pieza' in upd) cambios.push(upd.eta_pieza ? 'Llegada estimada: '+fmtD(upd.eta_pieza) : 'Quitó la llegada estimada');
+  if(fechaCambio) cambios.push((eqAbierto.fecha?'Turno cambiado a ':'Turno asignado: ')+fmtD(upd.fecha));
 
   try{
     if(Object.keys(upd).length){
       const {error}=await sb.from('equip_pedidos').update(upd).eq('id',eqAbierto.id);
       if(error) throw error;
     }
+    const origen = eqPuedeStock() ? 'stock' : (eqPuedeTurnar()||eqPuedePrioridad() ? 'turnos' : 'venta');
+    const registros=[];
+    if(cambios.length) registros.push({pedido_id:eqAbierto.id, texto:cambios.join(' · '), autor:cu.nombre, origen:origen, automatico:true});
     const com=document.getElementById('eq-mo-com').value.trim();
-    if(com){
-      const origen = eqPuedeStock() ? 'stock' : (eqPuedeTurnar()||eqPuedePrioridad() ? 'turnos' : 'venta');
-      const {error}=await sb.from('equip_comentarios')
-        .insert([{pedido_id:eqAbierto.id, texto:com, autor:cu.nombre, origen:origen}]);
+    if(com) registros.push({pedido_id:eqAbierto.id, texto:com, autor:cu.nombre, origen:origen});
+    if(registros.length){
+      const {error}=await sb.from('equip_comentarios').insert(registros);
       if(error) throw error;
     }
     eqCerrar();
