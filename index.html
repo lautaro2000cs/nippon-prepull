@@ -1576,6 +1576,8 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
         <div id="eqa-acc-chips" class="eq-acc-chips"></div>
         <div style="font-size:11px;color:var(--text-4);margin-top:4px">Elegí de la base (nombre + código). Si no está, escribilo y apretá Enter para agregarlo igual.</div>
         <input type="hidden" id="eqa-trabajo"/></div>
+      <div><label>Tipo de venta</label>
+        <select id="eqa-tipo"><option value="particular">Particular</option><option value="externo">Externo</option></select></div>
       <div><label>Vendedor</label><input type="text" id="eqa-vendedor"/></div>
       <div><label>Duración estimada</label>
         <select id="eqa-tiempo"><option value="">Seleccionar...</option><option>15MIN</option><option>30MIN</option><option>45MIN</option><option>1HS</option><option>2HS</option><option>3HS</option><option>4HS</option><option>5HS</option><option>6HS</option></select></div>
@@ -8213,6 +8215,10 @@ const eqPuedeVender    = () => can('equipamiento.vender');
 const eqPuedePrioridad = () => can('equipamiento.prioridad');
 const eqPuedeTurnar    = () => can('equipamiento.turnar');
 const eqPuedeStock     = () => can('equipamiento.stock');
+// Quién puede asignar/editar el turno de ESTE pedido: el rol de turnos y el
+// admin siempre; y si la venta es "externa", también quien la carga (vendedor).
+const eqEsExterno      = (p) => !!(p && p.tipo_venta==='externo');
+function eqPuedeTurnarPedido(p){ return esAdmin() || eqPuedeTurnar() || (eqEsExterno(p) && eqPuedeVender()); }
 
 // ── helpers ──
 function eqEsc(s){ return escapeHtml(String(s ?? '')); }
@@ -8381,6 +8387,7 @@ function eqPorDia(arr){
       '</tr></thead><tbody>'+g[f].map(function(p){
         return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+(p.equipada?' eq-ok':'')+'">'+
         '<td><strong>'+eqEsc(p.cliente)+'</strong>'+
+          (eqEsExterno(p)?' <span class="pill" style="background:#eef2ff;color:#4f46e5">Externo</span>':'')+
           (p.prioridad!=='normal'?' '+eqPrioPill(p.prioridad):'')+
           (p.nro_preor?'<div class="eq-dias">Pre-Or '+eqEsc(p.nro_preor)+'</div>':'')+'</td>'+
         '<td><strong>'+eqEsc(p.dominio||'—')+'</strong>'+
@@ -8437,6 +8444,7 @@ function eqFila(p){
   return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+'">'+
     '<td><strong>'+eqFmtFechaTs(p.creado_en)+'</strong>'+espera+'</td>'+
     '<td><strong>'+eqEsc(p.cliente)+'</strong>'+
+      (eqEsExterno(p)?' <span class="pill" style="background:#eef2ff;color:#4f46e5">Externo</span>':'')+
       (p.nro_preor?'<div class="eq-dias" style="color:var(--text-3)">Pre-Or '+eqEsc(p.nro_preor)+'</div>':'')+
       (p.nro_prosp?'<div class="eq-dias">prospecto '+eqEsc(p.nro_prosp)+'</div>':'')+
       (p.contacto?'<div style="font-size:11px;color:var(--text-5)">'+eqEsc(p.contacto)+'</div>':'')+
@@ -8502,9 +8510,9 @@ function eqBtn(p){
   const pa=eqPaso(p);
   if(eqPuedeStock() && (pa==='espera'||pa==='sin'))
     return '<button class="btn-sm btn-rep-mark" onclick="eqAbrir(\''+p.id+'\')"><i class="ti ti-package" style="font-size:12px"></i> Revisar</button>';
-  if(eqPuedeTurnar() && pa==='listo')
+  if(eqPuedeTurnarPedido(p) && pa==='listo')
     return '<button class="btn-sm btn-rep-mark" onclick="eqAbrir(\''+p.id+'\')"><i class="ti ti-calendar-plus" style="font-size:12px"></i> Turnar</button>';
-  if(eqPuedeTurnar() && pa==='turnado')
+  if(eqPuedeTurnarPedido(p) && pa==='turnado')
     return '<button class="btn-sm" onclick="eqAbrir(\''+p.id+'\')" title="Cambiar la fecha o quitar el turno"><i class="ti ti-calendar-cog" style="font-size:12px"></i> Editar turno</button>';
   if(eqPuedePrioridad() && pa==='espera')
     return '<button class="btn-sm" onclick="eqAbrir(\''+p.id+'\')"><i class="ti ti-flag" style="font-size:12px"></i> Prioridad</button>';
@@ -8534,6 +8542,7 @@ function eqAbrirAlta(id){
   document.getElementById('eqa-vendedor').value = p ? V('vendedor') : ((cu && cu.nombre) || '');
   document.getElementById('eqa-tiempo').value   = V('tiempo_trabajo');
   document.getElementById('eqa-cod').value      = V('codigo_turno');
+  document.getElementById('eqa-tipo').value     = (p && p.tipo_venta==='externo') ? 'externo' : 'particular';
 
   document.getElementById('eqa-titulo').textContent = p ? 'Editar venta de equipamiento' : 'Cargar venta de equipamiento';
   document.getElementById('eqa-sub').textContent = p
@@ -8575,14 +8584,15 @@ async function eqGuardarAlta(){
       vendedor: document.getElementById('eqa-vendedor').value.trim() || null,
       obs_venta: document.getElementById('eqa-obs').value.trim() || null,
       tiempo_trabajo: document.getElementById('eqa-tiempo').value || null,
-      codigo_turno: document.getElementById('eqa-cod').value || null
+      codigo_turno: document.getElementById('eqa-cod').value || null,
+      tipo_venta: document.getElementById('eqa-tipo').value || 'particular'
     };
     if(editando){
       // Registro de qué campos se editaron, para trazabilidad.
       const orig = eqPedidos.find(x=>x.id===eqEditId) || {};
       const ETI = {cliente:'Cliente',dominio:'Chasis',nro_preor:'N° de Pre-Or',nro_prosp:'N° prospecto',
                    contacto:'Contacto',vendedor:'Vendedor',obs_venta:'Observaciones',
-                   tiempo_trabajo:'Duración',codigo_turno:'Código de turno',trabajo:'Qué se vendió'};
+                   tiempo_trabajo:'Duración',codigo_turno:'Código de turno',trabajo:'Qué se vendió',tipo_venta:'Tipo de venta'};
       const cambios=[];
       Object.keys(ETI).forEach(function(k){
         const nuevo=(datos[k]==null?'':String(datos[k]));
@@ -8639,6 +8649,7 @@ async function eqAbrir(id){
   // Ficha del pedido: lo que la persona necesita para decidir, sin repetir el nombre
   const meta=[];
   if(p.dominio)   meta.push(eqEsc(p.dominio));
+  if(eqEsExterno(p)) meta.push('<b style="color:#4f46e5">Externo</b>');
   if(p.nro_preor) meta.push('Pre-Or '+eqEsc(p.nro_preor));
   if(p.nro_prosp) meta.push('prospecto '+eqEsc(p.nro_prosp));
   if(p.tiempo_trabajo) meta.push(eqEsc(p.tiempo_trabajo));
@@ -8674,7 +8685,7 @@ async function eqAbrir(id){
   document.getElementById('eq-bx-stock').style.display = verStock?'block':'none';
   if(verStock){ eqPintarStock(); document.getElementById('eq-mo-eta').value = p.eta_pieza||''; }
 
-  const verTurno = eqPuedeTurnar() && enTurno;
+  const verTurno = eqPuedeTurnarPedido(p) && enTurno;
   document.getElementById('eq-bx-turno').style.display = verTurno?'block':'none';
   if(verTurno){
     const min=eqDesdeCuando(p);
@@ -8705,7 +8716,7 @@ async function eqAbrir(id){
   // Rol de sólo lectura: puede ver todos los estadios pero no toca nada.
   // Si no tiene ninguna acción posible, se le oculta el campo de comentario
   // y el botón Guardar; sólo le queda Cerrar.
-  const puedeAlgo = eqPuedeVender()||eqPuedeStock()||eqPuedeTurnar()||eqPuedePrioridad()||esAdmin();
+  const puedeAlgo = eqPuedeVender()||eqPuedeStock()||eqPuedeTurnarPedido(p)||eqPuedePrioridad()||esAdmin();
   const addc=document.getElementById('eq-mo-addcom');
   if(addc) addc.style.display = puedeAlgo ? '' : 'none';
   const gd=document.getElementById('eq-mo-guardar');
@@ -8824,7 +8835,7 @@ async function eqGuardarModal(){
   }
 
   let fechaCambio=false;
-  if(eqPuedeTurnar() && document.getElementById('eq-bx-turno').style.display!=='none'){
+  if(eqPuedeTurnarPedido(eqAbierto) && document.getElementById('eq-bx-turno').style.display!=='none'){
     const f=document.getElementById('eq-mo-fecha').value;
     if(f){
       const min=eqDesdeCuando(eqAbierto);
