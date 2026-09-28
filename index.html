@@ -1127,8 +1127,14 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
                 <option value="rechazado">Rechazados</option>
                 <option value="todos">Todos</option>
               </select>
+              <select id="desest-modo" class="filter-sel" onchange="guardarDesestModo(this.value)" title="Ventana de desestimaciones" style="display:none">
+                <option value="auto">Ventana: automática</option>
+                <option value="abierto">Ventana: abierta</option>
+                <option value="cerrado">Ventana: cerrada</option>
+              </select>
             </div>
           </div>
+          <div id="desest-estado" style="margin-bottom:14px"></div>
           <div id="desest-cards" style="margin-bottom:16px"></div>
           <div id="desest-lista"></div>
         </div>
@@ -2731,6 +2737,7 @@ async function cargarBandejaDesest(){
     normalizarSucursales();
     encCargadas = true;
   }
+  await cargarDesestConfig();
   await cargarDesestimaciones();
   renderDesest();
 }
@@ -2766,6 +2773,17 @@ function renderDesest(){
   const sub = document.getElementById('desest-sub');
   const cards = document.getElementById('desest-cards');
   const esAdmin = cu && cu.rol === 'admin';
+
+  // Estado de la ventana de desestimaciones (banner para todos + control admin)
+  const est = desestEstadoTexto();
+  const bn = document.getElementById('desest-estado');
+  if(bn){
+    const c = est.abierta ? ['#ecfdf5','#a7f3d0','#065f46','circle-check'] : ['#fff7ed','#fed7aa','#9a3412','lock'];
+    bn.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:10px 13px;background:'+c[0]+';border:1px solid '+c[1]+';border-radius:10px;font-size:13px;color:'+c[2]+'">'+
+      '<i class="ti ti-'+c[3]+'" style="font-size:15px"></i> '+escapeHtml(est.txt)+'</div>';
+  }
+  const selModo = document.getElementById('desest-modo');
+  if(selModo){ selModo.style.display = esAdmin ? '' : 'none'; if(esAdmin) selModo.value = desestModo; }
 
   // Ámbito según rol
   const mios = desestDelUsuario();
@@ -3352,6 +3370,7 @@ async function reabrirDetenido(id){
 async function cargarEncuestas(){
   // Ajustes de UI según el rol (asesor vs admin/supervisor)
   ajustarUIEncuestas();
+  await cargarDesestConfig();   // estado de la ventana de desestimaciones
   // Si ya se cargó antes, igual refrescamos los datos que pueden haber
   // cambiado (desestimaciones aplicadas, pedidos resueltos) para que el
   // asesor vea la resolución del admin sin tener que apretar F5.
@@ -3462,6 +3481,43 @@ function puedePedirDesest(e){
     return encuestaEnSucursalDelJefe(e);
   }
   return false;
+}
+
+// ── Ventana de desestimaciones ──────────────────────────────────────
+// Corte automático: cerrado desde el día 29 a las 12:00 hasta fin de mes,
+// para dar tiempo a responder y cerrar la liquidación. El admin puede forzar
+// abierto/cerrado desde la bandeja (se guarda en app_config).
+let desestModo = 'auto';   // 'auto' | 'abierto' | 'cerrado'
+function desestCorteAutomatico(){
+  const n=new Date(), dia=n.getDate(), hora=n.getHours();
+  if(dia>29) return false;
+  if(dia===29 && hora>=12) return false;
+  return true;
+}
+function desestVentanaAbierta(){
+  if(desestModo==='abierto') return true;
+  if(desestModo==='cerrado') return false;
+  return desestCorteAutomatico();
+}
+function desestEstadoTexto(){
+  if(desestModo==='abierto') return {abierta:true, txt:'Desestimaciones ABIERTAS (forzado por administración).'};
+  if(desestModo==='cerrado') return {abierta:false, txt:'Desestimaciones CERRADAS (forzado por administración).'};
+  return desestCorteAutomatico()
+    ? {abierta:true, txt:'Desestimaciones abiertas · cierran el día 29 a las 12:00.'}
+    : {abierta:false, txt:'Desestimaciones cerradas hasta el próximo mes (cierre: día 29 a las 12:00 para finalizar la liquidación).'};
+}
+async function cargarDesestConfig(){
+  try{
+    const {data}=await sb.from('app_config').select('valor').eq('clave','desest_ventana').maybeSingle();
+    if(data && data.valor) desestModo=data.valor;
+  }catch(e){ /* si no existe la tabla, queda en 'auto' */ }
+}
+async function guardarDesestModo(v){
+  desestModo=v;
+  try{
+    await sb.from('app_config').upsert({clave:'desest_ventana', valor:v, actualizado_en:new Date().toISOString(), actualizado_por:(cu&&cu.nombre)||null});
+  }catch(e){ alert('No se pudo guardar el estado: '+(e.message||'error')); }
+  renderDesest();
 }
 
 // normaliza el nombre de una sucursal para comparar tolerando errores de Wise
@@ -5188,6 +5244,11 @@ function pedidoAsesorHtml(e){
 
   // sin pedido: mostrar el formulario solo si el usuario puede pedir sobre esta encuesta
   if(!puedePedir) return '';
+  // corte de la ventana de desestimaciones (no aplica al admin)
+  if(!(cu && cu.rol==='admin') && !desestVentanaAbierta()){
+    return '<div style="margin-top:16px;padding:12px 14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;font-size:13px;color:#9a3412">'+
+      '<i class="ti ti-lock" style="font-size:13px;vertical-align:-1px"></i> '+escapeHtml(desestEstadoTexto().txt)+'</div>';
+  }
   const fid = 'ped-'+encodeURIComponent(wid).replace(/[^a-z0-9]/gi,'');
   return `
     <div style="margin-top:16px;padding:14px;background:#f8fafc;border:1px dashed var(--border-2);border-radius:10px">
@@ -5243,6 +5304,9 @@ function togglePedidoForm(fid){
 // Envía el pedido de desestimación (con evidencia opcional) a Supabase
 async function enviarPedidoDesestimacion(widEnc, fid){
   const wid = decodeURIComponent(widEnc);
+  if(!(cu && cu.rol==='admin') && !desestVentanaAbierta()){
+    alert(desestEstadoTexto().txt); return;
+  }
   const motivo = (document.getElementById(fid+'-motivo')?.value || '').trim();
   if(!motivo){ alert('Escribí un motivo para el pedido.'); return; }
   const fileInput = document.getElementById(fid+'-file');
