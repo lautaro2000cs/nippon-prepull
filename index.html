@@ -1772,7 +1772,8 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
     <h3 id="gar-modal-title"><i class="ti ti-upload" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#1d4ed8"></i>Cargar archivo</h3>
     <div><label>Título <span style="color:var(--accent)">*</span></label><input type="text" id="f-gar-titulo" placeholder="Ej: Póliza de garantía / Manual"/></div>
     <div style="margin-top:12px"><label>Descripción</label><textarea id="f-gar-descripcion" rows="2" placeholder="Breve detalle (opcional)…" style="width:100%;padding:9px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit"></textarea></div>
-    <div style="margin-top:12px"><label>Archivo</label><input type="file" id="f-gar-file" style="font-size:13px"><div id="gar-file-hint" style="font-size:11.5px;color:var(--text-4);margin-top:4px">PDF, Word, imágenes, etc.</div></div>
+    <div id="gar-files-list" style="margin-top:12px"></div>
+    <div style="margin-top:12px"><label>Archivos</label><input type="file" id="f-gar-file" multiple style="font-size:13px"><div id="gar-file-hint" style="font-size:11.5px;color:var(--text-4);margin-top:4px">Podés elegir varios a la vez (PDF, Word, imágenes, etc.).</div></div>
     <p class="login-err" id="gar-err" style="display:none"></p>
     <div class="mfooter"><button class="btn-cancel" onclick="garCerrarModal()">Cancelar</button><button class="btn-save" id="gar-save-btn" onclick="garGuardar()">Subir archivo</button></div>
   </div>
@@ -4791,18 +4792,30 @@ function renderGar(){
   }).join('')+`</div>`;
 }
 
+// Devuelve la lista de archivos de un documento (soporta lo viejo de 1 archivo).
+function garArchivos(d){
+  if(d && Array.isArray(d.archivos) && d.archivos.length) return d.archivos;
+  if(d && d.archivo_path) return [{path:d.archivo_path, nombre:d.archivo_nombre||'archivo', tipo:d.archivo_tipo||'', bytes:d.tamano_bytes||0}];
+  return [];
+}
 function garTablaHtml(docs){
   const puede=garPuedeCargar();
   if(!docs.length) return `<div class="access-note"><i class="ti ti-info-circle"></i> No hay documentos cargados para este modelo todavía.${puede?' Usá “Cargar archivo” para subir el primero.':''}</div>`;
   const rows=docs.map(d=>{
     const fecha=d.actualizado_en?new Date(d.actualizado_en).toLocaleDateString('es-AR'):'—';
-    let acc=`<button class="pc-btn" onclick="garDescargar('${d.id}')" title="Descargar"><i class="ti ti-download"></i></button>`;
+    const files=garArchivos(d);
+    const filesHtml = files.length
+      ? '<div class="pdoc-cat" style="display:flex;flex-direction:column;gap:3px;margin-top:5px">'+
+          files.map((f,i)=>'<a href="#" onclick="event.preventDefault();garDescargar(\''+d.id+'\','+i+')" style="color:#1d4ed8;text-decoration:none;font-size:12px"><i class="ti ti-file-download" style="font-size:12px;vertical-align:-2px"></i> '+escapeHtml(f.nombre||'archivo')+'</a>').join('')+
+        '</div>'
+      : '<div class="pdoc-cat" style="color:var(--text-5)">Sin archivos</div>';
+    let acc='';
     if(puede){
-      acc+=`<button class="pc-btn" onclick="garEditar('${d.id}')" title="Actualizar"><i class="ti ti-upload"></i></button>`;
+      acc+=`<button class="pc-btn" onclick="garEditar('${d.id}')" title="Editar / agregar archivos"><i class="ti ti-upload"></i></button>`;
       acc+=`<button class="pc-btn" onclick="garBorrar('${d.id}')" title="Eliminar"><i class="ti ti-trash"></i></button>`;
     }
     return `<tr>
-      <td><div class="pdoc-t">${escapeHtml(d.titulo)}</div>${d.descripcion?`<div class="pdoc-d">${escapeHtml(d.descripcion)}</div>`:''}${d.archivo_nombre?`<div class="pdoc-cat">${escapeHtml(d.archivo_nombre)}</div>`:''}</td>
+      <td><div class="pdoc-t">${escapeHtml(d.titulo)}${files.length>1?` <span class="pill" style="background:#eef2ff;color:#1d4ed8">${files.length} archivos</span>`:''}</div>${d.descripcion?`<div class="pdoc-d">${escapeHtml(d.descripcion)}</div>`:''}${filesHtml}</td>
       <td style="white-space:nowrap;color:var(--text-3)">${fecha}</td>
       <td style="white-space:nowrap;color:var(--text-4);font-size:11.5px">${escapeHtml(d.subido_por_nombre||'')}</td>
       <td style="white-space:nowrap"><div style="display:flex;gap:5px;justify-content:flex-end">${acc}</div></td>
@@ -4819,83 +4832,106 @@ function garAbrir(n){ garModeloVista=n; renderGar(); }
 function garVolver(){ garModeloVista=null; renderGar(); }
 
 // ---- Alta / actualización ----
+let garEditArchivos = [];   // archivos ya guardados que se conservan al editar
+
+function garRenderFilesList(){
+  const cont=document.getElementById('gar-files-list'); if(!cont) return;
+  if(!garEditArchivos.length){ cont.innerHTML=''; return; }
+  cont.innerHTML='<label style="display:block;margin-bottom:5px">Archivos actuales</label>'+
+    garEditArchivos.map((f,i)=>'<div style="display:flex;align-items:center;gap:8px;background:var(--surface-sub,#faf9f7);border:1px solid var(--border-1);border-radius:8px;padding:6px 9px;margin-bottom:5px">'+
+      '<i class="ti ti-file" style="font-size:14px;color:var(--text-4)"></i>'+
+      '<span style="flex:1;font-size:12.5px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(f.nombre||'archivo')+'</span>'+
+      '<button type="button" onclick="garQuitarArchivo('+i+')" title="Quitar" style="border:none;background:none;color:var(--accent);cursor:pointer;font-size:15px;line-height:1">×</button>'+
+    '</div>').join('');
+}
+function garQuitarArchivo(i){ garEditArchivos.splice(i,1); garRenderFilesList(); }
+
 function garAbrirModal(){
-  garEditId=null;
-  document.getElementById('gar-modal-title').innerHTML='<i class="ti ti-upload" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#1d4ed8"></i>Cargar archivo · '+escapeHtml(garModeloVista||'');
+  garEditId=null; garEditArchivos=[];
+  document.getElementById('gar-modal-title').innerHTML='<i class="ti ti-upload" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#1d4ed8"></i>Cargar archivos · '+escapeHtml(garModeloVista||'');
   document.getElementById('gar-err').style.display='none';
   document.getElementById('f-gar-titulo').value='';
   document.getElementById('f-gar-descripcion').value='';
   document.getElementById('f-gar-file').value='';
-  document.getElementById('gar-file-hint').textContent='PDF, Word, imágenes, etc.';
-  document.getElementById('gar-save-btn').textContent='Subir archivo';
+  document.getElementById('gar-file-hint').textContent='Podés elegir varios a la vez (PDF, Word, imágenes, etc.).';
+  document.getElementById('gar-save-btn').textContent='Subir';
+  garRenderFilesList();
   document.getElementById('garov').classList.add('open');
 }
 function garEditar(id){
   const d=garDocs.find(x=>x.id===id); if(!d) return;
   garEditId=id;
-  document.getElementById('gar-modal-title').innerHTML='<i class="ti ti-upload" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#1d4ed8"></i>Actualizar · '+escapeHtml(d.titulo);
+  garEditArchivos=garArchivos(d).map(f=>({path:f.path,nombre:f.nombre,tipo:f.tipo||'',bytes:f.bytes||0}));
+  document.getElementById('gar-modal-title').innerHTML='<i class="ti ti-upload" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#1d4ed8"></i>Editar · '+escapeHtml(d.titulo);
   document.getElementById('gar-err').style.display='none';
   document.getElementById('f-gar-titulo').value=d.titulo||'';
   document.getElementById('f-gar-descripcion').value=d.descripcion||'';
   document.getElementById('f-gar-file').value='';
-  document.getElementById('gar-file-hint').textContent='Dejá el archivo vacío para conservar el actual, o elegí uno nuevo para reemplazarlo.';
+  document.getElementById('gar-file-hint').textContent='Agregá más archivos si querés. Quitá los que no van con la × de arriba.';
   document.getElementById('gar-save-btn').textContent='Guardar cambios';
+  garRenderFilesList();
   document.getElementById('garov').classList.add('open');
 }
-function garCerrarModal(){ garEditId=null; document.getElementById('garov').classList.remove('open'); }
+function garCerrarModal(){ garEditId=null; garEditArchivos=[]; document.getElementById('garov').classList.remove('open'); }
 
 async function garGuardar(){
   const err=document.getElementById('gar-err'); err.style.display='none';
   const btn=document.getElementById('gar-save-btn');
   const titulo=document.getElementById('f-gar-titulo').value.trim();
   const descripcion=document.getElementById('f-gar-descripcion').value.trim();
-  const file=document.getElementById('f-gar-file').files[0];
+  const nuevos=Array.from(document.getElementById('f-gar-file').files||[]);
   const editando=!!garEditId;
   if(!titulo){ err.textContent='Completá el título.'; err.style.display='block'; return; }
-  if(!editando && !file){ err.textContent='Elegí un archivo.'; err.style.display='block'; return; }
+  if((garEditArchivos.length + nuevos.length)===0){ err.textContent='Agregá al menos un archivo.'; err.style.display='block'; return; }
   try{
     btn.disabled=true; btn.textContent='Guardando...';
-    if(editando){
-      const d=garDocs.find(x=>x.id===garEditId); if(!d) throw new Error('no encontrado');
-      const upd={titulo, descripcion, actualizado_en:new Date().toISOString()};
-      let viejo=null;
-      if(file){
-        const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-        const path=`${d.modelo}/${Date.now()}_${safe}`;
-        const up=await sb.storage.from('garantias').upload(path,file,{upsert:false});
-        if(up.error) throw up.error;
-        viejo=d.archivo_path;
-        upd.archivo_path=path; upd.archivo_nombre=file.name; upd.archivo_tipo=file.type; upd.tamano_bytes=file.size;
-      }
-      const {error}=await sb.from('garantia_docs').update(upd).eq('id',garEditId);
-      if(error) throw error;
-      if(viejo){ try{ await sb.storage.from('garantias').remove([viejo]); }catch(e){} }
-    }else{
+    const modelo = editando ? (garDocs.find(x=>x.id===garEditId)||{}).modelo : garModeloVista;
+    // subir los archivos nuevos
+    const subidos=[];
+    for(const file of nuevos){
       const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-      const path=`${garModeloVista}/${Date.now()}_${safe}`;
+      const path=`${modelo}/${Date.now()}_${Math.random().toString(36).slice(2,7)}_${safe}`;
       const up=await sb.storage.from('garantias').upload(path,file,{upsert:false});
       if(up.error) throw up.error;
-      const {error}=await sb.from('garantia_docs').insert({
-        modelo:garModeloVista, titulo, descripcion,
-        archivo_path:path, archivo_nombre:file.name, archivo_tipo:file.type, tamano_bytes:file.size,
-        subido_por_username:cu.username, subido_por_nombre:cu.nombre
-      });
+      subidos.push({path, nombre:file.name, tipo:file.type, bytes:file.size});
+    }
+    const archivos=garEditArchivos.concat(subidos);
+    const primero=archivos[0]||{};
+    const datos={
+      titulo, descripcion, archivos,
+      archivo_path:primero.path||null, archivo_nombre:primero.nombre||null,
+      archivo_tipo:primero.tipo||null, tamano_bytes:primero.bytes||null,
+      actualizado_en:new Date().toISOString()
+    };
+    if(editando){
+      const d=garDocs.find(x=>x.id===garEditId)||{};
+      const antes=garArchivos(d).map(f=>f.path);
+      const quedan=new Set(archivos.map(f=>f.path));
+      const aBorrar=antes.filter(p=>!quedan.has(p));
+      const {error}=await sb.from('garantia_docs').update(datos).eq('id',garEditId);
+      if(error) throw error;
+      if(aBorrar.length){ try{ await sb.storage.from('garantias').remove(aBorrar); }catch(e){} }
+    }else{
+      datos.modelo=modelo; datos.subido_por_username=cu.username; datos.subido_por_nombre=cu.nombre;
+      const {error}=await sb.from('garantia_docs').insert(datos);
       if(error) throw error;
     }
     garCerrarModal();
     await cargarGarantias();
-    showToast(editando?'Documento actualizado.':'Archivo cargado.');
+    showToast(editando?'Documento actualizado.':'Archivos cargados.');
   }catch(ex){
     err.textContent='Error: '+(ex.message||'error'); err.style.display='block';
   }finally{
-    btn.disabled=false; btn.textContent=editando?'Guardar cambios':'Subir archivo';
+    btn.disabled=false; btn.textContent=editando?'Guardar cambios':'Subir';
   }
 }
 
-async function garDescargar(id){
-  const d=garDocs.find(x=>x.id===id); if(!d||!d.archivo_path){ alert('Sin archivo.'); return; }
+async function garDescargar(id, idx){
+  const d=garDocs.find(x=>x.id===id); if(!d) return;
+  const files=garArchivos(d);
+  const f=files[idx||0]; if(!f||!f.path){ alert('Sin archivo.'); return; }
   try{
-    const {data,error}=await sb.storage.from('garantias').createSignedUrl(d.archivo_path,120);
+    const {data,error}=await sb.storage.from('garantias').createSignedUrl(f.path,120);
     if(error) throw error;
     window.open(data.signedUrl,'_blank');
   }catch(err){ alert('No se pudo descargar: '+(err.message||'error')); }
@@ -4903,11 +4939,12 @@ async function garDescargar(id){
 
 async function garBorrar(id){
   const d=garDocs.find(x=>x.id===id); if(!d) return;
-  if(!confirm(`¿Eliminar “${d.titulo}”? No se puede deshacer.`)) return;
+  if(!confirm(`¿Eliminar “${d.titulo}” y todos sus archivos? No se puede deshacer.`)) return;
   try{
     const {error}=await sb.from('garantia_docs').delete().eq('id',id);
     if(error) throw error;
-    if(d.archivo_path){ try{ await sb.storage.from('garantias').remove([d.archivo_path]); }catch(e){} }
+    const paths=garArchivos(d).map(f=>f.path).filter(Boolean);
+    if(paths.length){ try{ await sb.storage.from('garantias').remove(paths); }catch(e){} }
     await cargarGarantias();
     showToast('Documento eliminado.');
   }catch(err){ alert('No se pudo eliminar: '+(err.message||'error')); }
