@@ -593,6 +593,18 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
 .eq-cit{background:var(--surface-sub,#faf9f7);border-radius:8px;padding:7px 9px;font-size:12.5px}
 .eq-cit .cm{font-size:10.5px;color:var(--text-5);margin-top:2px}
 .eq-cit-auto{background:#eef2f6;color:var(--text-3)}
+.eq-acc-wrap{position:relative}
+.eq-acc-sug{position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:40;background:#fff;border:1px solid var(--border-2);border-radius:10px;box-shadow:0 10px 26px -12px rgba(16,24,40,.35);max-height:230px;overflow:auto}
+.eq-acc-opt{padding:8px 11px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border-1)}
+.eq-acc-opt:last-child{border-bottom:none}
+.eq-acc-opt:hover,.eq-acc-opt.act{background:#eef4f3}
+.eq-acc-opt .cod{font-family:var(--mono,monospace);font-size:11px;color:var(--text-5);margin-top:1px}
+.eq-acc-opt .add{font-size:11px;color:#0f766e}
+.eq-acc-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.eq-acc-chip{display:inline-flex;align-items:center;gap:7px;background:#e6f4f1;border:1px solid #bfe3db;border-radius:8px;padding:5px 8px;font-size:12.5px;color:#0f766e;max-width:100%}
+.eq-acc-chip .cod{font-family:var(--mono,monospace);font-size:10.5px;color:#5b8f86}
+.eq-acc-chip .nocod{font-size:10px;color:#b45309;font-style:italic}
+.eq-acc-chip button{border:none;background:none;color:#0f766e;cursor:pointer;font-size:14px;line-height:1;padding:0}
 
 /* ── SERVICE PACK ─────────────────────────────────────── */
 .tsp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
@@ -1550,8 +1562,14 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
       <div><label>N° de Pre-Or <span style="color:var(--accent)">*</span></label><input type="text" id="eqa-preor" placeholder="N° de pre-orden"/></div>
       <div><label>N° prospecto</label><input type="text" id="eqa-prosp"/></div>
       <div><label>Contacto</label><input type="text" id="eqa-contacto" placeholder="Teléfono"/></div>
-      <div class="full"><label>Qué se vendió <span style="color:var(--accent)">*</span></label>
-        <input type="text" id="eqa-trabajo" placeholder="Ej: COBERTOR + BARRA DE TRABAJO + LANZA"/></div>
+      <div class="full"><label>Accesorios vendidos <span style="color:var(--accent)">*</span></label>
+        <div class="eq-acc-wrap">
+          <input type="text" id="eqa-acc-input" autocomplete="off" placeholder="Escribí el nombre o el código del accesorio…" oninput="eqAccBuscar()" onkeydown="eqAccKey(event)"/>
+          <div id="eqa-acc-sug" class="eq-acc-sug" style="display:none"></div>
+        </div>
+        <div id="eqa-acc-chips" class="eq-acc-chips"></div>
+        <div style="font-size:11px;color:var(--text-4);margin-top:4px">Elegí de la base (nombre + código). Si no está, escribilo y apretá Enter para agregarlo igual.</div>
+        <input type="hidden" id="eqa-trabajo"/></div>
       <div><label>Vendedor</label><input type="text" id="eqa-vendedor"/></div>
       <div><label>Duración estimada</label>
         <select id="eqa-tiempo"><option value="">Seleccionar...</option><option>15MIN</option><option>30MIN</option><option>45MIN</option><option>1HS</option><option>2HS</option><option>3HS</option><option>4HS</option><option>5HS</option><option>6HS</option></select></div>
@@ -8062,6 +8080,67 @@ function quitarAdjuntoDrawer(i){drawerAdjuntos.splice(i,1);renderDrawerAdjuntos(
 //  Tablas: equip_pedidos, equip_comentarios
 // ============================================================
 let eqPedidos = [];
+const EQ_ACCESORIOS=[{"c":"PS246BY00300","d":"RED DE CARGA (DERECHA)"},{"c":"PS2A3BY00100","d":"TIRA APERTURA DE BAUL"},{"c":"PS382BY00300","d":"ZOCALO DE PUERTA (DEPORT)"},{"c":"PV150BY01000","d":"SPOILER LATERAL"},{"c":"PV154BY01000","d":"SPOILER DELANTERO"},{"c":"PV156BY01000","d":"SPOILER TRASERO"},{"c":"PV170BY01000","d":"MOLDURA LATERRAL INFERIOR"},{"c":"PV228BY01000","d":"MANTA PERROS"},{"c":"PV22CBY01000","d":"CINTURON PARA PERROS"},{"c":"PV22CBY02000","d":"ASIENTOS PARA PERROS"},{"c":"PV52BBY01000","d":"LED DE CABINA (BLUETOOTH)"},{"c":"PV676BY01000","d":"CARGADOR INALAMBRICO"},{"c":"PXKIT REG","d":"KIT REGLAMENTARIO"},{"c":"PXXC308","d":"CHAPON CUBRE CARTER COROLLA/CROSS CCA"},{"c":"PXXC309","d":"CHAPON CUBRE CARTER YARIS CROSS BRA"},{"c":"PV6020D02000","d":"SMART DATA LINK MULTIMED."},{"c":"PZQ727508100","d":"CARGO BARRIER, H ROOF, FR"},{"c":"PZQ727504000","d":"CARGO BARRIER, L ROOF, FR"},{"c":"PZQ727504100","d":"CARGO BARRIER, L ROOF, FR"},{"c":"PH4020KM1000","d":"PROTECTOR FRONTAL 2019"},{"c":"PZ0030000500","d":"RED DE BAUL"},{"c":"PC2461200100","d":"CARGO NET (SUV)"},{"c":"PC2460A00100","d":"CARGO NET"},{"c":"PC2460K00100","d":"CARGO NET (SUV)"},{"c":"PV4030A01000","d":"SIDE MIRROR GARNISH"},{"c":"PC4010K02200","d":"FOG LAMP CHROMED COVER"},{"c":"PZ0150D60300","d":"APLIQUE CROM. CAJA CAMBIO"},{"c":"PC4010K02D00","d":"HEADLAMP GARNISH LED CHRO"},{"c":"PV3820A01000","d":"SCUFF PLATE"},{"c":"PV3820D00100","d":"PLACA ZOCALO"},{"c":"PC3820K00H00","d":"SW4 SCUFF PLATE"},{"c":"PC3820K00400","d":"ZOCALO PTA. DC"},{"c":"PV3820201000","d":"ZOCALOS"},{"c":"PC5580K00200","d":"REAR USB OUT X 2 (N2)"},{"c":"PC6420K00200","d":"AUTO FOLDING MIRROR"},{"c":"PC1860K1FG00","d":"FILM IMPERMEABLE P/ESPEJO"},{"c":"PC4660K00600","d":"BOCHA PALANC.CAMB.KEVLAR"},{"c":"PC4660K00400","d":"BOCHA PALANC.CAMB.KEVLAR"},{"c":"PH3B51001000","d":"DECK CARGO NET"},{"c":"PBR033040200","d":"CABLEADO GANCHO ARRASTRE"},{"c":"PC4010K00100","d":"MOLDURA CROMADA"},{"c":"PH9600KB10PC","d":"COBERT.PLAST.TOW.HIT SW4"},{"c":"PH9600KB11PC","d":"MOLDURA PLAS. ENGANCHE SW4 +24"},{"c":"PV3820D01000","d":"PLACA ZOCALO"},{"c":"PC4580K00100","d":"TRABA LLANTA AUXIL.(MCGU)"},{"c":"PBR302922100","d":"KIT CAMARA DE RETROCESO"},{"c":"PBR302922000","d":"KIT BACK CAMERA"},{"c":"PZV611421000","d":"MANIJA CUARTA PTA CROMADA"},{"c":"PV4130A01000","d":"MUFFLER CUTTER"},{"c":"PC4130K00100","d":"SALIDA DE ESCAPE CROMADA"},{"c":"PZ0560D00700","d":"MUFFLER CUTTER"},{"c":"PC4131200100","d":"SALIDA DE ESCAPE CROMADA"},{"c":"PXXSOPMAT5KG","d":"SOPORTE MATAFUEGO 5KG EN CAJA VERTICAL"},{"c":"PXXLOCKHILUXAL","d":"KIT ANTIROBO AUX HILUX ALEACION"},{"c":"PXXLOCKSW4","d":"KIT ANTIROBO SW4"},{"c":"PXXLOCKHILUX","d":"KIT ANTIROBO AUX HILUX CHAPA"},{"c":"PC5E10K01M00","d":"KICK ACTIVATE PRIMER"},{"c":"PXARRES.MP","d":"ARRESTALLAMAS MP"},{"c":"PXXCHECKPOINT","d":"CHECKPOINT HILUX DIS"},{"c":"PZU1206010TM","d":"CONJ.TOMA ELEC.ENGAN"},{"c":"PXXSOPCAJA","d":"SOPORTE AUX CENTRO DE CAJA"},{"c":"PX004","d":"PROTECTOR VALVULA FRENO"},{"c":"PXSOP.MAT.MP","d":"SOPORTE MATAFUEGO 2.5 KG"},{"c":"PH4170KA2000","d":"ELECTRONIC MODULE PROT."},{"c":"PX023","d":"PROTECTOR MODULO TRANS. 4X4"},{"c":"PH4170KA0000","d":"RADIATOR PROTECTOR"},{"c":"PH4150KA1000","d":"RR SHOCK ABSORBER PROT."},{"c":"PXPROT.AMOR.MP","d":"PROTECTOR AMORTIGUADOR TRAS.MP"},{"c":"PV5010D31000","d":"PARKING SENSOR KIT"},{"c":"PV5010201000","d":"SENSOR ESTAC. FR"},{"c":"PV5010201100","d":"SENSOR ESTAC.TRAS."},{"c":"PV501BY02000","d":"SENSOR ESTAC. TRASERO"},{"c":"PV501BY01000","d":"SENSOR ESTAC. DELANTERO"},{"c":"PH45610010ST","d":"SET HERRAM. TUERCAS SEG."},{"c":"PC4580K00500","d":"WHEEL HOUSE LINER SET"},{"c":"PH0221001000","d":"KIT SEGURIDAD"},{"c":"MS3435200900","d":"GR REAR BUMPER SPOILER"},{"c":"MS3165201400","d":"GR BODY STRIPE"},{"c":"GRCOBYARISAP","d":"COBERTOR ANTIPOLVO YARIS"},{"c":"PS241BY00300","d":"BANDEJA ANTIDER ASIEN TRA"},{"c":"PH4200KA2000","d":"MATAFUEGO 1 KG"},{"c":"PH4150KA2000","d":"ABS&BRACKET SENSOR PROT."},{"c":"PH8B00001000","d":"SOPORTE MATAFUEGO"},{"c":"PH4200KA0000","d":"FIRST AID KIT"},{"c":"PH4150KA5000","d":"RR BUZZER SIRENA DE RETR"},{"c":"CS1860KA1000","d":"KIT REFLECTIVO"},{"c":"CS1860011000","d":"MAX SPEED 110 SIGNAL 3M"},{"c":"PH1860KA3000","d":"RED REFLECTIVE TAPE 3M"},{"c":"PH3B10KA10UP","d":"COB.CAJA DC FITT.KIT U"},{"c":"PV301BY01000","d":"RACK PARA TECHO YARIS CROSS"},{"c":"PV162BY01000","d":"DEFLECTOR VENT. YARIS CROSS"},{"c":"PV170BY02000","d":"MOLDURA"},{"c":"PS234BY00200","d":"PROTECCION SOLAR FRONTAL"},{"c":"ATURY04504","d":"KIT VIDRIOS + CIERRE CENT. HILUX S/C"},{"c":"PV382BY01000","d":"PLACA DESGASTE"},{"c":"PC187BY00900","d":"EMBLEMA (NEGRO PIANO)"},{"c":"ATURY12415","d":"KIT ILUMINACIÓN INTERNA - AMBIENT LIGHT"},{"c":"PS246BY00200","d":"RED DE CARGA"},{"c":"PC187BY00700","d":"LOGOTIPO CAPOT (NEGR PIA)"},{"c":"PC187BY00600","d":"LOGOTIPO CAPOT (CROMADO)"},{"c":"ATURY04509","d":"LOGOTIPO FRONTAL LED HILUX-SW4 S/ TSS"},{"c":"ATURY03504","d":"CARGADOR USB-C + INDUCTIVO COROLLA 21-26"},{"c":"ATURY06507","d":"CONECTOR 7 PINES HILUX CS"},{"c":"ATURY09510","d":"ALARMA CON CONTROL REMOTO"},{"c":"ATURY12401","d":"AUT. VIDRIOS ELÉC. C. CROSS 24-26"},{"c":"ATURY11402","d":"AUT. VIDRIOS ELÉC. HILUX-SW4-YARIS"},{"c":"ATURY11403","d":"AUT. VIDRIOS ELÉC. + PLEG. ESPEJOS"},{"c":"ATURY11405","d":"AL. ANTIROBO RUEDAS + C. AUT. DE PUERTA"},{"c":"ATURY11406","d":"ALARMA KEYLESS S/ S.VOLUMETRICO"},{"c":"ATURY11412","d":"AUT. VIDRIOS, ESPEJOS, TECHO, TILT DOWN"},{"c":"ATURY11414","d":"AUT. VIDRIOS + PLEG. ESPEJOS + TILT DOWN"},{"c":"ATURY11417","d":"AUT. VIDRIOS ELÉC. + PLEG. DE ESPEJOS"},{"c":"ATURY11422","d":"MÓDULO PLEGAMIENTO DE ESPEJOS (2018-2026"},{"c":"ATURY12403","d":"CAMARAS LATERALES + 3 AV inputs"},{"c":"ATURY12404","d":"CAMARAS LATERALES + 3 AV input YARIS"},{"c":"ATURY12406","d":"CAMARA DEL. CON SOPORTE HILUX 20-26"},{"c":"ATURY12408","d":"CAMARA DEL. CON SOPORTE C.CROSS 24-26"},{"c":"ATURY12409","d":"CAMARA DEL. CON SOPORTE COROLLA 20-26"},{"c":"ATURY12410","d":"CAMARA DEL. CON SOPORTE YARIS 18-26"},{"c":"ATURY12412","d":"CAMARAS LATERALES + 1 AV input"},{"c":"PH3B00KA1100","d":"BARRA SPORT"},{"c":"PH3B010160SP","d":"BARRA GRS-3."},{"c":"PH3B01015000","d":"BARRA ANTIV. CROM. SPORT"},{"c":"PXXTRIFOLDAL","d":"TAPA TRIFOLD P/ ALERON"},{"c":"PXXTRIFOLD","d":"TAPA TRI FOLD HILUX +16"},{"c":"PH3B00KA14CB","d":"BARRA DE LUJO NEGRA C"},{"c":"PH3B00KA15CS","d":"BARRA DE LUJO CROMADA C"},{"c":"PH3B00KA1000","d":"BARRA DE TRABAJO DC"},{"c":"PH4150KA4000","d":"REAR RUBBER CURTAIN"},{"c":"PH4150KA3000","d":"REAR DIFFERENTIAL PROTECT"},{"c":"PH4170KA1000","d":"TRANSMISSION PROT. 4X4"},{"c":"PH4150KA0000","d":"FUEL TANK PROTECTOR"},{"c":"PH4580KM2000","d":"SPARE WHEEL BRACKET T"},{"c":"PXPOLLERA.MP","d":"BARRERO POLLERA TRASERA"},{"c":"PH9600KB1100","d":"GANCHO DE ARRASTRE 3000KG"},{"c":"PH9600KB1000","d":"KIT GANCHO SW4 ARG"},{"c":"PH9600KM1000","d":"KID GANCHO Y BOCHA PU-ARG"},{"c":"PH3B10KA8100","d":"HARD TONNEAU COVER"},{"c":"PXX017","d":"ENGANCHE CON CABEZAL Y BOCHA - RAV 4 HIB"},{"c":"PXXC304","d":"CUBRE CARTER COROLLA DESDE2021"},{"c":"PXX304SP","d":"PROTECTOR DIFERENCIAL CUADRADO"},{"c":"PXX304","d":"PROTECTOR DE DIFERENCIAL"},{"c":"PXX301","d":"PROTECTOR DE CAJA CAMBIO"},{"c":"PXX302","d":"CHAPON TANQUE COMBUST."},{"c":"PXXSOPAUXT","d":"SOPORTE AUX T 1 RUEDA"},{"c":"PX1","d":"BARRERO POLLERAS CENTRAL"},{"c":"PV2410D02100","d":"COBERTOR BAUL - SD"},{"c":"PV2410D00100","d":"BANDEJA BAUL HB ETIOS"},{"c":"PH1861004000","d":"CALCO LAT. PU. LH. NEGRO"},{"c":"PH1861003000","d":"CALCO LAT. PU. RH. NEGRO"},{"c":"PH1861005000","d":"CALCO LAT. PU. RH BRONCE"},{"c":"PH1861006000","d":"CALCO LAT. PU. LH. BRONCE"},{"c":"PH1860KB1000","d":"CALCO LAT. SW4"},{"c":"PH1780KB1000","d":"PAINT PROTECTION FILM -"},{"c":"PH1750KB1000","d":"PAINT PROTECTION FILM -"},{"c":"PH3B00KA12CT","d":"SOPORTE TIPO C BAR. LUJ."},{"c":"PC3010K00200","d":"ROOF RACK (PU)"},{"c":"PZV221511000","d":"BARRA TRANSVERSAL TECHO"},{"c":"PC3010K005S1","d":"ROOF RACK (SUV)"},{"c":"PV1620D01000","d":"DEFLECTOR DE VIENTO - HB"},{"c":"PZV331601000","d":"SIDE VISOR COROLLA 2014"},{"c":"PV1770D01000","d":"PROTECTOR LAT. PARAG. HB"},{"c":"PZV811603000","d":"MOLDURA LATERAL"},{"c":"PW3010200100","d":"BARRAS DE TECHO"},{"c":"PV2410D01000","d":"COBERT.BAUL - HB YARIS"},{"c":"PH2410KB1200","d":"TRUNK LINER 3 ROW SEAT"},{"c":"PZV821511000","d":"ALFOMBRA BAUL"},{"c":"PH1860KA1000","d":"CALCO LAT. DC"},{"c":"PH1880KM1000","d":"TOYOTA DECAL - WHITE"},{"c":"PH1880KM2000","d":"TOYOTA DECAL - BLACK"},{"c":"PH1860KA4000","d":"SIDE STRIPES RED"},{"c":"PC3A20K00US2","d":"ASIST.PORTON TRAS."},{"c":"PC3B20K00100","d":"ASIST. PORTON TRAS."},{"c":"P75310A00100","d":"MOLDURA PUERTA"},{"c":"PW3B50K01500","d":"KIT CAJA HERRAMIENTA LAT."},{"c":"PW3B50K01400","d":"KIT CAJA HERRAMIENTA FR"},{"c":"PV2410203000","d":"BANDEJA DE BAUL"},{"c":"PC1620K00H00","d":"SIDE VISORS SW4"},{"c":"PC1620K00300","d":"SIDE VISOR"},{"c":"PC1700K01U00","d":"SIDE PROTEC.MOLDING GRIS"},{"c":"PC1700K01T00","d":"SIDE PROTEC.MOLDING ROJO"},{"c":"PC1700K00600","d":"BODY SIDE MOLDING"},{"c":"CS6020K01000","d":"ESTEREO BLUETOOTH P/HILUX"},{"c":"PV1620202000","d":"DEFLECTOR DE VENTANILLAS"},{"c":"PC4010K00300","d":"MOLDURA FARO ANTINIEBLA"},{"c":"PW4054200024","d":"REAR LOWER TRUNK GARNISH"},{"c":"PV1620A01000","d":"SIDE VISOR"},{"c":"PV1700201000","d":"MOLDURA LATERAL"},{"c":"PV1700203000","d":"MOLDURA EXTERIOR BAJA"},{"c":"PV2410A01000","d":"LUGGAGE TRAY"},{"c":"PW2414200000","d":"TRUNK LINER"},{"c":"PH2410KB1300","d":"TRUNK LINER 2 ROW SEAT"},{"c":"PH5D21002000","d":"INST. ELEC. SW4 (TH)"},{"c":"PV5D2BY01000","d":"INST. ELECT. YARIS CROSS"},{"c":"PV5D2BY02000","d":"INST. ELECT. YARIS CROSS"},{"c":"PC4050K00500","d":"REAR LAMP CHROMED COVER"},{"c":"PH5D21001000","d":"INST. ELECTRICA PU (TH)"},{"c":"PZ00606001M1","d":"HELADERA"},{"c":"PH3B20KA10TG","d":"TERMINACION CAJA"},{"c":"PH3B20KA1000","d":"TERMINACION COBERT. CAJA"},{"c":"PZV811401000","d":"MOLDURA LATERAL"},{"c":"PC3080K00200","d":"MOLDURAS TECHO DC ACC"},{"c":"PV2410D01100","d":"BANDEJA PORTAEQUIPAJE HB"},{"c":"PZ0020D01000","d":"BANDEJA BAUL"},{"c":"PH4580KM1000","d":"SOPORTE RUEDA AUXILIO"},{"c":"PH8B00KM1000","d":"SOPORTE MATAFUEGO 5KG"},{"c":"PZQ158932000","d":"HOOD ORNAMENT CLEAR"},{"c":"CS3880KA2000","d":"ESCALON RETRACTIL P/HILUX"},{"c":"PH9600KB10PT","d":"KIT PERNO TH SW4 ARG"},{"c":"PH9600KB10BT","d":"KIT BOCHA TH SW4 ARG"},{"c":"PH9600KM10BT","d":"KIT BOCHA TH PU ARG"},{"c":"PH9600KM10PT","d":"KIT PERNOS PH PU ARG"},{"c":"PH8B00KM2000","d":"10KG FIRE EXTINGUISH SUP."},{"c":"PC1540K00U00","d":"PROTECTOR PARAGOLPE FRONTAL"},{"c":"P75311200100","d":"LED SCUFF PLATE, FRONT DO"},{"c":"PT7671622000","d":"BARRA DE TECHO COR. CROSS"},{"c":"PZ4030063600","d":"PORTEQUIPAJE SKI&SNOW"},{"c":"PV1700D02010","d":"MOLDURA LATERAL"},{"c":"PH3B10KA1100","d":"LONA CAJA"},{"c":"PXXC303","d":"CUBRE CARTER YARIS"},{"c":"PXXC305","d":"CHAPON CUBRE CARTER YARIS CROSS CCA"},{"c":"PXXC306","d":"CHAPON CUBRE CARTER YARIS CCA"},{"c":"PXXC300","d":"CHAPON CUBRE CARTER RAV4 HIBRIDA"},{"c":"PXXC301","d":"CHAPON CUBRE CARTER ETIOS"},{"c":"PXXC307","d":"CHAPON CUBRE CARTER C.CROSS HIB"},{"c":"PH7000KM10DO","d":"ESTRIBOS HILUX DC"},{"c":"PH3B41001000","d":"PROTECTOR CARTER HILUX"},{"c":"PV241BY01000","d":"BANDEJA DE EQUIPAJE"},{"c":"PS241BY00200","d":"BANDEJA ANTIDERRAME BAUL"},{"c":"PC5930K00N","d":"SET LED ANTINIEBLA"},{"c":"PC5930K01600","d":"LED LAMP (FOG LAMP)"},{"c":"PC5930K00300","d":"FARO ANTINIEBLA"},{"c":"PH3B10KA22SP","d":"LONA CAJA"},{"c":"CS41700020CL","d":"PROTECTOR CARTER CALADO"},{"c":"PH40210090SP","d":"FRONT BUMPER GUARD GR2"},{"c":"PV1700D02000","d":"MOLDURA LATERAL"},{"c":"PH4231001000","d":"PROTEC. INSECT. GRILLA DEL."},{"c":"PJ2412680100","d":"ALFOMBRA HIACE 4DR"},{"c":"PJ2412680200","d":"ALFOMBRA HIACE 5DR"},{"c":"PZQ158931500","d":"TINTED BONNET PROTECTOR"},{"c":"PZQ158933000","d":"HOOD ORNAMENT TINT"},{"c":"PZQ128910000","d":"SNORKEL WIDE BODY"},{"c":"PZQ128911000","d":"SNORKEL NARROW BODY"},{"c":"PZQ128904000","d":"SNORKEL DX/CS"},{"c":"PXMAT","d":"MATAFUEGO 5KG DISTRI."},{"c":"76870YY02100","d":"BARRA"},{"c":"PC150BY00843","d":"ALERON DE TECHO - NEGRO"},{"c":"PV960BY01000","d":"ENGANCHE DE REMOLQUE"},{"c":"PH9600KM4000","d":"GANCHO ARRASTRE CON BOCHA"},{"c":"PXXDEFENSATALAM","d":"DEFENSA TALAMPAYA HILUX 16-21+"},{"c":"PZQ444212100","d":"SIDE STEP RAV4"},{"c":"PV3880A01000","d":"SIDE STEPS"},{"c":"PH3B00KA2000","d":"BARRA PORTON TRAS.DC"},{"c":"PC1560D00J00","d":"FALDONES LATERALES"},{"c":"PC4170D00100","d":"MOLDURA INF.PARAG.DEL.HB"},{"c":"PC4150D00100","d":"MOLDURA INF.PARAG.TRAS.HB"},{"c":"PC1580K00B00","d":"REAR UNDER RUN"},{"c":"PH4011005000","d":"FRONT, BUMPER GUARD SW4"},{"c":"PH4011002000","d":"PROTECTOR PARAG. DEL."},{"c":"PW3B50K00000","d":"CAJA HERRAMIENTAS LATERAL"},{"c":"PC4030K00200","d":"OVER FENDER"},{"c":"PC4030K01400","d":"OVERFENDER SILVER DCAB"},{"c":"PW3B50K00300","d":"CAJA HERRAMIENTAS FRONTAL"},{"c":"PV5010D01000","d":"SENSOR ESTAC.DEL."},{"c":"PV5010D21000","d":"SENSOR ESTACIONAM FRONTAL"},{"c":"PV5010D22000","d":"SENSOR ESTACIONAMIENTO"},{"c":"PV5010A01000","d":"FRONT PARKING SENSOR"},{"c":"PV5010D00200","d":"SENSOR ESTAC. SD"},{"c":"PC2340K00100","d":"PARASOL FRONTAL PARAB."},{"c":"PC5C10K00900","d":"WIRELESS CHARGER"},{"c":"PC5C10A00A00","d":"WIRELESS CHARGER"},{"c":"PC5C10K00C00","d":"WIRELESS CHARGER"},{"c":"PC4060K00100","d":"TAILGATE GARNISH"},{"c":"PC4030K00100","d":"MOLDURA CROMADA GUARD."},{"c":"PZV641421200","d":"APLIQUE CROMADO FOG LAMP"},{"c":"PC6A30D001M1","d":"DIGITAL CAMARA (BRASIL)"},{"c":"PC4010K02A00","d":"HEADLAMP GARNISH HAL CHRO"},{"c":"PC4020K00200","d":"COBERT.CROMADO OPTICA DEL"},{"c":"PZ0170000601","d":"PORTA TABLET"},{"c":"PC22B0K004M2","d":"COMBO HOOOK DOCK (SOPORTE DE TABLET)"},{"c":"PC6A60K00100","d":"DISPLAY INT.REFL.PARAB"},{"c":"PC5230K00G00","d":"LEG ROOM LAMP (2+2)"},{"c":"PC5070K001CR","d":"BACK SENSOR W/ECU 4X4"},{"c":"PC5070K00RCR","d":"BACK PARKING SENSOR"},{"c":"PZQ718907000","d":"TAILGATE CENTRAL LOCKING"},{"c":"PZQ718902000","d":"TAILGATE CENTRAL LOCKING"},{"c":"PZQ9889110UP","d":"FRONT CORNER PARK ASSIST"},{"c":"PV4030201000","d":"CHROME-PLATED DOOR HANDLE"},{"c":"PC1680K00500","d":"BASE+MANIJA PTA CROMADA"},{"c":"PV4030202000","d":"COROLLA REAR VIEW MIRROR"},{"c":"PZV831121000","d":"TUERCAS LLANTAS"},{"c":"PV4560K00100","d":"TUERCA DE SEGURIDAD"},{"c":"002760094200","d":"KIT SEGURIDAD CHAPA"},{"c":"PV456BY01000","d":"TUERCA SEGURIDAD"},{"c":"PW4560001300","d":"TUERCA SEGURIDAD"},{"c":"PC3720K00200","d":"COBERTOR PICK UP DC"},{"c":"PS372BY00100","d":"COBERTOR YARIS CROSS"},{"c":"PH5621001000","d":"DECK ILLUMINATION"},{"c":"PC4A10K00400","d":"AMORTIGUADOR ASISTENTE CAPO"},{"c":"PC4580K00200","d":"TRABA LLANTA AUXIL.(MASS)"},{"c":"PC5C11200600","d":"CARGADOR INAL."},{"c":"PZ0020D01200","d":"LUGGAGE STORAGE"},{"c":"PC5571200100","d":"COMPRESOR 12V (V2)"},{"c":"PH4200KA3000","d":"MATAFUEGO 10 KG"},{"c":"PH3B10KA13DO","d":"COBERTOR D/C"},{"c":"PC1540K01600","d":"FRONT UNDER RUN SW4"},{"c":"PC4010K00200","d":"COBERT.FARO ANTINIEB.CROM"},{"c":"PH3B10KA10LS","d":"SEPARADOR DE CARGA"},{"c":"PH5D20KB1000","d":"INST.ELEC. (TH)"},{"c":"PV1620D02000","d":"DEFLECTOR DE VIENTO - SD"},{"c":"PV1770D03000","d":"PROTECTOR PARAG.HB"},{"c":"PV5010200100","d":"SENSOR ESTAC. FR"},{"c":"PV5010D00100","d":"SENSOR ESTAC. HB"},{"c":"PV5010D01100","d":"SENSOR ESTAC.TRAS."},{"c":"PZ0241201100","d":"SCUFF PLATE COROLLA 2014"},{"c":"PZ0330K00900","d":"SIDE VISOR SW4"},{"c":"PZ0421200500","d":"MOLDURA CROMADA ESPEJO"},{"c":"PZ0600K01800","d":"LAMPARA ANTINIEBLA"},{"c":"PZQ128903000","d":"SNORKEL WIDE BODY"},{"c":"PZV340801100","d":"PROTECTOR PARAGOLPES"},{"c":"PZV341401000","d":"PROTECTOR PARAGOLPE FR"},{"c":"PBR80232T000","d":"HERRAMIENTA SENSOR ESTACIONAMIENTO"},{"c":"PH3B10KJ1000","d":"COBERTOR CAJA SC"}];
+// ── Buscador de accesorios (base con código + descripción) ──────────
+let eqAccSel = [];      // accesorios elegidos: [{c,d}]
+let eqAccFilt = [];     // resultados visibles del buscador
+let eqAccIdx = -1;      // opción resaltada con el teclado
+function eqAccNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function eqAccBuscar(){
+  const inp=document.getElementById('eqa-acc-input'); const box=document.getElementById('eqa-acc-sug');
+  const q=eqAccNorm(inp.value.trim());
+  if(!q){ box.style.display='none'; eqAccFilt=[]; eqAccIdx=-1; return; }
+  const ya=new Set(eqAccSel.map(a=>(a.c||'')+'|'+a.d));
+  eqAccFilt = EQ_ACCESORIOS.filter(a=> !ya.has((a.c||'')+'|'+a.d) &&
+      (eqAccNorm(a.d).includes(q) || eqAccNorm(a.c).includes(q))).slice(0,8);
+  eqAccIdx=-1;
+  if(!eqAccFilt.length){ box.innerHTML='<div class="eq-acc-opt" style="color:var(--text-4);cursor:default">Sin coincidencias · Enter para agregar “'+eqEsc(inp.value.trim())+'”</div>'; box.style.display='block'; return; }
+  box.innerHTML = eqAccFilt.map((a,i)=>'<div class="eq-acc-opt" data-i="'+i+'" onclick="eqAccAdd('+i+')"><div>'+eqEsc(a.d)+'</div><div class="cod">'+eqEsc(a.c)+'</div></div>').join('');
+  box.style.display='block';
+}
+function eqAccKey(e){
+  const box=document.getElementById('eqa-acc-sug');
+  if(e.key==='ArrowDown'){ e.preventDefault(); if(eqAccFilt.length){ eqAccIdx=(eqAccIdx+1)%eqAccFilt.length; eqAccPintar(); } }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); if(eqAccFilt.length){ eqAccIdx=(eqAccIdx-1+eqAccFilt.length)%eqAccFilt.length; eqAccPintar(); } }
+  else if(e.key==='Enter'){ e.preventDefault();
+    if(eqAccIdx>=0 && eqAccFilt[eqAccIdx]) eqAccAdd(eqAccIdx);
+    else if(eqAccFilt.length===1) eqAccAdd(0);
+    else eqAccAddCustom();
+  }
+  else if(e.key==='Escape'){ box.style.display='none'; }
+}
+function eqAccPintar(){
+  document.querySelectorAll('#eqa-acc-sug .eq-acc-opt').forEach((el,i)=>el.classList.toggle('act',i===eqAccIdx));
+}
+function eqAccAdd(i){
+  const a=eqAccFilt[i]; if(!a) return;
+  eqAccSel.push({c:a.c||'', d:a.d});
+  const inp=document.getElementById('eqa-acc-input'); inp.value=''; document.getElementById('eqa-acc-sug').style.display='none';
+  eqAccFilt=[]; eqAccIdx=-1; eqAccRenderChips(); inp.focus();
+}
+function eqAccAddCustom(){
+  const inp=document.getElementById('eqa-acc-input'); const t=inp.value.trim().toUpperCase();
+  if(!t) return;
+  eqAccSel.push({c:'', d:t});
+  inp.value=''; document.getElementById('eqa-acc-sug').style.display='none';
+  eqAccFilt=[]; eqAccIdx=-1; eqAccRenderChips(); inp.focus();
+}
+function eqAccQuitar(i){ eqAccSel.splice(i,1); eqAccRenderChips(); }
+function eqAccRenderChips(){
+  const cont=document.getElementById('eqa-acc-chips'); if(!cont) return;
+  cont.innerHTML = eqAccSel.map((a,i)=>'<span class="eq-acc-chip"><span><span>'+eqEsc(a.d)+'</span> '+
+    (a.c?'<span class="cod">'+eqEsc(a.c)+'</span>':'<span class="nocod">sin código</span>')+'</span>'+
+    '<button type="button" title="Quitar" onclick="eqAccQuitar('+i+')">×</button></span>').join('');
+  // sincroniza el campo oculto (texto para búsquedas y compatibilidad)
+  const h=document.getElementById('eqa-trabajo'); if(h) h.value=eqAccSel.map(a=>a.d).join(' + ');
+}
+function eqAccReset(lista){
+  eqAccSel = Array.isArray(lista) ? lista.map(a=>({c:(a.c||a.codigo||''), d:(a.d||a.desc||'')})).filter(a=>a.d) : [];
+  const inp=document.getElementById('eqa-acc-input'); if(inp) inp.value='';
+  const box=document.getElementById('eqa-acc-sug'); if(box) box.style.display='none';
+  eqAccFilt=[]; eqAccIdx=-1; eqAccRenderChips();
+}
+
 let eqVista = 'espera';
 let eqAbierto = null, eqTmpPrio = null, eqTmpStock = null;
 
@@ -8383,7 +8462,10 @@ function eqAbrirAlta(id){
   document.getElementById('eqa-preor').value    = V('nro_preor');
   document.getElementById('eqa-prosp').value    = V('nro_prosp');
   document.getElementById('eqa-contacto').value = V('contacto');
-  document.getElementById('eqa-trabajo').value  = V('trabajo');
+  // Lista de accesorios: de la columna estructurada si existe; si no, del texto viejo.
+  if(p && Array.isArray(p.accesorios) && p.accesorios.length) eqAccReset(p.accesorios);
+  else if(p && p.trabajo) eqAccReset(String(p.trabajo).split(' + ').map(t=>({c:'',d:t.trim()})).filter(x=>x.d));
+  else eqAccReset([]);
   document.getElementById('eqa-obs').value      = V('obs_venta');
   document.getElementById('eqa-vendedor').value = p ? V('vendedor') : ((cu && cu.nombre) || '');
   document.getElementById('eqa-tiempo').value   = V('tiempo_trabajo');
@@ -8408,11 +8490,11 @@ function eqCerrarAlta(){ eqEditId=null; document.getElementById('eq-mov-alta').c
 async function eqGuardarAlta(){
   const err=document.getElementById('eqa-err'); err.style.display='none';
   const cliente=document.getElementById('eqa-cliente').value.trim();
-  const trabajo=document.getElementById('eqa-trabajo').value.trim();
+  const trabajo=eqAccSel.map(a=>a.d).join(' + ');
   const preor=document.getElementById('eqa-preor').value.trim();
   if(!cliente){ err.textContent='Falta el cliente.'; err.style.display='block'; return; }
   if(!preor){ err.textContent='Falta el N° de Pre-Or.'; err.style.display='block'; return; }
-  if(!trabajo){ err.textContent='Falta indicar qué se vendió.'; err.style.display='block'; return; }
+  if(!eqAccSel.length){ err.textContent='Agregá al menos un accesorio.'; err.style.display='block'; return; }
 
   const editando = !!eqEditId;
   const btn=document.getElementById('eqa-btn');
@@ -8421,6 +8503,7 @@ async function eqGuardarAlta(){
     const datos={
       cliente: cliente,
       trabajo: trabajo.toUpperCase(),
+      accesorios: eqAccSel.map(a=>({c:a.c||'', d:a.d})),
       dominio: document.getElementById('eqa-dominio').value.trim().toUpperCase() || null,
       nro_preor: preor || null,
       nro_prosp: document.getElementById('eqa-prosp').value.trim() || null,
@@ -8500,8 +8583,16 @@ async function eqAbrir(id){
     const dd=eqDiasDesde(p.creado_en);
     meta.push('cargado '+eqFmtFechaTs(p.creado_en)+(dd>0?' · hace '+dd+' día'+(dd>1?'s':''):' · hoy'));
   }
+  // Detalle de accesorios con su código (para que stock/repuestos identifiquen la pieza exacta).
+  const accHtml = (Array.isArray(p.accesorios) && p.accesorios.length)
+    ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:3px">'+
+        p.accesorios.map(a=>'<div style="font-size:12px;color:var(--text-2)">• '+eqEsc(a.d||a.desc||'')+
+          (a.c||a.codigo?' <span style="font-family:var(--mono,monospace);font-size:10.5px;color:var(--text-5)">'+eqEsc(a.c||a.codigo)+'</span>':' <span style="font-size:10px;color:#b45309;font-style:italic">sin código</span>')+'</div>').join('')+
+      '</div>'
+    : '';
   document.getElementById('eq-mo-sub').innerHTML =
     '<div style="font-weight:600;color:var(--text-2);font-size:13px">'+eqEsc(p.trabajo)+'</div>'+
+    accHtml+
     (meta.length?'<div style="margin-top:2px">'+meta.join(' · ')+'</div>':'')+
     (p.obs_venta?'<div style="margin-top:4px;color:var(--text-3)">'+eqEsc(p.obs_venta)+'</div>':'');
   document.getElementById('eq-mo-err').style.display='none';
