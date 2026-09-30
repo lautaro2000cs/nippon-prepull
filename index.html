@@ -1254,6 +1254,11 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
               <div class="eq-sv" id="eq-v-turnado">0</div>
               <div class="eq-sd">Con fecha asignada</div>
             </button>
+            <button class="eq-step" id="eq-s-hist" onclick="eqVer('hist')">
+              <div class="eq-sn"><i class="ti ti-history"></i> Histórico</div>
+              <div class="eq-sv" id="eq-v-hist">0</div>
+              <div class="eq-sd">Equipados de días pasados</div>
+            </button>
           </div>
 
           <div class="filters-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
@@ -8327,7 +8332,7 @@ async function cargarEquip(){
 
 function eqVer(v){
   eqVista=v;
-  ['espera','listo','sin','turnado'].forEach(x=>{
+  ['espera','listo','sin','turnado','hist'].forEach(x=>{
     const el=document.getElementById('eq-s-'+x);
     if(el) el.classList.toggle('act', x===v);
   });
@@ -8338,22 +8343,24 @@ const EQ_SUB={
   espera :'Ventas cargadas que control de stock todavía no revisó.',
   listo  :'Tienen la pieza confirmada (o pedida con fecha de arribo). Ya se pueden turnar.',
   sin    :'No hay stock o está pedida sin fecha. No se pueden turnar todavía.',
-  turnado:'Ya tienen fecha y hora asignada.'
+  turnado:'Ya tienen fecha y hora asignada.',
+  hist   :'Turnos de días pasados ya marcados como equipados. Se ordenan del más reciente al más antiguo.'
 };
 const EQ_VACIO={
   espera :['inbox','Nada esperando revisión','Cuando un vendedor cargue una venta, aparece acá para que control de stock la revise.'],
   listo  :['package','Ningún pedido listo todavía','Los pedidos llegan acá cuando stock confirma que hay pieza, o que está pedida con fecha de arribo.'],
   sin    :['circle-check','Sin pedidos trabados','Ningún pedido está frenado por falta de pieza.'],
-  turnado:['calendar','Sin turnos asignados','Los pedidos con pieza confirmada se turnan desde la solapa "Listos para turnar".']
+  turnado:['calendar','Sin turnos asignados','Los pedidos con pieza confirmada se turnan desde la solapa "Listos para turnar".'],
+  hist   :['history','Sin histórico todavía','Cuando un turno pasado se marca como equipado, se archiva acá y podés consultarlo por fecha.']
 };
 
 function eqRender(){
   const cont=document.getElementById('eq-cont');
   if(!cont) return;
 
-  const c={espera:0,listo:0,sin:0,turnado:0};
+  const c={espera:0,listo:0,sin:0,turnado:0,hist:0};
   eqPedidos.forEach(p=>{ const k=eqPaso(p); if(c[k]===undefined) return;
-    if(k==='turnado' && !eqTurnadoVigente(p)) return;   // no contar los ya equipados y pasados
+    if(k==='turnado' && !eqTurnadoVigente(p)){ c.hist++; return; }   // pasados y equipados -> histórico
     c[k]++; });
   Object.keys(c).forEach(k=>{ const el=document.getElementById('eq-v-'+k); if(el) el.textContent=c[k]; });
   const sSin=document.getElementById('eq-s-sin');
@@ -8366,8 +8373,9 @@ function eqRender(){
   const sub=document.getElementById('eq-sub');
   if(sub) sub.textContent=EQ_SUB[eqVista];
 
-  let arr=eqPedidos.filter(p=>eqPaso(p)===eqVista);
-  if(eqVista==='turnado') arr=arr.filter(eqTurnadoVigente);
+  let arr;
+  if(eqVista==='hist') arr=eqPedidos.filter(p=>eqPaso(p)==='turnado' && !eqTurnadoVigente(p));
+  else { arr=eqPedidos.filter(p=>eqPaso(p)===eqVista); if(eqVista==='turnado') arr=arr.filter(eqTurnadoVigente); }
   const q=(document.getElementById('eq-q').value||'').toLowerCase().trim();
   const fp=document.getElementById('eq-fp').value;
   if(fp) arr=arr.filter(p=>p.prioridad===fp);
@@ -8378,7 +8386,7 @@ function eqRender(){
   const porAntig = (document.getElementById('eq-orden')||{}).value === 'antig';
   arr.sort(function(a,b){
     const antig = String(a.creado_en).localeCompare(String(b.creado_en));
-    if(eqVista==='turnado'){
+    if(eqVista==='turnado' || eqVista==='hist'){
       // los turnados van por fecha del turno; dentro del día, urgentes primero
       return String(a.fecha||'').localeCompare(String(b.fecha||''))
           || (P[a.prioridad]-P[b.prioridad]) || antig;
@@ -8396,7 +8404,7 @@ function eqRender(){
       : '<div class="eq-empty"><i class="ti ti-'+v[0]+'"></i><div class="t">'+v[1]+'</div><div class="s">'+v[2]+'</div></div>';
     return;
   }
-  cont.innerHTML = eqVista==='turnado' ? eqPorDia(arr) : eqTabla(arr);
+  cont.innerHTML = (eqVista==='turnado'||eqVista==='hist') ? eqPorDia(arr, eqVista==='hist') : eqTabla(arr);
 }
 
 function eqTabla(arr){
@@ -8407,9 +8415,9 @@ function eqTabla(arr){
     '</tr></thead><tbody>'+arr.map(eqFila).join('')+'</tbody></table></div>';
 }
 
-function eqPorDia(arr){
+function eqPorDia(arr, desc){
   const g={}; arr.forEach(p=>{ (g[p.fecha]=g[p.fecha]||[]).push(p); });
-  const dias=Object.keys(g).sort();
+  const dias=Object.keys(g).sort(); if(desc) dias.reverse();
   const h=eqHoy();
 
   const resumen='<div class="eq-resumen">'+dias.map(function(f){
