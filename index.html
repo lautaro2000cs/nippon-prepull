@@ -3690,9 +3690,7 @@ function sinLavado(e){
 
 function promedioEncuesta(e){
   if(estaAnulada(e)) return null;
-  const desest = preguntasDesestimadas(e);
-  const excluir = new Set(desest);
-  if(sinLavado(e)) excluir.add('p_limpieza'); // Añelo, S.T.M., CDO Y HIACE: sin lavado
+  const excluir = new Set(preguntasDesestimadas(e));
   const notas = PREGUNTAS_ASESOR
     .filter(([clave]) => !excluir.has(clave))
     .map(([clave]) => e[clave])
@@ -3700,6 +3698,13 @@ function promedioEncuesta(e){
     .map(Number);
   if(notas.length === 0) return null;
   return Math.round((notas.reduce((a,b)=>a+b,0)/notas.length)*100)/100;
+}
+
+// Promedio de un asesor ESTILO POWER BI: junta todas las respuestas de sus
+// encuestas (no anuladas) y saca un solo promedio. Es el número que se usa
+// para ranking y comisiones.
+function promedioAsesorPBI(encs){
+  return promedioGeneralDe(encs.filter(e => !estaAnulada(e)), PREGUNTAS_ASESOR);
 }
 
 // filtra encuestas por rango de fechas (fecha_respuesta) + búsqueda.
@@ -3951,11 +3956,11 @@ function mesAnterior(m){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
 }
 
-// Nota de una pregunta respetando anuladas y desestimaciones
+// Nota de una pregunta respetando anuladas y desestimaciones.
+// (Se cuenta Limpieza siempre que tenga nota, igual que Power BI.)
 function notaEnc(e, clave){
   if(estaAnulada(e)) return null;
   if(preguntasDesestimadas(e).includes(clave)) return null;
-  if(clave === 'p_limpieza' && sinLavado(e)) return null; // Añelo, S.T.M., CDO Y HIACE: sin lavado
   const v = e[clave];
   return (v!=null && !isNaN(Number(v))) ? Number(v) : null;
 }
@@ -3965,11 +3970,17 @@ function promedioDe(encs, clave){
   if(!notas.length) return null;
   return notas.reduce((a,b)=>a+b,0)/notas.length;
 }
-// Promedio general = media de los promedios de columna disponibles
+// Promedio general estilo POWER BI = promedio de TODAS las respuestas
+// individuales juntas (cada respuesta pesa igual), sin redondeo intermedio.
+// Antes se promediaban los promedios de columna (cada pregunta pesaba igual),
+// lo que daba diferencias cuando una pregunta tenía menos respuestas.
 function promedioGeneralDe(encs, cols){
-  const ms = cols.map(([c]) => promedioDe(encs, c)).filter(v => v!=null);
-  if(!ms.length) return null;
-  return ms.reduce((a,b)=>a+b,0)/ms.length;
+  let suma = 0, n = 0;
+  encs.forEach(e => cols.forEach(([c]) => {
+    const v = notaEnc(e, c);
+    if(v != null){ suma += v; n++; }
+  }));
+  return n ? suma / n : null;
 }
 
 // Base del tablero: aplica scope de jefe + slicer de sucursal + saca anuladas.
@@ -5021,23 +5032,21 @@ function renderEncResumen(){
   }
 
   // agrupar por asesor (excluye encuestas anuladas por el admin)
+  // Promedio estilo Power BI: junta todas las respuestas del asesor.
   const grupos = {};
   arr.filter(e => !estaAnulada(e)).forEach(e => {
     const a = e.asesor || '(sin asesor)';
-    if(!grupos[a]) grupos[a] = { asesor:a, notas:[], total:0 };
-    const n = promedioEncuesta(e);
-    if(n != null && !isNaN(n)) grupos[a].notas.push(n);
+    if(!grupos[a]) grupos[a] = { asesor:a, encs:[], total:0 };
+    grupos[a].encs.push(e);
     grupos[a].total++;
   });
 
   const filas = Object.values(grupos).map(g => {
-    const prom = g.notas.length ? g.notas.reduce((a,b)=>a+b,0)/g.notas.length : null;
-    return { ...g, prom };
+    return { asesor:g.asesor, total:g.total, prom: promedioAsesorPBI(g.encs) };
   }).sort((a,b)=> (b.prom??-1) - (a.prom??-1));
 
-  // métricas generales (sobre las no anuladas)
-  const todasNotas = arr.filter(e=>!estaAnulada(e)).map(promedioEncuesta).filter(n=>n!=null&&!isNaN(n));
-  const promGeneral = todasNotas.length ? (todasNotas.reduce((a,b)=>a+b,0)/todasNotas.length) : null;
+  // métrica general estilo Power BI: promedio de todas las respuestas juntas
+  const promGeneral = promedioAsesorPBI(arr.filter(e=>!estaAnulada(e)));
   const mejor = filas.filter(f=>f.prom!=null)[0];
 
   const totalVigentes = arr.filter(e=>!estaAnulada(e)).length;
@@ -5175,10 +5184,6 @@ function renderEncDetalle(){
     const rid = 'encrow-'+i;
     const desest = preguntasDesestimadas(e);
     const numTds = ENC_NUM_COLS.map(([k]) => {
-      // Limpieza no cuenta en Añelo/S.T.M./CDO Y HIACE: se muestra N/A tachado
-      if(k === 'p_limpieza' && sinLavado(e)){
-        return `<td style="padding:9px 12px;text-align:center;font-family:var(--mono);color:var(--text-5);text-decoration:line-through;opacity:.6" title="Sin lavado en esta sucursal — no cuenta">N/A</td>`;
-      }
       const v = e[k];
       const n = (v!=null && !isNaN(Number(v))) ? Number(v) : null;
       const tach = desest.includes(k);
@@ -5275,8 +5280,7 @@ function exportarComisiones(){
   // Detalle: una fila por encuesta válida, con TODAS las preguntas (igual que el
   // reporte general). Preguntas desestimadas -> puntuación vacía (no cuentan).
   const filas = arr.map(e => {
-    const excluir = new Set(preguntasDesestimadas(e));
-    if(sinLavado(e)) excluir.add('p_limpieza'); // sucursales sin lavado: no cuenta limpieza
+    const excluir = new Set(preguntasDesestimadas(e)); // solo se vacían preguntas desestimadas
     const nota = (k) => {
       if(excluir.has(k)) return '';                      // desestimada -> sin puntuación
       const v = e[k];
@@ -5305,24 +5309,24 @@ function exportarComisiones(){
     };
   });
 
-  // Resumen por asesor: promedio de los promedios (igual que la solapa "Por asesor").
+  // Resumen por asesor: promedio ESTILO POWER BI (junta todas las respuestas).
   const grupos = {};
   arr.forEach(e => {
     const a = e.asesor || '(sin asesor)';
-    if(!grupos[a]) grupos[a] = { asesor:a, sucursales:new Set(), notas:[], total:0 };
+    if(!grupos[a]) grupos[a] = { asesor:a, sucursales:new Set(), encs:[], total:0 };
     if(e.sucursal) grupos[a].sucursales.add(e.sucursal);
-    const n = promedioEncuesta(e);
-    if(n!=null && !isNaN(n)) grupos[a].notas.push(n);
+    grupos[a].encs.push(e);
     grupos[a].total++;
   });
   const resumen = Object.values(grupos).map(g => {
-    const prom = g.notas.length ? g.notas.reduce((a,b)=>a+b,0)/g.notas.length : null;
+    const prom = promedioAsesorPBI(g.encs);
+    const conNota = g.encs.filter(e => promedioEncuesta(e)!=null).length;
     const sucs = Array.from(g.sucursales);
     return {
       'Asesor': g.asesor,
       'Sucursal': sucs.length===1 ? sucs[0] : (sucs.length===0 ? '' : 'Varias'),
       'Encuestas': g.total,
-      'Con nota': g.notas.length,
+      'Con nota': conNota,
       'Promedio comisión': prom!=null ? Number(prom.toFixed(2)) : '',
     };
   }).sort((a,b)=> (b['Promedio comisión']===''?-1:b['Promedio comisión']) - (a['Promedio comisión']===''?-1:a['Promedio comisión']));
