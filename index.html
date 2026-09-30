@@ -8260,6 +8260,15 @@ function eqPuedeTurnarPedido(p){ return esAdmin() || eqPuedeTurnar() || (eqEsExt
 // ── helpers ──
 function eqEsc(s){ return escapeHtml(String(s ?? '')); }
 function eqHoy(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+// Un turnado sigue "vigente" (se muestra) si es de hoy en adelante, o si es de
+// un día pasado pero TODAVÍA no se tildó como equipado. Los pasados ya equipados
+// se van sacando para dejar la vista limpia.
+function eqTurnadoVigente(p){
+  if(eqPaso(p)!=='turnado') return true;
+  if(!p.fecha) return true;
+  if(p.fecha>=eqHoy()) return true;
+  return !p.equipada;
+}
 function eqFmtTs(t){ if(!t) return ''; const d=new Date(t);
   return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
 function eqDiasDesde(ts){ if(!ts) return 0; return Math.floor((Date.now()-new Date(ts))/86400000); }
@@ -8343,7 +8352,9 @@ function eqRender(){
   if(!cont) return;
 
   const c={espera:0,listo:0,sin:0,turnado:0};
-  eqPedidos.forEach(p=>{ const k=eqPaso(p); if(c[k]!==undefined) c[k]++; });
+  eqPedidos.forEach(p=>{ const k=eqPaso(p); if(c[k]===undefined) return;
+    if(k==='turnado' && !eqTurnadoVigente(p)) return;   // no contar los ya equipados y pasados
+    c[k]++; });
   Object.keys(c).forEach(k=>{ const el=document.getElementById('eq-v-'+k); if(el) el.textContent=c[k]; });
   const sSin=document.getElementById('eq-s-sin');
   if(sSin) sSin.classList.toggle('alerta', c.sin>0);
@@ -8356,6 +8367,7 @@ function eqRender(){
   if(sub) sub.textContent=EQ_SUB[eqVista];
 
   let arr=eqPedidos.filter(p=>eqPaso(p)===eqVista);
+  if(eqVista==='turnado') arr=arr.filter(eqTurnadoVigente);
   const q=(document.getElementById('eq-q').value||'').toLowerCase().trim();
   const fp=document.getElementById('eq-fp').value;
   if(fp) arr=arr.filter(p=>p.prioridad===fp);
@@ -8718,7 +8730,9 @@ async function eqAbrir(id){
   document.getElementById('eq-bx-prio').style.display = verPrio?'block':'none';
   if(verPrio){ eqPintarPrio(); document.getElementById('eq-mo-motivo').value = p.motivo_prioridad||''; }
 
-  const verStock = eqPuedeStock() && !enTurno;
+  // Stock: normalmente sólo antes de turnar. El admin puede corregirlo también
+  // en un pedido ya turnado (ej: figuraba "pedida" pero la pieza está).
+  const verStock = (eqPuedeStock() && !enTurno) || esAdmin();
   document.getElementById('eq-bx-stock').style.display = verStock?'block':'none';
   if(verStock){ eqPintarStock(); document.getElementById('eq-mo-eta').value = p.eta_pieza||''; }
 
