@@ -2692,6 +2692,7 @@ function aplicarAsesorOverride(arr){
 let encSubTab = 'resumen';
 let encCargadas = false;
 let desestimaciones = [];      // pedidos de desestimación
+let desestEditando = new Set(); // ids de pedidos resueltos que el admin está re-editando
 
 // Carga los pedidos de desestimación desde Supabase
 async function cargarDesestimaciones(){
@@ -2934,13 +2935,17 @@ function tarjetaDesest(d){
 
       ${(cu && cu.rol==='admin') && d.estado === 'pendiente' && e ? bloqueResolver(d, e, did) : ''}
       ${d.estado === 'en_revision' ? `<div style="margin-top:8px;padding:10px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;font-size:13px;color:var(--text-2)"><b>En revisión:</b> ${escapeHtml(d.decision_admin||'Se pidió descargo al solicitante.')} <span style="color:var(--text-4)">— esperando descargo</span></div>` : ''}
-      ${(d.estado === 'aprobado' || d.estado === 'rechazado') ? `<div style="margin-top:8px;padding:10px 13px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;font-size:13px;color:var(--text-2)"><b>Resolución:</b> ${escapeHtml(d.decision_admin||'—')}${d.resuelto_por?` <span style="color:var(--text-4)">— por ${escapeHtml(d.resuelto_por)}</span>`:''}</div>` : ''}
+      ${(d.estado === 'aprobado' || d.estado === 'rechazado') ? (
+        (cu && cu.rol==='admin' && e && desestEditando.has(d.id))
+          ? bloqueResolver(d, e, did, true)
+          : `<div style="margin-top:8px;padding:10px 13px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;font-size:13px;color:var(--text-2)"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div><b>Resolución:</b> ${escapeHtml(d.decision_admin||'—')}${d.resuelto_por?` <span style="color:var(--text-4)">— por ${escapeHtml(d.resuelto_por)}</span>`:''}${d.resuelto_en?` <span style="color:var(--text-4)">· ${new Date(d.resuelto_en).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'})}</span>`:''}</div>${(cu && cu.rol==='admin' && e)?`<button onclick="editarResolucion(${d.id})" style="flex:none;font-size:11px;padding:5px 11px;border-radius:7px;cursor:pointer;border:1px solid #16a34a;background:#fff;color:#15803d;font-weight:600;white-space:nowrap"><i class="ti ti-pencil" style="font-size:12px;vertical-align:-1px"></i> Editar resolución</button>`:''}</div></div>`
+      ) : ''}
     </div>
   `;
 }
 
 // Bloque con los controles para que el admin resuelva un pedido pendiente
-function bloqueResolver(d, e, did){
+function bloqueResolver(d, e, did, modoEdicion){
   const desest = preguntasDesestimadas(e);
   const checks = PREGUNTAS_DESESTIMABLES.map(([clave, label]) => {
     const marcada = desest.includes(clave);
@@ -2949,9 +2954,13 @@ function bloqueResolver(d, e, did){
     </label>`;
   }).join('');
 
+  const bordeColor = modoEdicion ? '#16a34a' : 'var(--border-1)';
+  const titulo = modoEdicion ? 'Editar resolución' : 'Resolver pedido';
+
   return `
-    <div style="margin-top:12px;border-top:1px solid var(--border-1);padding-top:12px">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-4);font-weight:700;margin-bottom:8px">Resolver pedido</div>
+    <div style="margin-top:12px;border-top:2px solid ${bordeColor};padding-top:12px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-4);font-weight:700;margin-bottom:8px">${titulo}</div>
+      ${modoEdicion ? `<div style="font-size:12px;color:var(--text-3);margin-bottom:8px;padding:8px 11px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px"><b>Resolución actual:</b> ${escapeHtml(d.decision_admin||'—')}. Elegí una nueva acción para reemplazarla.</div>` : ''}
       <div style="font-size:12px;color:var(--text-3);margin-bottom:6px">Marcá las preguntas a desestimar (si aplica):</div>
       <div style="margin-bottom:12px">${checks}</div>
       <textarea id="${did}-nota" rows="2" placeholder="Nota / respuesta para el asesor (opcional)…" style="width:100%;padding:8px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;margin-bottom:10px"></textarea>
@@ -2959,10 +2968,22 @@ function bloqueResolver(d, e, did){
         <button onclick="resolverDesest(${d.id},'aprobar_preguntas','${did}')" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:none;background:#4f46e5;color:#fff;font-weight:600">Aplicar preguntas marcadas</button>
         <button onclick="resolverDesest(${d.id},'anular','${did}')" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid #dc2626;background:#fef2f2;color:#dc2626;font-weight:600">Anular encuesta completa</button>
         <button onclick="resolverDesest(${d.id},'rechazar','${did}')" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid var(--border-2);background:#fff;color:var(--text-3)">Rechazar pedido</button>
-        ${!d.revision_abierta ? `<button onclick="resolverDesest(${d.id},'revision','${did}')" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid #2563eb;background:#eff6ff;color:#2563eb;font-weight:600" title="Deja la ventana abierta para que el solicitante cargue un descargo">Dejar en revisión (pedir descargo)</button>` : ''}
+        ${(!d.revision_abierta && !modoEdicion) ? `<button onclick="resolverDesest(${d.id},'revision','${did}')" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid #2563eb;background:#eff6ff;color:#2563eb;font-weight:600" title="Deja la ventana abierta para que el solicitante cargue un descargo">Dejar en revisión (pedir descargo)</button>` : ''}
+        ${modoEdicion ? `<button onclick="cancelarEdicionResol(${d.id})" style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid var(--border-2);background:#fff;color:var(--text-3)">Cancelar</button>` : ''}
       </div>
     </div>
   `;
+}
+
+// Abre / cierra el modo edición de una resolución ya tomada (solo admin)
+function editarResolucion(id){
+  if(!(cu && cu.rol==='admin')) return;
+  desestEditando.add(id);
+  renderDesest();
+}
+function cancelarEdicionResol(id){
+  desestEditando.delete(id);
+  renderDesest();
 }
 
 // Aplica la resolución del admin
@@ -2987,23 +3008,29 @@ async function resolverDesest(id, accion, did){
         alert('Marcá al menos una pregunta, o usá "Anular" / "Rechazar".');
         return;
       }
-      // aplicar a la encuesta
+      // aplicar a la encuesta (declarativo: además limpia una posible anulación previa)
       const { error: e1 } = await sb.from('encuestas')
-        .update({ preguntas_desestimadas: preguntasAfectadas })
+        .update({ preguntas_desestimadas: preguntasAfectadas, anulada: false })
         .eq('wise_id', d.encuesta_id);
       if(e1) throw e1;
-      if(e) e.preguntas_desestimadas = preguntasAfectadas;
+      if(e){ e.preguntas_desestimadas = preguntasAfectadas; e.anulada = false; }
       const labels = PREGUNTAS_DESESTIMABLES.filter(([c])=>preguntasAfectadas.includes(c)).map(([,l])=>l).join(', ');
       decision = `Se desestimaron: ${labels}.` + (nota?` ${nota}`:'');
     } else if(accion === 'anular'){
       const { error: e1 } = await sb.from('encuestas')
-        .update({ anulada: true })
+        .update({ anulada: true, preguntas_desestimadas: [] })
         .eq('wise_id', d.encuesta_id);
       if(e1) throw e1;
-      if(e) e.anulada = true;
+      if(e){ e.anulada = true; e.preguntas_desestimadas = []; }
       encuestaEliminada = true;
       decision = 'Encuesta anulada completa.' + (nota?` ${nota}`:'');
     } else if(accion === 'rechazar'){
+      // rechazar revierte cualquier efecto previo sobre la encuesta
+      const { error: e1 } = await sb.from('encuestas')
+        .update({ anulada: false, preguntas_desestimadas: [] })
+        .eq('wise_id', d.encuesta_id);
+      if(e1) throw e1;
+      if(e){ e.anulada = false; e.preguntas_desestimadas = []; }
       nuevoEstado = 'rechazado';
       decision = nota || 'Pedido rechazado.';
     } else if(accion === 'revision'){
@@ -3025,6 +3052,7 @@ async function resolverDesest(id, accion, did){
     const { error: e2 } = await sb.from('desestimaciones').update(updatePayload).eq('id', id);
     if(e2) throw e2;
 
+    desestEditando.delete(id);
     await cargarDesestimaciones();
     renderDesest();
   }catch(err){
