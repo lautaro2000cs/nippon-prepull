@@ -3778,6 +3778,20 @@ function renderSucursalChips(){
   conts.forEach(c => { c.style.display = 'flex'; c.innerHTML = html; });
 }
 
+// Formatea una fecha (string "YYYY-MM-DD" o timestamp) a DD/MM/AA SIN correr el
+// día por zona horaria. new Date("2026-09-01") se interpreta como UTC y en AR
+// (UTC-3) mostraba 31/08; acá tomamos los dígitos tal cual.
+function fmtFechaCorta(f){
+  if(!f) return '';
+  const s = String(f).slice(0,10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if(m) return `${m[3]}/${m[2]}/${m[1].slice(2)}`;
+  const d = new Date(f);
+  return isNaN(d) ? '' : d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'});
+}
+// Fecha calendario (YYYY-MM-DD) de una encuesta, para comparar sin zona horaria.
+function fechaCalEnc(f){ return f ? String(f).slice(0,10) : ''; }
+
 function encuestasFiltradas(soloMias){
   let arr = encuestas.slice();
 
@@ -3791,13 +3805,12 @@ function encuestasFiltradas(soloMias){
 
   const desde = document.getElementById('enc-desde')?.value;
   const hasta = document.getElementById('enc-hasta')?.value;
+  // Comparación por fecha calendario (string), sin corrimiento por zona horaria.
   if(desde){
-    const d = new Date(desde + 'T00:00:00');
-    arr = arr.filter(e => { const f = fechaDe(e); return f && new Date(f) >= d; });
+    arr = arr.filter(e => { const f = fechaCalEnc(fechaDe(e)); return f && f >= desde; });
   }
   if(hasta){
-    const h = new Date(hasta + 'T23:59:59');
-    arr = arr.filter(e => { const f = fechaDe(e); return f && new Date(f) <= h; });
+    arr = arr.filter(e => { const f = fechaCalEnc(fechaDe(e)); return f && f <= hasta; });
   }
 
   // slicer de sucursales (admin/supervisor): 0 seleccionadas = todas
@@ -5149,7 +5162,7 @@ function renderEncDetalle(){
   arr.slice(0, 500).forEach((e, i) => {
     const nota = promedioEncuesta(e);
     const critica = nota != null && nota < ENC_UMBRAL_CRITICA;
-    const f = e.fecha ? new Date(e.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—';
+    const f = e.fecha ? fmtFechaCorta(e.fecha) : '—';
     const rid = 'encrow-'+i;
     const desest = preguntasDesestimadas(e);
     const numTds = ENC_NUM_COLS.map(([k]) => {
@@ -5191,7 +5204,7 @@ function exportarEncuestasExcel(){
   if(!arr.length){ alert('No hay encuestas para exportar con los filtros actuales.'); return; }
 
   const estadoLbl = { pendiente:'Pendiente', aprobado:'Aprobado', rechazado:'Rechazado', en_revision:'En revisión' };
-  const fmtFecha = (f) => f ? new Date(f).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '';
+  const fmtFecha = fmtFechaCorta;
 
   const filas = arr.map(e => {
     const ped = (desestimaciones || []).find(d => d.encuesta_id === e.wise_id);
@@ -5242,7 +5255,7 @@ function exportarComisiones(){
   const arr = encuestasFiltradas(true).filter(e => !estaAnulada(e));
   if(!arr.length){ alert('No hay encuestas para el reporte de comisiones con los filtros actuales.'); return; }
 
-  const fmtFecha = (f) => f ? new Date(f).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '';
+  const fmtFecha = fmtFechaCorta;
 
   // Detalle: una fila por encuesta válida, con TODAS las preguntas (igual que el
   // reporte general). Preguntas desestimadas -> puntuación vacía (no cuentan).
@@ -5273,6 +5286,7 @@ function exportarComisiones(){
       'Calidad': nota('p_calidad'),
       'NPS': nota('p_recomienda'),
       'Prom. asesor': prom!=null ? Number(prom.toFixed(2)) : '',
+      'Comentario del cliente': (e.comentario || '').toString().trim(),
     };
   });
 
@@ -5305,7 +5319,7 @@ function exportarComisiones(){
   XLSX.utils.book_append_sheet(wb, wsRes, 'Comisiones');
 
   const wsDet = XLSX.utils.json_to_sheet(filas);
-  wsDet['!cols'] = Object.keys(filas[0]).map(k => ({ wch: k==='Servicio'?34 : (k==='Asesor'?24 : (k==='Sucursal'?14 : 12)) }));
+  wsDet['!cols'] = Object.keys(filas[0]).map(k => ({ wch: k==='Comentario del cliente'?50 : (k==='Servicio'?34 : (k==='Asesor'?24 : (k==='Sucursal'?14 : 12))) }));
   XLSX.utils.book_append_sheet(wb, wsDet, 'Detalle');
 
   const hoy = new Date().toISOString().slice(0,10);
