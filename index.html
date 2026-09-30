@@ -3789,6 +3789,15 @@ function fmtFechaCorta(f){
   const d = new Date(f);
   return isNaN(d) ? '' : d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'});
 }
+// Igual que fmtFechaCorta pero con el año completo (DD/MM/AAAA).
+function fmtFechaLarga(f){
+  if(!f) return '';
+  const s = String(f).slice(0,10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if(m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const d = new Date(f);
+  return isNaN(d) ? '' : d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
 // Fecha calendario (YYYY-MM-DD) de una encuesta, para comparar sin zona horaria.
 function fechaCalEnc(f){ return f ? String(f).slice(0,10) : ''; }
 
@@ -5255,7 +5264,7 @@ function exportarComisiones(){
   const arr = encuestasFiltradas(true).filter(e => !estaAnulada(e));
   if(!arr.length){ alert('No hay encuestas para el reporte de comisiones con los filtros actuales.'); return; }
 
-  const fmtFecha = fmtFechaCorta;
+  const fmtFecha = fmtFechaLarga;
 
   // Detalle: una fila por encuesta válida, con TODAS las preguntas (igual que el
   // reporte general). Preguntas desestimadas -> puntuación vacía (no cuentan).
