@@ -5244,7 +5244,8 @@ function exportarComisiones(){
 
   const fmtFecha = (f) => f ? new Date(f).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '';
 
-  // Detalle: una fila por encuesta válida. Preguntas desestimadas -> vacío.
+  // Detalle: una fila por encuesta válida, con TODAS las preguntas (igual que el
+  // reporte general). Preguntas desestimadas -> puntuación vacía (no cuentan).
   const filas = arr.map(e => {
     const excluir = new Set(preguntasDesestimadas(e));
     if(sinLavado(e)) excluir.add('p_limpieza'); // sucursales sin lavado: no cuenta limpieza
@@ -5260,12 +5261,17 @@ function exportarComisiones(){
       'Sucursal': e.sucursal || '',
       'Servicio': e.servicio || '',
       'Patente': e.dominio || '',
+      'Teléfono': e.telefono || '',
       'N° Orden': e.nro_orden || '',
+      'Fac. turnos': nota('p_turnos'),
+      'Tiempo espera': nota('p_espera'),
       'Amabilidad': nota('p_amabilidad'),
       'Atención': nota('p_atencion'),
       'Puntualidad': nota('p_puntualidad'),
       'Explicación': nota('p_explicacion'),
       'Limpieza': nota('p_limpieza'),
+      'Calidad': nota('p_calidad'),
+      'NPS': nota('p_recomienda'),
       'Prom. asesor': prom!=null ? Number(prom.toFixed(2)) : '',
     };
   });
