@@ -5264,7 +5264,13 @@ function exportarComisiones(){
   const arr = encuestasFiltradas(true).filter(e => !estaAnulada(e));
   if(!arr.length){ alert('No hay encuestas para el reporte de comisiones con los filtros actuales.'); return; }
 
-  const fmtFecha = fmtFechaLarga;
+  // Fecha como objeto Date real (mediodía local para no correr el día por zona horaria).
+  const fechaExcel = (f) => {
+    const s = String(f||'').slice(0,10);
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if(m) return new Date(+m[1], +m[2]-1, +m[3], 12, 0, 0);
+    const d = new Date(f); return isNaN(d) ? '' : d;
+  };
 
   // Detalle: una fila por encuesta válida, con TODAS las preguntas (igual que el
   // reporte general). Preguntas desestimadas -> puntuación vacía (no cuentan).
@@ -5278,7 +5284,7 @@ function exportarComisiones(){
     };
     const prom = promedioEncuesta(e);
     return {
-      'Fecha': fmtFecha(e.fecha),
+      'Fecha': fechaExcel(e.fecha),
       'Asesor': e.asesor || '',
       'Sucursal': e.sucursal || '',
       'Servicio': e.servicio || '',
@@ -5327,8 +5333,13 @@ function exportarComisiones(){
   wsRes['!cols'] = [{wch:26},{wch:16},{wch:11},{wch:10},{wch:18}];
   XLSX.utils.book_append_sheet(wb, wsRes, 'Comisiones');
 
-  const wsDet = XLSX.utils.json_to_sheet(filas);
+  const wsDet = XLSX.utils.json_to_sheet(filas, { cellDates:true });
   wsDet['!cols'] = Object.keys(filas[0]).map(k => ({ wch: k==='Comentario del cliente'?50 : (k==='Servicio'?34 : (k==='Asesor'?24 : (k==='Sucursal'?14 : 12))) }));
+  // Forzar año completo en la columna Fecha (columna A), pase lo que pase con la config regional.
+  for(let r=0;r<filas.length;r++){
+    const c = wsDet['A'+(r+2)];
+    if(c && (c.t==='d' || c.t==='n')) c.z = 'dd/mm/yyyy';
+  }
   XLSX.utils.book_append_sheet(wb, wsDet, 'Detalle');
 
   const hoy = new Date().toISOString().slice(0,10);
