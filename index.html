@@ -793,9 +793,13 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
           Service Pack
         </button>
-        <button class="nav-item" id="tab-equip" style="display:none" onclick="swTab('equip',this)">
+        <button class="nav-item" id="tab-equip" style="display:none" onclick="eqIrScope('normal',this)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-          <span id="tab-equip-lbl">Equipamiento</span>
+          Equipamiento
+        </button>
+        <button class="nav-item" id="tab-equip-esp" style="display:none" onclick="eqIrScope('especial',this)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 13v.01"/><path d="M9 17v.01"/></svg>
+          Ventas Especiales
         </button>
         <button class="nav-item" id="tab-garantias" style="display:none" onclick="swTab('garantias',this)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
@@ -2290,13 +2294,6 @@ const MODULOS = {
     color: '#0f766e',
     icono: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'
   },
-  equip_especial: {
-    id: 'equip_especial',
-    nombre: 'Ventas Especiales',
-    desc: 'Ventas a empresas: mismo circuito de stock, con turnado a cargo de un rol dedicado.',
-    color: '#7c3aed',
-    icono: '<path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 13v.01"/><path d="M9 17v.01"/>'
-  },
   garantias: {
     id: 'garantias',
     nombre: 'Garantías',
@@ -2374,8 +2371,7 @@ function puedeAcceder(moduloId){
   if(moduloId === 'admin') return !!(cu && cu.rol === 'admin'); // solo admin, regla dura
   if(moduloId === 'procedimientos') return can('procedimientos.ver');
   if(moduloId === 'detenidos') return can('detenidos.gestionar');
-  if(moduloId === 'equipamiento') return can('equipamiento.ver');
-  if(moduloId === 'equip_especial') return can('equipamiento.especial.ver');
+  if(moduloId === 'equipamiento') return can('equipamiento.ver') || can('equipamiento.especial.ver');
   if(moduloId === 'garantias') return can('garantias.ver');
   if(moduloId === 'tsp') return can('tsp.ver');
   return can(moduloId + '.ver');
@@ -2469,8 +2465,6 @@ async function showApp(){
   const enProc = cu.modulo === 'procedimientos';
   const enDetenidos = cu.modulo === 'detenidos';
   const enEquip = cu.modulo === 'equipamiento';
-  const enEquipEsp = cu.modulo === 'equip_especial';
-  const enEquipAny = enEquip || enEquipEsp;
   const enTsp = cu.modulo === 'tsp';
   const enGarantias = cu.modulo === 'garantias';
 
@@ -2488,13 +2482,14 @@ async function showApp(){
   const tabDet = document.getElementById('tab-detenidos');
   if(tabDet) tabDet.style.display=enDetenidos?'':'none';
   const tabEq = document.getElementById('tab-equip');
-  if(tabEq) tabEq.style.display=enEquipAny?'':'none';
-  // Scope del módulo de equipamiento (normal vs ventas especiales) + etiquetas
-  eqScope = enEquipEsp ? 'especial' : 'normal';
-  const _eqLbl = enEquipEsp ? 'Ventas Especiales' : 'Equipamiento';
-  const _navLbl = document.getElementById('tab-equip-lbl'); if(_navLbl) _navLbl.textContent = _eqLbl;
-  const _eqH2 = document.getElementById('eq-h2'); if(_eqH2) _eqH2.textContent = _eqLbl;
-  const _eqEye = document.getElementById('eq-eyebrow'); if(_eqEye) _eqEye.textContent = enEquipEsp ? 'Accesorios · Ventas a empresas' : 'Accesorios · De la venta al turno';
+  if(tabEq) tabEq.style.display=(enEquip && can('equipamiento.ver'))?'':'none';
+  const tabEqEsp = document.getElementById('tab-equip-esp');
+  if(tabEqEsp) tabEqEsp.style.display=(enEquip && can('equipamiento.especial.ver'))?'':'none';
+  // Scope inicial dentro de Equipamiento: normal si puede verlo, si no, especial.
+  if(enEquip){
+    eqScope = can('equipamiento.ver') ? 'normal' : 'especial';
+    eqAplicarScopeLabels();
+  }
   const tabTsp = document.getElementById('tab-tsp');
   if(tabTsp) tabTsp.style.display=enTsp?'':'none';
   const tabGar = document.getElementById('tab-garantias');
@@ -2514,7 +2509,7 @@ async function showApp(){
     startTab = 'proc';
   } else if(enDetenidos){
     startTab = 'detenidos';
-  } else if(enEquipAny){
+  } else if(enEquip){
     startTab = 'equip';
   } else if(enTsp){
     startTab = 'tsp';
@@ -2536,6 +2531,11 @@ async function showApp(){
   if(btnEl) btnEl.classList.add('act');
   const tcEl = document.getElementById('tc-'+startTab);
   if(tcEl) tcEl.classList.add('act');
+  // Si entra directo a Ventas Especiales (sin acceso al normal), marcar esa sub-pestaña
+  if(enEquip && eqScope==='especial'){
+    const bE=document.getElementById('tab-equip'); if(bE) bE.classList.remove('act');
+    const bEsp=document.getElementById('tab-equip-esp'); if(bEsp) bEsp.classList.add('act');
+  }
 
   // filtros del sidebar solo tienen sentido en Pre Pull
   const sidebarFilters = document.getElementById('sidebar-filters');
@@ -2557,7 +2557,7 @@ async function showApp(){
   } else if(enDetenidos){
     detVista='sucursales'; detSucSel=null; detCardFilter='todos';
     cargarDetenidos();
-  } else if(enEquipAny){
+  } else if(enEquip){
     cargarEquip();
     iniciarRealtimeEquip();
   } else if(enTsp){
@@ -8455,6 +8455,24 @@ let eqAbierto = null, eqTmpPrio = null, eqTmpStock = null;
 let eqScope = 'normal';
 const eqEsEspecial = (p) => !!(p && p.especial === true);
 const eqEnScope = (p) => eqScope === 'especial' ? eqEsEspecial(p) : !eqEsEspecial(p);
+
+// Títulos del módulo según la sub-pestaña activa (normal vs especiales)
+function eqAplicarScopeLabels(){
+  const esp = eqScope === 'especial';
+  const h2 = document.getElementById('eq-h2'); if(h2) h2.textContent = esp ? 'Ventas Especiales' : 'Equipamiento';
+  const eye = document.getElementById('eq-eyebrow'); if(eye) eye.textContent = esp ? 'Accesorios · Ventas a empresas' : 'Accesorios · De la venta al turno';
+}
+// Cambia entre la vista normal y la de ventas especiales (misma pantalla).
+function eqIrScope(scope, el){
+  eqScope = scope === 'especial' ? 'especial' : 'normal';
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('act'));
+  if(el) el.classList.add('act');
+  document.querySelectorAll('.tc').forEach(c=>c.classList.remove('act'));
+  const tc = document.getElementById('tc-equip'); if(tc) tc.classList.add('act');
+  eqAplicarScopeLabels();
+  eqVer('espera');
+  if(!eqPedidos.length) cargarEquip();
+}
 
 // ── permisos ──
 const eqPuedeVender    = () => can('equipamiento.vender');
