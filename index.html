@@ -795,7 +795,7 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
         </button>
         <button class="nav-item" id="tab-equip" style="display:none" onclick="swTab('equip',this)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-          Equipamiento
+          <span id="tab-equip-lbl">Equipamiento</span>
         </button>
         <button class="nav-item" id="tab-garantias" style="display:none" onclick="swTab('garantias',this)">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
@@ -1220,8 +1220,8 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
         <div class="tc" id="tc-equip">
           <div class="sec-hdr">
             <div class="sec-hdr-left">
-              <div class="sec-eyebrow">Accesorios · De la venta al turno</div>
-              <h2>Equipamiento</h2>
+              <div class="sec-eyebrow" id="eq-eyebrow">Accesorios · De la venta al turno</div>
+              <h2 id="eq-h2">Equipamiento</h2>
               <div class="tb-sub" id="eq-sub" style="margin-top:4px"></div>
             </div>
             <div class="hdr-actions" style="display:flex;gap:8px;align-items:center">
@@ -1584,6 +1584,8 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
         <input type="hidden" id="eqa-trabajo"/></div>
       <div><label>Tipo de venta</label>
         <select id="eqa-tipo"><option value="particular">Particular</option><option value="externo">Externo</option></select></div>
+      <div><label>¿Venta especial? (empresa)</label>
+        <select id="eqa-especial"><option value="no">No</option><option value="si">Sí — va a Ventas Especiales</option></select></div>
       <div><label>Vendedor</label><input type="text" id="eqa-vendedor"/></div>
       <div><label>Duración estimada</label>
         <select id="eqa-tiempo"><option value="">Seleccionar...</option><option>15MIN</option><option>30MIN</option><option>45MIN</option><option>1HS</option><option>2HS</option><option>3HS</option><option>4HS</option><option>5HS</option><option>6HS</option></select></div>
@@ -2288,6 +2290,13 @@ const MODULOS = {
     color: '#0f766e',
     icono: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'
   },
+  equip_especial: {
+    id: 'equip_especial',
+    nombre: 'Ventas Especiales',
+    desc: 'Ventas a empresas: mismo circuito de stock, con turnado a cargo de un rol dedicado.',
+    color: '#7c3aed',
+    icono: '<path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 13v.01"/><path d="M9 17v.01"/>'
+  },
   garantias: {
     id: 'garantias',
     nombre: 'Garantías',
@@ -2312,7 +2321,7 @@ const MODULOS = {
 // Roles creados después de la matriz de permisos de la base: todavía no tienen
 // filas en rol_permiso, así que se resuelven por la tabla de canFallback().
 // Cuando se siembren en la base, se los saca de acá y nada más cambia.
-const ROLES_SIN_MATRIZ = ['ambiente','equip_venta','equip_stock','equip_turnos','equip_ver','garantista'];
+const ROLES_SIN_MATRIZ = ['ambiente','equip_venta','equip_stock','equip_turnos','equip_turnos_esp','equip_ver','garantista'];
 
 function can(p){
   // El admin siempre tiene acceso a todo, sin depender de la matriz de la base.
@@ -2346,10 +2355,11 @@ function canFallback(p){
     jefe_servicio:['prepull.ver','prepull.turnos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','procedimientos.ver','encuestas.desestimacion.pedir','tsp.ver','tsp.cargar','tsp.marcar'],
     seguridad:    ['minutas.ver','procedimientos.ver','procedimientos.subir'],
     ambiente:     ['minutas.ver','procedimientos.ver','procedimientos.subir'],
-    equip_venta:  ['equipamiento.ver','equipamiento.vender','equipamiento.prioridad','procedimientos.ver'],
-    equip_stock:  ['equipamiento.ver','equipamiento.stock','procedimientos.ver'],
+    equip_venta:  ['equipamiento.ver','equipamiento.especial.ver','equipamiento.vender','equipamiento.prioridad','procedimientos.ver'],
+    equip_stock:  ['equipamiento.ver','equipamiento.especial.ver','equipamiento.stock','procedimientos.ver'],
     equip_turnos: ['equipamiento.ver','equipamiento.turnar','equipamiento.prioridad','procedimientos.ver'],
-    equip_ver:    ['equipamiento.ver'],
+    equip_turnos_esp: ['equipamiento.especial.ver','equipamiento.turnar.especial','procedimientos.ver'],
+    equip_ver:    ['equipamiento.ver','equipamiento.especial.ver'],
     garantista:   ['garantias.ver','garantias.cargar','procedimientos.ver'],
   };
   const perms = new Set(M[cu.rol] || []);
@@ -2365,6 +2375,7 @@ function puedeAcceder(moduloId){
   if(moduloId === 'procedimientos') return can('procedimientos.ver');
   if(moduloId === 'detenidos') return can('detenidos.gestionar');
   if(moduloId === 'equipamiento') return can('equipamiento.ver');
+  if(moduloId === 'equip_especial') return can('equipamiento.especial.ver');
   if(moduloId === 'garantias') return can('garantias.ver');
   if(moduloId === 'tsp') return can('tsp.ver');
   return can(moduloId + '.ver');
@@ -2439,7 +2450,7 @@ async function showApp(){
   document.getElementById('s-login').classList.remove('active');
   document.getElementById('s-app').classList.add('active');
   document.getElementById('tb-user').textContent=cu.nombre;
-  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene',ambiente:'Ambiente',equip_venta:'Equipamiento · Ventas',equip_stock:'Equipamiento · Stock',equip_turnos:'Equipamiento · Turnos',equip_ver:'Equipamiento · Consulta',garantista:'Garantías',jefe_servicio:'Jefe de Servicio'}[cu.rol]||cu.rol;
+  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene',ambiente:'Ambiente',equip_venta:'Equipamiento · Ventas',equip_stock:'Equipamiento · Stock',equip_turnos:'Equipamiento · Turnos',equip_turnos_esp:'Ventas Especiales · Turnos',equip_ver:'Equipamiento · Consulta',garantista:'Garantías',jefe_servicio:'Jefe de Servicio'}[cu.rol]||cu.rol;
   const sucEl=document.getElementById('tb-suc');
   if(cu.sucursalFija){sucEl.style.display='inline-flex';sucEl.innerHTML=`<i class="ti ti-map-pin" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${cu.sucursalFija}`;}
   else sucEl.style.display='none';
@@ -2458,6 +2469,8 @@ async function showApp(){
   const enProc = cu.modulo === 'procedimientos';
   const enDetenidos = cu.modulo === 'detenidos';
   const enEquip = cu.modulo === 'equipamiento';
+  const enEquipEsp = cu.modulo === 'equip_especial';
+  const enEquipAny = enEquip || enEquipEsp;
   const enTsp = cu.modulo === 'tsp';
   const enGarantias = cu.modulo === 'garantias';
 
@@ -2475,7 +2488,13 @@ async function showApp(){
   const tabDet = document.getElementById('tab-detenidos');
   if(tabDet) tabDet.style.display=enDetenidos?'':'none';
   const tabEq = document.getElementById('tab-equip');
-  if(tabEq) tabEq.style.display=enEquip?'':'none';
+  if(tabEq) tabEq.style.display=enEquipAny?'':'none';
+  // Scope del módulo de equipamiento (normal vs ventas especiales) + etiquetas
+  eqScope = enEquipEsp ? 'especial' : 'normal';
+  const _eqLbl = enEquipEsp ? 'Ventas Especiales' : 'Equipamiento';
+  const _navLbl = document.getElementById('tab-equip-lbl'); if(_navLbl) _navLbl.textContent = _eqLbl;
+  const _eqH2 = document.getElementById('eq-h2'); if(_eqH2) _eqH2.textContent = _eqLbl;
+  const _eqEye = document.getElementById('eq-eyebrow'); if(_eqEye) _eqEye.textContent = enEquipEsp ? 'Accesorios · Ventas a empresas' : 'Accesorios · De la venta al turno';
   const tabTsp = document.getElementById('tab-tsp');
   if(tabTsp) tabTsp.style.display=enTsp?'':'none';
   const tabGar = document.getElementById('tab-garantias');
@@ -2495,7 +2514,7 @@ async function showApp(){
     startTab = 'proc';
   } else if(enDetenidos){
     startTab = 'detenidos';
-  } else if(enEquip){
+  } else if(enEquipAny){
     startTab = 'equip';
   } else if(enTsp){
     startTab = 'tsp';
@@ -2538,7 +2557,7 @@ async function showApp(){
   } else if(enDetenidos){
     detVista='sucursales'; detSucSel=null; detCardFilter='todos';
     cargarDetenidos();
-  } else if(enEquip){
+  } else if(enEquipAny){
     cargarEquip();
     iniciarRealtimeEquip();
   } else if(enTsp){
@@ -6916,7 +6935,7 @@ function convertirAgente(id){
 function llenarRolesUsr(){
   const sel=document.getElementById('f-usr-rol');
   const roles = (RP_ROLES && RP_ROLES.length) ? RP_ROLES
-    : [{id:'admin',label:'Admin'},{id:'supervisor',label:'Supervisor'},{id:'citas',label:'Citas'},{id:'repuestos',label:'Repuestos'},{id:'compras',label:'Compras'},{id:'asesor',label:'Asesor'},{id:'jefe_servicio',label:'Jefe de Servicio'},{id:'seguridad',label:'Seguridad e Higiene'},{id:'equip_venta',label:'Equipamiento · Ventas'},{id:'equip_stock',label:'Equipamiento · Stock'},{id:'equip_turnos',label:'Equipamiento · Turnos'},{id:'equip_ver',label:'Equipamiento · Consulta'},{id:'garantista',label:'Garantías'},{id:'ambiente',label:'Ambiente'}];
+    : [{id:'admin',label:'Admin'},{id:'supervisor',label:'Supervisor'},{id:'citas',label:'Citas'},{id:'repuestos',label:'Repuestos'},{id:'compras',label:'Compras'},{id:'asesor',label:'Asesor'},{id:'jefe_servicio',label:'Jefe de Servicio'},{id:'seguridad',label:'Seguridad e Higiene'},{id:'equip_venta',label:'Equipamiento · Ventas'},{id:'equip_stock',label:'Equipamiento · Stock'},{id:'equip_turnos',label:'Equipamiento · Turnos'},{id:'equip_turnos_esp',label:'Ventas Especiales · Turnos'},{id:'equip_ver',label:'Equipamiento · Consulta'},{id:'garantista',label:'Garantías'},{id:'ambiente',label:'Ambiente'}];
   const actual = sel.value;
   sel.innerHTML='<option value="">Seleccionar...</option>'+roles.map(r=>`<option value="${r.id}">${escapeHtml(r.label)}</option>`).join('');
   if(actual) sel.value=actual;
@@ -8431,6 +8450,11 @@ function eqAccReset(lista){
 
 let eqVista = 'espera';
 let eqAbierto = null, eqTmpPrio = null, eqTmpStock = null;
+// Scope del módulo: 'normal' (Equipamiento) o 'especial' (Ventas Especiales).
+// Lo setea showApp según el módulo activo. Filtra qué pedidos se ven en cada uno.
+let eqScope = 'normal';
+const eqEsEspecial = (p) => !!(p && p.especial === true);
+const eqEnScope = (p) => eqScope === 'especial' ? eqEsEspecial(p) : !eqEsEspecial(p);
 
 // ── permisos ──
 const eqPuedeVender    = () => can('equipamiento.vender');
@@ -8440,7 +8464,15 @@ const eqPuedeStock     = () => can('equipamiento.stock');
 // Quién puede asignar/editar el turno de ESTE pedido: el rol de turnos y el
 // admin siempre; y si la venta es "externa", también quien la carga (vendedor).
 const eqEsExterno      = (p) => !!(p && p.tipo_venta==='externo');
-function eqPuedeTurnarPedido(p){ return esAdmin() || eqPuedeTurnar() || (eqEsExterno(p) && eqPuedeVender()); }
+const eqPuedeTurnarEsp = () => can('equipamiento.turnar.especial');
+// Quién puede turnar ESTE pedido:
+//  - especiales: solo el rol de turnos especiales (o admin)
+//  - normales/externos: el rol de turnos normal, el admin, y si es externo, el vendedor
+function eqPuedeTurnarPedido(p){
+  if(esAdmin()) return true;
+  if(eqEsEspecial(p)) return eqPuedeTurnarEsp();
+  return eqPuedeTurnar() || (eqEsExterno(p) && eqPuedeVender());
+}
 
 // ── helpers ──
 function eqEsc(s){ return escapeHtml(String(s ?? '')); }
@@ -8538,8 +8570,11 @@ function eqRender(){
   const cont=document.getElementById('eq-cont');
   if(!cont) return;
 
+  // Solo los pedidos del scope activo (normal vs ventas especiales)
+  const base = eqPedidos.filter(eqEnScope);
+
   const c={espera:0,listo:0,sin:0,turnado:0,hist:0};
-  eqPedidos.forEach(p=>{ const k=eqPaso(p); if(c[k]===undefined) return;
+  base.forEach(p=>{ const k=eqPaso(p); if(c[k]===undefined) return;
     if(k==='turnado' && !eqTurnadoVigente(p)){ c.hist++; return; }   // pasados y equipados -> histórico
     c[k]++; });
   Object.keys(c).forEach(k=>{ const el=document.getElementById('eq-v-'+k); if(el) el.textContent=c[k]; });
@@ -8554,8 +8589,8 @@ function eqRender(){
   if(sub) sub.textContent=EQ_SUB[eqVista];
 
   let arr;
-  if(eqVista==='hist') arr=eqPedidos.filter(p=>eqPaso(p)==='turnado' && !eqTurnadoVigente(p));
-  else { arr=eqPedidos.filter(p=>eqPaso(p)===eqVista); if(eqVista==='turnado') arr=arr.filter(eqTurnadoVigente); }
+  if(eqVista==='hist') arr=base.filter(p=>eqPaso(p)==='turnado' && !eqTurnadoVigente(p));
+  else { arr=base.filter(p=>eqPaso(p)===eqVista); if(eqVista==='turnado') arr=arr.filter(eqTurnadoVigente); }
   const q=(document.getElementById('eq-q').value||'').toLowerCase().trim();
   const fp=document.getElementById('eq-fp').value;
   if(fp) arr=arr.filter(p=>p.prioridad===fp);
@@ -8780,6 +8815,9 @@ function eqAbrirAlta(id){
   document.getElementById('eqa-tiempo').value   = V('tiempo_trabajo');
   document.getElementById('eqa-cod').value      = V('codigo_turno');
   document.getElementById('eqa-tipo').value     = (p && p.tipo_venta==='externo') ? 'externo' : 'particular';
+  // Venta especial: al editar refleja el pedido; al cargar nueva, viene marcada
+  // si estás dentro del módulo "Ventas Especiales".
+  document.getElementById('eqa-especial').value = p ? (eqEsEspecial(p) ? 'si' : 'no') : (eqScope==='especial' ? 'si' : 'no');
 
   document.getElementById('eqa-titulo').textContent = p ? 'Editar venta de equipamiento' : 'Cargar venta de equipamiento';
   document.getElementById('eqa-sub').textContent = p
@@ -8822,7 +8860,8 @@ async function eqGuardarAlta(){
       obs_venta: document.getElementById('eqa-obs').value.trim() || null,
       tiempo_trabajo: document.getElementById('eqa-tiempo').value || null,
       codigo_turno: document.getElementById('eqa-cod').value || null,
-      tipo_venta: document.getElementById('eqa-tipo').value || 'particular'
+      tipo_venta: document.getElementById('eqa-tipo').value || 'particular',
+      especial: document.getElementById('eqa-especial').value === 'si'
     };
     if(editando){
       // Registro de qué campos se editaron, para trazabilidad.
@@ -8836,6 +8875,7 @@ async function eqGuardarAlta(){
         const viejo=(orig[k]==null?'':String(orig[k]));
         if(nuevo!==viejo) cambios.push(ETI[k]+': “'+(viejo||'—')+'” → “'+(nuevo||'—')+'”');
       });
+      if(!!orig.especial !== datos.especial) cambios.push('Venta especial: '+(orig.especial?'Sí':'No')+' → '+(datos.especial?'Sí':'No'));
       const {error}=await sb.from('equip_pedidos').update(datos).eq('id', eqEditId);
       if(error) throw error;
       if(cambios.length){
