@@ -3691,6 +3691,7 @@ function sinLavado(e){
 function promedioEncuesta(e){
   if(estaAnulada(e)) return null;
   const excluir = new Set(preguntasDesestimadas(e));
+  if(sinLavado(e)) excluir.add('p_limpieza'); // Añelo, S.T.M., CDO Y HIACE: sin lavado
   const notas = PREGUNTAS_ASESOR
     .filter(([clave]) => !excluir.has(clave))
     .map(([clave]) => e[clave])
@@ -3957,10 +3958,12 @@ function mesAnterior(m){
 }
 
 // Nota de una pregunta respetando anuladas y desestimaciones.
-// (Se cuenta Limpieza siempre que tenga nota, igual que Power BI.)
+// Limpieza NO cuenta en Añelo, S.T.M. y CDO Y HIACE (no se hace lavado ahí),
+// ni para los asesores en esas encuestas.
 function notaEnc(e, clave){
   if(estaAnulada(e)) return null;
   if(preguntasDesestimadas(e).includes(clave)) return null;
+  if(clave === 'p_limpieza' && sinLavado(e)) return null;
   const v = e[clave];
   return (v!=null && !isNaN(Number(v))) ? Number(v) : null;
 }
@@ -5184,6 +5187,10 @@ function renderEncDetalle(){
     const rid = 'encrow-'+i;
     const desest = preguntasDesestimadas(e);
     const numTds = ENC_NUM_COLS.map(([k]) => {
+      // Limpieza no cuenta en Añelo/S.T.M./CDO Y HIACE: se muestra N/A tachado
+      if(k === 'p_limpieza' && sinLavado(e)){
+        return `<td style="padding:9px 12px;text-align:center;font-family:var(--mono);color:var(--text-5);text-decoration:line-through;opacity:.6" title="Sin lavado en esta sucursal — no cuenta">N/A</td>`;
+      }
       const v = e[k];
       const n = (v!=null && !isNaN(Number(v))) ? Number(v) : null;
       const tach = desest.includes(k);
@@ -5280,7 +5287,8 @@ function exportarComisiones(){
   // Detalle: una fila por encuesta válida, con TODAS las preguntas (igual que el
   // reporte general). Preguntas desestimadas -> puntuación vacía (no cuentan).
   const filas = arr.map(e => {
-    const excluir = new Set(preguntasDesestimadas(e)); // solo se vacían preguntas desestimadas
+    const excluir = new Set(preguntasDesestimadas(e));
+    if(sinLavado(e)) excluir.add('p_limpieza'); // Añelo, S.T.M., CDO Y HIACE: sin lavado
     const nota = (k) => {
       if(excluir.has(k)) return '';                      // desestimada -> sin puntuación
       const v = e[k];
