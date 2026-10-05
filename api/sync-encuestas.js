@@ -515,6 +515,36 @@ async function guardarEnSupabase(registros) {
   return { insertados: registros.length };
 }
 
+// --- app_config (Supabase): recordar la última exportación para reutilizarla ---
+// Evita pedir una exportación nueva en cada intento (Wise limita por cuenta).
+async function leerConfig(clave){
+  try{
+    const url = `${process.env.SUPABASE_URL}/rest/v1/app_config?clave=eq.${encodeURIComponent(clave)}&select=valor`;
+    const res = await fetch(url, { headers: {
+      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY,
+    }});
+    if(!res.ok) return null;
+    const arr = await res.json();
+    return (arr && arr[0] && arr[0].valor) ? arr[0].valor : null;
+  }catch(e){ return null; }
+}
+async function guardarConfig(clave, valor){
+  try{
+    const url = `${process.env.SUPABASE_URL}/rest/v1/app_config?on_conflict=clave`;
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify([{ clave, valor }]),
+    });
+  }catch(e){ /* best-effort: si falla, no rompe la sync */ }
+}
+
 // Descarga las filas del reporte, mapea, filtra respondidas y guarda en Supabase.
 // (compartido por el modo una-pasada y por la fase "status" del modo en 2 fases)
 async function descargarMapearYGuardar(reportUrl) {
@@ -565,14 +595,43 @@ export default async function handler(req, res) {
 
     // ===== FASE 1 (manual): iniciar export y devolver export_id al toque =====
     if (action === "start") {
+      const AHORA = Date.now();
+      const cache = await leerConfig("wise_last_export");
+
+      // Si hay una exportación reciente del MISMO rango (< 30 min), la reutilizamos
+      // en vez de pedir una nueva. Esto evita gastar el cupo de Wise con reintentos.
+      if (cache && cache.export_id &&
+          cache.date_from === dateFrom && cache.date_to === dateTo &&
+          cache.ts && (AHORA - cache.ts) < 30 * 60 * 1000) {
+        return res.status(200).json({
+          ok: true, phase: "started", export_id: cache.export_id, reutilizado: true,
+          rango_pedido: { date_from: dateFrom, date_to: dateTo },
+        });
+      }
+
       const token = await autenticar();
-      const { exportId, raw } = await iniciarExport(token, dateFrom, dateTo);
-      return res.status(200).json({
-        ok: true,
-        phase: "started",
-        export_id: exportId,
-        rango_pedido: { date_from: dateFrom, date_to: dateTo },
-      });
+      try {
+        const { exportId } = await iniciarExport(token, dateFrom, dateTo);
+        await guardarConfig("wise_last_export", {
+          export_id: exportId, date_from: dateFrom, date_to: dateTo, ts: AHORA,
+        });
+        return res.status(200).json({
+          ok: true, phase: "started", export_id: exportId,
+          rango_pedido: { date_from: dateFrom, date_to: dateTo },
+        });
+      } catch (e) {
+        const msg = String(e.message || e);
+        // Si Wise rechaza por límite de cuenta, reutilizamos la última exportación
+        // conocida (aunque sea de otro rango) para poder al menos descargar algo.
+        if (msg.includes("REPORT_LIMIT_EXCEEDED") && cache && cache.export_id) {
+          return res.status(200).json({
+            ok: true, phase: "started", export_id: cache.export_id, reutilizado: true,
+            aviso: "Wise alcanzó su límite de exportaciones; se reutilizó la última.",
+            rango_pedido: { date_from: cache.date_from, date_to: cache.date_to },
+          });
+        }
+        throw e;
+      }
     }
 
     // ===== FASE 2 (manual): consultar estado; si está listo, descargar+guardar =====
