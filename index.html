@@ -2356,7 +2356,7 @@ function canFallback(p){
     equip_stock:  ['equipamiento.ver','equipamiento.especial.ver','equipamiento.stock','procedimientos.ver'],
     equip_turnos: ['equipamiento.ver','equipamiento.turnar','equipamiento.prioridad','procedimientos.ver'],
     equip_turnos_esp: ['equipamiento.especial.ver','equipamiento.turnar.especial','procedimientos.ver'],
-    equip_ver:    ['equipamiento.ver','equipamiento.especial.ver'],
+    equip_ver:    ['equipamiento.ver','equipamiento.especial.ver','equipamiento.equipar'],
     garantista:   ['garantias.ver','garantias.cargar','procedimientos.ver'],
   };
   const perms = new Set(M[cu.rol] || []);
@@ -8483,6 +8483,9 @@ const eqPuedeStock     = () => can('equipamiento.stock');
 // admin siempre; y si la venta es "externa", también quien la carga (vendedor).
 const eqEsExterno      = (p) => !!(p && p.tipo_venta==='externo');
 const eqPuedeTurnarEsp = () => can('equipamiento.turnar.especial');
+// Quién puede marcar la unidad como equipada (disponibilidad):
+// el vendedor y el admin como siempre, y ahora también el rol de Consulta.
+const eqPuedeEquipar   = () => can('equipamiento.equipar') || eqPuedeVender() || esAdmin();
 // Quién puede turnar ESTE pedido:
 //  - especiales: solo el rol de turnos especiales (o admin)
 //  - normales/externos: el rol de turnos normal, el admin, y si es externo, el vendedor
@@ -8768,10 +8771,10 @@ function eqEditFila(p){
          ' style="padding:5px 8px"><i class="ti ti-pencil" style="font-size:12px"></i></button>';
 }
 
-// Tilde de "unidad equipada" en la vista de turnados. La marca el vendedor
-// (o el admin); para el resto queda como sólo lectura.
+// Tilde de "unidad equipada" en la vista de turnados. La marcan el vendedor,
+// el admin y el rol de Consulta; para el resto queda como sólo lectura.
 function eqEquipCell(p){
-  const puede = eqPuedeVender() || esAdmin();
+  const puede = eqPuedeEquipar();
   const on = !!p.equipada;
   const ttl = on && p.equipada_por ? ' title="Equipada por '+eqEsc(p.equipada_por)+(p.equipada_en?' · '+eqFmtFechaTs(p.equipada_en):'')+'"' : '';
   if(puede){
