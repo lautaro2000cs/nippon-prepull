@@ -2345,7 +2345,7 @@ function canFallback(p){
   if(cu.rol === 'admin') return true;
   const M = {
     supervisor:   ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','encuestas.sincronizar','minutas.ver','procedimientos.ver','procedimientos.subir','tsp.ver','tsp.cargar','tsp.marcar'],
-    citas:        ['prepull.ver','prepull.turnos.ver','procedimientos.ver','encuestas.fir.crear','encuestas.desestimacion.pedir','equipamiento.ver','equipamiento.prioridad'],
+    citas:        ['prepull.ver','prepull.turnos.ver','procedimientos.ver','encuestas.fir.crear','encuestas.desestimacion.pedir','equipamiento.ver','equipamiento.prioridad','equipamiento.preor'],
     repuestos:    ['prepull.ver','prepull.repuestos.ver','prepull.repuestos.marcar','procedimientos.ver'],
     compras:      ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar','procedimientos.ver'],
     asesor:       ['encuestas.ver','encuestas.desestimaciones.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
@@ -8486,6 +8486,8 @@ const eqPuedeTurnarEsp = () => can('equipamiento.turnar.especial');
 // Quién puede marcar la unidad como equipada (disponibilidad):
 // el vendedor y el admin como siempre, y ahora también el rol de Consulta.
 const eqPuedeEquipar   = () => can('equipamiento.equipar') || eqPuedeVender() || esAdmin();
+// Quién marca que en SIAC ya se cambió la fecha del Pre-Or: Citas y admin.
+const eqPuedeMarcarPreor = () => can('equipamiento.preor') || esAdmin();
 // Quién puede turnar ESTE pedido:
 //  - especiales: solo el rol de turnos especiales (o admin)
 //  - normales/externos: el rol de turnos normal, el admin, y si es externo, el vendedor
@@ -8676,7 +8678,7 @@ function eqPorDia(arr, desc){
       '<span style="font-weight:400;color:var(--text-5)"> · '+n+' '+(n===1?'turno':'turnos')+' · '+eqFmtHoras(hs)+'</span></div>'+
       '<div class="table-wrap"><table><thead><tr>'+
       '<th style="width:20%">Cliente</th><th style="width:12%">Chasis/Pat.</th>'+
-      '<th>Qué se vendió</th><th style="width:9%">Dur.</th><th style="width:11%;text-align:center">Equipada</th><th style="width:9%"></th>'+
+      '<th>Qué se vendió</th><th style="width:8%">Dur.</th><th style="width:10%;text-align:center">Equipada</th><th style="width:11%;text-align:center">Pre-Or SIAC</th><th style="width:9%"></th>'+
       '</tr></thead><tbody>'+g[f].map(function(p){
         return '<tr class="'+(p.prioridad==='urgente'?'eq-urg':'')+(p.equipada?' eq-ok':'')+'">'+
         '<td><strong>'+eqEsc(p.cliente)+'</strong>'+
@@ -8689,6 +8691,7 @@ function eqPorDia(arr, desc){
           (p.estado_stock==='pedido'?'<div class="eq-dias" style="color:#1f5fa8">pieza en camino · llega '+fmtD(p.eta_pieza)+'</div>':'')+'</td>'+
         '<td>'+(p.tiempo_trabajo?'<span class="eq-chip">'+eqEsc(p.tiempo_trabajo)+'</span>':'—')+'</td>'+
         '<td style="text-align:center">'+eqEquipCell(p)+'</td>'+
+        '<td style="text-align:center">'+eqPreorCell(p)+'</td>'+
         '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqDel(p)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   }).join('');
@@ -8795,6 +8798,34 @@ async function eqToggleEquipada(id, checked){
     if(error) throw error;
     const p=eqPedidos.find(x=>x.id===id); if(p) Object.assign(p,upd);
     showToast(checked?'Unidad marcada como equipada.':'Marca de equipada quitada.');
+    eqRender();
+  }catch(err){ alert('No se pudo guardar: '+(err.message||'error')); eqRender(); }
+}
+
+// Tilde de "fecha de Pre-Or ya cambiada en SIAC". La marca Citas (o el admin);
+// sirve de seguimiento y lo ven todos los sectores. Para el resto es sólo lectura.
+function eqPreorCell(p){
+  const puede = eqPuedeMarcarPreor();
+  const on = !!p.preor_siac;
+  const ttl = on && p.preor_siac_por ? ' title="Actualizada en SIAC por '+eqEsc(p.preor_siac_por)+(p.preor_siac_en?' · '+eqFmtFechaTs(p.preor_siac_en):'')+'"' : '';
+  if(puede){
+    return '<input type="checkbox" '+(on?'checked':'')+ttl+
+           ' onchange="eqTogglePreorSiac(\''+p.id+'\',this.checked)"'+
+           ' style="width:19px;height:19px;accent-color:#1f5fa8;cursor:pointer;vertical-align:middle">';
+  }
+  return on
+    ? '<span class="pill" style="background:#e6f0fb;color:#1f5fa8"'+ttl+'><i class="ti ti-check" style="font-size:11px;vertical-align:-1px"></i> Sí</span>'
+    : '<span style="color:var(--text-5);font-size:12px">—</span>';
+}
+async function eqTogglePreorSiac(id, checked){
+  try{
+    const upd = checked
+      ? { preor_siac:true,  preor_siac_por:(cu&&cu.nombre)||null, preor_siac_en:new Date().toISOString() }
+      : { preor_siac:false, preor_siac_por:null, preor_siac_en:null };
+    const {error}=await sb.from('equip_pedidos').update(upd).eq('id',id);
+    if(error) throw error;
+    const p=eqPedidos.find(x=>x.id===id); if(p) Object.assign(p,upd);
+    showToast(checked?'Pre-Or marcada como actualizada en SIAC.':'Marca de Pre-Or quitada.');
     eqRender();
   }catch(err){ alert('No se pudo guardar: '+(err.message||'error')); eqRender(); }
 }
