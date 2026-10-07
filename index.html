@@ -1977,8 +1977,34 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // El admin puede crear usuarios y definir su contraseña desde la pestaña Usuarios.
 
 // TODAY se construye con la fecha LOCAL del browser (evita bug de zona horaria UTC-3 Argentina)
-const _n=new Date();
-const TODAY=new Date(_n.getFullYear(),_n.getMonth(),_n.getDate());
+// OJO: se recalcula con refrescarHoy() porque si la pestaña queda abierta de un día
+// para el otro, "hoy" quedaba congelado en la fecha de ayer.
+let _n=new Date();
+let TODAY=new Date(_n.getFullYear(),_n.getMonth(),_n.getDate());
+// Recalcula TODAY a la fecha local actual. Devuelve true si cambió el día.
+function refrescarHoy(){
+  const n=new Date();
+  const nt=new Date(n.getFullYear(),n.getMonth(),n.getDate());
+  if(nt.getTime()!==TODAY.getTime()){ TODAY=nt; return true; }
+  return false;
+}
+// Si el usuario vuelve a la pestaña y cambió el día, re-renderizamos las vistas
+// que dependen de "hoy" para que no sigan mostrando los turnos de ayer.
+function _reRenderPorCambioDeDia(){
+  if(!refrescarHoy()) return;
+  try{ if(cu && cu.modulo==='prepull'){
+    if(typeof renderTurnos==='function') renderTurnos();
+    if(typeof renderRepuestos==='function') renderRepuestos();
+    if(typeof renderNoShow==='function') renderNoShow();
+    if(typeof renderHistorico==='function') renderHistorico();
+    if(typeof renderDash==='function') renderDash();
+    if(typeof renderRepHistorico==='function') renderRepHistorico();
+    if(typeof renderMetricas==='function') renderMetricas();
+    if(typeof actualizarContadoresSubTabs==='function') actualizarContadoresSubTabs();
+  } }catch(e){ /* no romper por un re-render */ }
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) _reRenderPorCambioDeDia(); });
+window.addEventListener('focus', _reRenderPorCambioDeDia);
 function toStr(d){
   // Formatear sin pasar por UTC para evitar el offset de zona horaria
   const dd=String(d.getDate()).padStart(2,'0');
@@ -6326,6 +6352,7 @@ function valePill(v){return v?'<span class="pill p-arr"><i class="ti ti-check" s
 function rolPill(r){const m={admin:'<span class="pill" style="background:#fbeceb;color:#c62a27">Admin</span>',citas:'<span class="pill" style="background:#e6f4ec;color:#1f7a48">Citas</span>',repuestos:'<span class="pill" style="background:#eef0ff;color:#4f46e5">Repuestos</span>',compras:'<span class="pill" style="background:#fbf1de;color:#9a6a08">Compras</span>',supervisor:'<span class="pill" style="background:#e6f1fb;color:#0c447c">Supervisor</span>',jefe_servicio:'<span class="pill" style="background:#f3e8ff;color:#7c3aed">Jefe de Servicio</span>',equip_venta:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Ventas</span>',equip_stock:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Stock</span>',equip_turnos:'<span class="pill" style="background:#e6f4f1;color:#0f766e">Equip · Turnos</span>',equip_ver:'<span class="pill" style="background:#eef2f1;color:#4b5f5b">Equip · Consulta</span>',garantista:'<span class="pill" style="background:#e6effd;color:#1d4ed8">Garantías</span>',ambiente:'<span class="pill" style="background:#e8f3e8;color:#2c5f2d">Ambiente</span>'};return m[r]||`<span style="font-size:11px">${r}</span>`;}
 
 function renderGroups(cid,items,fn,horizFilt){
+  refrescarHoy();   // asegura que "hoy" sea el día actual aunque la pestaña esté abierta hace rato
   // Cachear el grupo de cada item una sola vez (diffHabil puede ser lento con muchos turnos)
   const grouped=new Map();
   items.forEach(x=>{const k=getGroup(x.fecha).key;if(!grouped.has(k))grouped.set(k,[]);grouped.get(k).push(x);});
