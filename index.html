@@ -2371,7 +2371,7 @@ function canFallback(p){
   if(cu.rol === 'admin') return true;
   const M = {
     supervisor:   ['prepull.ver','prepull.dashboard.ver','prepull.turnos.ver','prepull.repuestos.ver','encuestas.ver','encuestas.tableros.ver','encuestas.desestimaciones.ver','encuestas.sincronizar','minutas.ver','procedimientos.ver','procedimientos.subir','tsp.ver','tsp.cargar','tsp.marcar'],
-    citas:        ['prepull.ver','prepull.turnos.ver','procedimientos.ver','encuestas.fir.crear','encuestas.desestimacion.pedir','equipamiento.ver','equipamiento.prioridad','equipamiento.preor'],
+    citas:        ['prepull.ver','prepull.turnos.ver','procedimientos.ver','encuestas.fir.crear','encuestas.desestimacion.pedir','equipamiento.ver','equipamiento.especial.ver','equipamiento.prioridad','equipamiento.preor'],
     repuestos:    ['prepull.ver','prepull.repuestos.ver','prepull.repuestos.marcar','procedimientos.ver'],
     compras:      ['prepull.ver','prepull.turnos.ver','prepull.repuestos.ver','prepull.compras.ver','compras.editar','procedimientos.ver'],
     asesor:       ['encuestas.ver','encuestas.desestimaciones.ver','procedimientos.ver','encuestas.desestimacion.pedir'],
@@ -8832,6 +8832,8 @@ async function eqToggleEquipada(id, checked){
 // Tilde de "fecha de Pre-Or ya cambiada en SIAC". La marca Citas (o el admin);
 // sirve de seguimiento y lo ven todos los sectores. Para el resto es sólo lectura.
 function eqPreorCell(p){
+  // En ventas externas no aplica el seguimiento de Pre-Or en SIAC (es otro caso).
+  if(eqEsExterno(p)) return '<span style="color:var(--text-5);font-size:12px" title="No aplica en ventas externas">—</span>';
   const puede = eqPuedeMarcarPreor();
   const on = !!p.preor_siac;
   const ttl = on && p.preor_siac_por ? ' title="Actualizada en SIAC por '+eqEsc(p.preor_siac_por)+(p.preor_siac_en?' · '+eqFmtFechaTs(p.preor_siac_en):'')+'"' : '';
