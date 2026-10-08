@@ -3227,12 +3227,20 @@ function detEstadoPill(v){
 }
 function normUbic(s){ return normSucursal(canonSucursal(s||'')); }
 
+let detAsesores = []; // lista de asesores tomada de Encuestas (Wise), para el select
 async function cargarDetenidos(){
   const cont=document.getElementById('det-cont');
-  // Aseguramos tener la lista de usuarios para poblar el select de Asesor
-  // (otros roles como Jefe de Servicio no la cargan en otro lado).
-  if(!usuarios || !usuarios.length){
-    try{ const r=await sb.from('usuarios').select('*'); if(r.data) usuarios=r.data; }catch(e){}
+  // Lista de asesores desde Encuestas (los mismos que se ven en ese módulo),
+  // respetando el override manual de asesor si existe.
+  if(!detAsesores.length){
+    try{
+      const r=await sb.from('encuestas').select('asesor,asesor_override');
+      if(r.data){
+        const m=new Map(); // clave normalizada -> nombre para mostrar
+        r.data.forEach(e=>{ const nombre=String(e.asesor_override||e.asesor||'').trim(); if(nombre){ const k=nombre.toLowerCase(); if(!m.has(k)) m.set(k,nombre); } });
+        detAsesores=[...m.values()].sort((a,b)=>a.localeCompare(b,'es'));
+      }
+    }catch(e){}
   }
   const { data, error } = await sb.from('vehiculos_detenidos').select('*').order('fecha_ingreso',{ascending:true}).order('creado_en',{ascending:true});
   if(error){ if(cont) cont.innerHTML='<div class="access-note"><i class="ti ti-alert-triangle"></i> No se pudieron cargar los vehículos: '+escapeHtml(error.message)+'</div>'; return; }
@@ -3247,8 +3255,10 @@ function llenarSelectsDetenidos(){
   if(selSuc){ const cur=selSuc.value; selSuc.innerHTML='<option value="">Seleccionar...</option>'+SUCURSALES.map(s=>`<option>${s}</option>`).join(''); selSuc.value=cur; }
   const selAse=document.getElementById('dm-asesor');
   if(selAse){ const cur=selAse.value;
-    const ases=(usuarios||[]).filter(u=>u.rol==='asesor').map(u=>u.nombre).filter(Boolean).sort((a,b)=>a.localeCompare(b,'es'));
-    selAse.innerHTML='<option value="">Seleccionar...</option>'+ases.map(n=>`<option>${escapeHtml(n)}</option>`).join('');
+    let lista=detAsesores.slice();
+    // si el asesor ya cargado no está en la lista (nombre viejo), lo mantenemos
+    if(cur && !lista.some(n=>n.toLowerCase()===cur.toLowerCase())) lista=[cur,...lista];
+    selAse.innerHTML='<option value="">Seleccionar...</option>'+lista.map(n=>`<option>${escapeHtml(n)}</option>`).join('');
     selAse.value=cur;
   }
 }
@@ -3390,7 +3400,11 @@ function abrirDetModal(id){
   llenarSelectsDetenidos();
   const set=(id2,val)=>{const el=document.getElementById(id2); if(el) el.value=val;};
   set('dm-ubicacion',g('ubicacion')); set('dm-cliente',g('cliente')); set('dm-dominio',g('dominio'));
-  set('dm-unidad',g('unidad')); set('dm-asesor',g('asesor')); set('dm-orden',g('nro_orden'));
+  set('dm-unidad',g('unidad'));
+  // Asesor: si el nombre guardado no está en la lista, lo agregamos como opción
+  (function(){ const el=document.getElementById('dm-asesor'); const nombre=g('asesor');
+    if(el && nombre){ if(![...el.options].some(o=>o.value===nombre)){ const o=document.createElement('option'); o.textContent=nombre; el.appendChild(o);} el.value=nombre; } })();
+  set('dm-orden',g('nro_orden'));
   set('dm-fentrega',gd('fecha_ingreso')); set('dm-cargo',g('cargo')); set('dm-fnp',gd('fecha_np'));
   set('dm-entreganp',gd('entrega_np_rtos')); set('dm-nronp',g('nro_np')); set('dm-pres',g('pres'));
   set('dm-arribo',gd('arribo')); set('dm-tiempo',g('tiempo_taller')); set('dm-turno',gd('turno_fecha'));
