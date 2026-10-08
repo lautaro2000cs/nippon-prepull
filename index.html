@@ -3229,6 +3229,11 @@ function normUbic(s){ return normSucursal(canonSucursal(s||'')); }
 
 async function cargarDetenidos(){
   const cont=document.getElementById('det-cont');
+  // Aseguramos tener la lista de usuarios para poblar el select de Asesor
+  // (otros roles como Jefe de Servicio no la cargan en otro lado).
+  if(!usuarios || !usuarios.length){
+    try{ const r=await sb.from('usuarios').select('*'); if(r.data) usuarios=r.data; }catch(e){}
+  }
   const { data, error } = await sb.from('vehiculos_detenidos').select('*').order('fecha_ingreso',{ascending:true}).order('creado_en',{ascending:true});
   if(error){ if(cont) cont.innerHTML='<div class="access-note"><i class="ti ti-alert-triangle"></i> No se pudieron cargar los vehículos: '+escapeHtml(error.message)+'</div>'; return; }
   detenidos = data || [];
@@ -3354,20 +3359,20 @@ function renderDetenidos(){
   const q=(document.getElementById('det-buscar')?.value||'').toLowerCase().trim();
   let arr=base.slice();
   if(detVista==='activos' && detCardFilter!=='todos') arr=arr.filter(v=>estadoDetenido(v)===detCardFilter);
-  if(q) arr=arr.filter(v=>[v.dominio,v.cliente,v.nro_orden,v.nro_np,v.unidad,v.ubicacion].some(x=>(x||'').toString().toLowerCase().includes(q)));
+  if(q) arr=arr.filter(v=>[v.dominio,v.cliente,v.nro_orden,v.nro_np,v.pres,v.unidad,v.ubicacion].some(x=>(x||'').toString().toLowerCase().includes(q)));
 
   const volver=`<button class="btn-sm" style="margin-bottom:12px" onclick="detVista='sucursales';detSucSel=null;detCardFilter='todos';renderDetenidos()"><i class="ti ti-arrow-left" style="font-size:12px"></i> Volver a sucursales</button>`;
   if(sub) sub.textContent = (detSucSel?`${detSucSel} · `:'') + (detVista==='activos'?`${base.length} en taller`:`${base.length} reparados`);
 
   const fmtN=n=>{ if(n==null||n==='') return '—'; return String(n); };
   const th = detVista==='activos'
-    ? `<th>Estado</th><th>Cliente</th><th>Dominio</th><th>Unidad</th><th>Asesor</th><th>N° Orden</th><th>F. ingreso</th><th>Cargo</th><th>N° NP</th><th>Arribo</th><th>Turno</th><th>T. taller (hs)</th><th>Obs.</th><th>Acciones</th>`
-    : `<th>Cliente</th><th>Dominio</th><th>Unidad</th><th>N° Orden</th><th>F. ingreso</th><th>N° NP</th><th>T. taller (hs)</th><th>Orden cerrada</th><th>Acciones</th>`;
+    ? `<th>Estado</th><th>Cliente</th><th>Dominio</th><th>Unidad</th><th>Asesor</th><th>N° Orden</th><th>F. ingreso</th><th>Cargo</th><th>N° NP</th><th>N° Presup.</th><th>Arribo</th><th>Turno</th><th>T. taller (hs)</th><th>Obs.</th><th>Acciones</th>`
+    : `<th>Cliente</th><th>Dominio</th><th>Unidad</th><th>N° Orden</th><th>F. ingreso</th><th>N° NP</th><th>N° Presup.</th><th>T. taller (hs)</th><th>Orden cerrada</th><th>Acciones</th>`;
   const rows=arr.map(v=>{
     if(detVista==='activos'){
-      return `<tr><td>${detEstadoPill(v)}</td><td>${escapeHtml(v.cliente||'—')}</td><td><strong>${escapeHtml(v.dominio||'—')}</strong></td><td>${escapeHtml(v.unidad||'—')}</td><td>${escapeHtml(v.asesor||'—')}</td><td>${escapeHtml(v.nro_orden||'—')}</td><td>${v.fecha_ingreso?fmtD(v.fecha_ingreso):'—'}</td><td>${escapeHtml(v.cargo||'—')}</td><td>${escapeHtml(v.nro_np||'—')}</td><td>${v.arribo?fmtD(v.arribo):'—'}</td><td>${v.turno_fecha?fmtD(v.turno_fecha):'—'}</td><td>${fmtN(v.tiempo_taller)}</td><td style="max-width:150px;font-size:12px">${escapeHtml(v.observaciones||'—')}</td><td><div style="display:flex;gap:5px"><button class="btn-sm btn-rep-mark" onclick="abrirDetModal('${v.id}')"><i class="ti ti-edit" style="font-size:12px"></i></button><button class="btn-sm" style="background:#059669;color:#fff" onclick="marcarReparado('${v.id}')"><i class="ti ti-lock" style="font-size:12px"></i> Cerrar orden</button></div></td></tr>`;
+      return `<tr><td>${detEstadoPill(v)}</td><td>${escapeHtml(v.cliente||'—')}</td><td><strong>${escapeHtml(v.dominio||'—')}</strong></td><td>${escapeHtml(v.unidad||'—')}</td><td>${escapeHtml(v.asesor||'—')}</td><td>${escapeHtml(v.nro_orden||'—')}</td><td>${v.fecha_ingreso?fmtD(v.fecha_ingreso):'—'}</td><td>${escapeHtml(v.cargo||'—')}</td><td>${escapeHtml(v.nro_np||'—')}</td><td>${escapeHtml(v.pres||'—')}</td><td>${v.arribo?fmtD(v.arribo):'—'}</td><td>${v.turno_fecha?fmtD(v.turno_fecha):'—'}</td><td>${fmtN(v.tiempo_taller)}</td><td style="max-width:150px;font-size:12px">${escapeHtml(v.observaciones||'—')}</td><td><div style="display:flex;gap:5px"><button class="btn-sm btn-rep-mark" onclick="abrirDetModal('${v.id}')"><i class="ti ti-edit" style="font-size:12px"></i></button><button class="btn-sm" style="background:#059669;color:#fff" onclick="marcarReparado('${v.id}')"><i class="ti ti-lock" style="font-size:12px"></i> Cerrar orden</button></div></td></tr>`;
     }else{
-      return `<tr><td>${escapeHtml(v.cliente||'—')}</td><td><strong>${escapeHtml(v.dominio||'—')}</strong></td><td>${escapeHtml(v.unidad||'—')}</td><td>${escapeHtml(v.nro_orden||'—')}</td><td>${v.fecha_ingreso?fmtD(v.fecha_ingreso):'—'}</td><td>${escapeHtml(v.nro_np||'—')}</td><td>${fmtN(v.tiempo_taller)}</td><td>${v.reparado_en?fmtD(v.reparado_en):'—'}</td><td><button class="btn-sm" onclick="reabrirDetenido('${v.id}')"><i class="ti ti-arrow-back-up" style="font-size:12px"></i> Reabrir</button></td></tr>`;
+      return `<tr><td>${escapeHtml(v.cliente||'—')}</td><td><strong>${escapeHtml(v.dominio||'—')}</strong></td><td>${escapeHtml(v.unidad||'—')}</td><td>${escapeHtml(v.nro_orden||'—')}</td><td>${v.fecha_ingreso?fmtD(v.fecha_ingreso):'—'}</td><td>${escapeHtml(v.nro_np||'—')}</td><td>${escapeHtml(v.pres||'—')}</td><td>${fmtN(v.tiempo_taller)}</td><td>${v.reparado_en?fmtD(v.reparado_en):'—'}</td><td><button class="btn-sm" onclick="reabrirDetenido('${v.id}')"><i class="ti ti-arrow-back-up" style="font-size:12px"></i> Reabrir</button></td></tr>`;
     }
   }).join('');
   cont.innerHTML = volver + (arr.length
