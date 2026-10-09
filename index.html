@@ -1229,6 +1229,9 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
               <div class="tb-sub" id="eq-sub" style="margin-top:4px"></div>
             </div>
             <div class="hdr-actions" style="display:flex;gap:8px;align-items:center">
+              <button class="btn-sm" id="eq-btn-masiva" onclick="eqmAbrir()" style="display:none">
+                <i class="ti ti-building-warehouse" style="font-size:13px;vertical-align:-2px"></i> Carga masiva
+              </button>
               <button class="btn-sm" id="eq-btn-nueva" onclick="eqAbrirAlta()" style="display:none">
                 <i class="ti ti-plus" style="font-size:13px;vertical-align:-2px"></i> Cargar venta
               </button>
@@ -1601,6 +1604,56 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
     <div class="mfooter">
       <button class="btn-cancel" onclick="eqCerrarAlta()">Cancelar</button>
       <button class="btn-save" id="eqa-btn" onclick="eqGuardarAlta()">Guardar venta</button>
+    </div>
+  </div>
+</div>
+
+<!-- CARGA MASIVA · VENTAS ESPECIALES -->
+<div class="modal-ov" id="eq-masiva">
+  <div class="modal">
+    <h3><i class="ti ti-building-warehouse" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#7c3aed"></i> Carga masiva · Ventas Especiales</h3>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem">Una empresa con varias camionetas que llevan los mismos accesorios. Cada camioneta se crea como un pedido especial y Repuestos puede confirmar stock una por una.</div>
+    <div class="mgrid">
+      <div class="full"><label>Empresa <span style="color:var(--accent)">*</span></label><input type="text" id="eqm-empresa" placeholder="Nombre de la empresa"/></div>
+      <div class="full"><label>Accesorios (para todas las camionetas) <span style="color:var(--accent)">*</span></label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" id="eqm-acc-input" list="eqm-acc-list" autocomplete="off" placeholder="Escribí el nombre o el código del accesorio…" onkeydown="if(event.key==='Enter'){event.preventDefault();eqmAccAdd();}" style="flex:1"/>
+          <button type="button" class="btn-sm" onclick="eqmAccAdd()"><i class="ti ti-plus" style="font-size:12px"></i> Agregar</button>
+        </div>
+        <datalist id="eqm-acc-list"></datalist>
+        <div id="eqm-acc-chips" class="eq-acc-chips"></div>
+        <div style="font-size:11px;color:var(--text-4);margin-top:4px">Elegí de la lista o escribilo y apretá Enter. Estos van en TODAS las camionetas.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <label style="font-weight:600;margin:0">Camionetas <span style="color:var(--accent)">*</span></label>
+        <button type="button" class="btn-sm" onclick="eqmAddFila()"><i class="ti ti-plus" style="font-size:12px"></i> Agregar camioneta</button>
+      </div>
+      <div id="eqm-unidades"></div>
+    </div>
+
+    <div style="margin-top:16px;padding:12px 14px;background:var(--surface-sub,#f6f7f9);border:1px solid var(--border-1);border-radius:10px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin:0">
+        <input type="checkbox" id="eqm-extra-on" onchange="eqmToggleExtras()"> ¿Alguna camioneta necesita algún accesorio adicional?
+      </label>
+      <div id="eqm-extra-box" style="display:none;margin-top:12px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1;min-width:170px"><label style="font-size:11px;color:var(--text-4)">¿A qué camioneta?</label>
+            <select id="eqm-extra-unidad" class="drawer-input" style="width:100%"></select></div>
+          <div style="flex:2;min-width:210px"><label style="font-size:11px;color:var(--text-4)">Accesorio adicional</label>
+            <input type="text" id="eqm-extra-acc" list="eqm-acc-list" autocomplete="off" class="drawer-input" placeholder="Nombre o código…" style="width:100%" onkeydown="if(event.key==='Enter'){event.preventDefault();eqmAddExtra();}"/></div>
+          <button type="button" class="btn-sm" onclick="eqmAddExtra()"><i class="ti ti-plus" style="font-size:12px"></i> Agregar</button>
+        </div>
+        <div id="eqm-extra-chips" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <p class="login-err" id="eqm-err" style="display:none"></p>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="eqmCerrar()">Cancelar</button>
+      <button class="btn-save" id="eqm-btn" onclick="eqmGuardar()">Crear camionetas</button>
     </div>
   </div>
 </div>
@@ -8507,6 +8560,8 @@ function eqAplicarScopeLabels(){
   const esp = eqScope === 'especial';
   const h2 = document.getElementById('eq-h2'); if(h2) h2.textContent = esp ? 'Ventas Especiales' : 'Equipamiento';
   const eye = document.getElementById('eq-eyebrow'); if(eye) eye.textContent = esp ? 'Accesorios · Ventas a empresas' : 'Accesorios · De la venta al turno';
+  const btnM=document.getElementById('eq-btn-masiva');
+  if(btnM) btnM.style.display = (esp && (eqPuedeVender()||esAdmin())) ? '' : 'none';
 }
 // Cambia entre la vista normal y la de ventas especiales (misma pantalla).
 function eqIrScope(scope, el){
@@ -8603,6 +8658,8 @@ function eqDesdeCuando(p){
 async function cargarEquip(){
   const btn=document.getElementById('eq-btn-nueva');
   if(btn) btn.style.display = eqPuedeVender() ? '' : 'none';
+  const btnM=document.getElementById('eq-btn-masiva');
+  if(btnM) btnM.style.display = (eqScope==='especial' && (eqPuedeVender()||esAdmin())) ? '' : 'none';
 
   const {data,error}=await sb.from('equip_pedidos')
     .select('*, equip_comentarios(*)').eq('anulado',false).order('creado_en');
@@ -8688,7 +8745,12 @@ function eqRender(){
       : '<div class="eq-empty"><i class="ti ti-'+v[0]+'"></i><div class="t">'+v[1]+'</div><div class="s">'+v[2]+'</div></div>';
     return;
   }
-  cont.innerHTML = (eqVista==='turnado'||eqVista==='hist') ? eqPorDia(arr, eqVista==='hist') : eqTabla(arr);
+  // En Ventas Especiales, las vistas de stock (espera/listos/sin) se agrupan por
+  // empresa para que Repuestos confirme stock por camioneta (entregas parciales).
+  const porEmpresa = (eqScope==='especial' && (eqVista==='espera'||eqVista==='listo'||eqVista==='sin'));
+  cont.innerHTML = (eqVista==='turnado'||eqVista==='hist')
+      ? eqPorDia(arr, eqVista==='hist')
+      : (porEmpresa ? eqTablaEmpresa(arr) : eqTabla(arr));
 }
 
 function eqTabla(arr){
@@ -8876,6 +8938,193 @@ async function eqTogglePreorSiac(id, checked){
     showToast(checked?'Pre-Or marcada como actualizada en SIAC.':'Marca de Pre-Or quitada.');
     eqRender();
   }catch(err){ alert('No se pudo guardar: '+(err.message||'error')); eqRender(); }
+}
+
+// ====================================================================
+//  CARGA MASIVA · VENTAS ESPECIALES
+//  Una empresa + accesorios base + lista de camionetas (Pre-Or/Prosp/Chasis)
+//  + accesorios adicionales por camioneta. Crea N pedidos especiales.
+// ====================================================================
+let eqmAccSel = [];   // accesorios base [{c,d}]
+let eqmFilas  = [];   // camionetas [{preor,prosp,chasis}]
+let eqmExtras = [];   // adicionales [{idx, c, d}]
+
+function eqmAbrir(){
+  eqmAccSel = []; eqmExtras = [];
+  eqmFilas = [{preor:'',prosp:'',chasis:''},{preor:'',prosp:'',chasis:''},{preor:'',prosp:'',chasis:''}];
+  document.getElementById('eqm-empresa').value = '';
+  document.getElementById('eqm-acc-input').value = '';
+  document.getElementById('eqm-extra-on').checked = false;
+  document.getElementById('eqm-extra-box').style.display = 'none';
+  document.getElementById('eqm-extra-acc').value = '';
+  document.getElementById('eqm-err').style.display = 'none';
+  // datalist de accesorios (una sola vez alcanza, pero lo armamos por las dudas)
+  const dl = document.getElementById('eqm-acc-list');
+  if(dl && !dl.childElementCount){ dl.innerHTML = EQ_ACCESORIOS.map(a=>'<option value="'+eqEsc(a.d)+'">'+eqEsc(a.c)+'</option>').join(''); }
+  eqmRenderAccChips(); eqmRenderFilas(); eqmRenderExtras();
+  document.getElementById('eq-masiva').classList.add('open');
+}
+function eqmCerrar(){ document.getElementById('eq-masiva').classList.remove('open'); }
+
+// --- accesorios base ---
+function eqmAccAdd(){
+  const inp=document.getElementById('eqm-acc-input'); const t=inp.value.trim(); if(!t) return;
+  // match contra la base por descripción exacta; si no, lo agrega como texto
+  const match = EQ_ACCESORIOS.find(a=>a.d.toLowerCase()===t.toLowerCase() || a.c.toLowerCase()===t.toLowerCase());
+  const item = match ? {c:match.c, d:match.d} : {c:'', d:t.toUpperCase()};
+  if(!eqmAccSel.some(a=>a.d===item.d)) eqmAccSel.push(item);
+  inp.value=''; eqmRenderAccChips(); inp.focus();
+}
+function eqmAccQuitar(i){ eqmAccSel.splice(i,1); eqmRenderAccChips(); }
+function eqmRenderAccChips(){
+  const cont=document.getElementById('eqm-acc-chips'); if(!cont) return;
+  cont.innerHTML = eqmAccSel.map((a,i)=>'<span class="eq-acc-chip"><span><span>'+eqEsc(a.d)+'</span> '+
+    (a.c?'<span class="cod">'+eqEsc(a.c)+'</span>':'<span class="nocod">sin código</span>')+'</span>'+
+    '<button type="button" title="Quitar" onclick="eqmAccQuitar('+i+')">×</button></span>').join('');
+}
+
+// --- camionetas ---
+function eqmAddFila(){ eqmFilas.push({preor:'',prosp:'',chasis:''}); eqmRenderFilas(); eqmRenderExtras(); }
+function eqmQuitarFila(i){ eqmFilas.splice(i,1); if(!eqmFilas.length) eqmFilas.push({preor:'',prosp:'',chasis:''});
+  // reacomodar extras que apuntaban a filas movidas
+  eqmExtras = eqmExtras.filter(x=>x.idx<eqmFilas.length);
+  eqmRenderFilas(); eqmRenderExtras(); }
+function eqmSetFila(i,campo,val){ if(eqmFilas[i]){ eqmFilas[i][campo]=val; } }
+function eqmRenderFilas(){
+  const cont=document.getElementById('eqm-unidades'); if(!cont) return;
+  cont.innerHTML = eqmFilas.map((f,i)=>
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:7px">'+
+      '<div style="width:22px;text-align:center;color:var(--text-5);font-size:12px">'+(i+1)+'</div>'+
+      '<input class="drawer-input" style="flex:1" placeholder="N° Pre-Or *" value="'+eqEsc(f.preor)+'" oninput="eqmSetFila('+i+',\'preor\',this.value)">'+
+      '<input class="drawer-input" style="flex:1" placeholder="N° Prospecto" value="'+eqEsc(f.prosp)+'" oninput="eqmSetFila('+i+',\'prosp\',this.value)">'+
+      '<input class="drawer-input" style="flex:1" placeholder="Chasis / Patente" value="'+eqEsc(f.chasis)+'" oninput="eqmSetFila('+i+',\'chasis\',this.value)">'+
+      '<button type="button" class="btn-sm" title="Quitar" onclick="eqmQuitarFila('+i+')" style="color:var(--accent);border-color:rgba(224,50,47,.35)"><i class="ti ti-trash" style="font-size:12px"></i></button>'+
+    '</div>').join('');
+}
+
+// --- adicionales por camioneta ---
+function eqmToggleExtras(){
+  const on=document.getElementById('eqm-extra-on').checked;
+  document.getElementById('eqm-extra-box').style.display = on ? '' : 'none';
+  if(on) eqmRenderExtras();
+}
+function eqmEtiquetaFila(i){ const f=eqmFilas[i]||{}; return '#'+(i+1)+' · '+(f.preor?('Pre-Or '+f.preor):'sin Pre-Or')+(f.chasis?(' · '+f.chasis):''); }
+function eqmRenderExtras(){
+  const sel=document.getElementById('eqm-extra-unidad');
+  if(sel){ const cur=sel.value; sel.innerHTML=eqmFilas.map((f,i)=>'<option value="'+i+'">'+eqEsc(eqmEtiquetaFila(i))+'</option>').join(''); if(cur) sel.value=cur; }
+  const chips=document.getElementById('eqm-extra-chips');
+  if(chips){ chips.innerHTML = eqmExtras.map((x,i)=>
+    '<div style="display:inline-flex;align-items:center;gap:6px;background:#f3e8ff;border:1px solid #d8b4fe;border-radius:8px;padding:4px 9px;font-size:12px;margin:0 6px 6px 0">'+
+      '<b>'+eqEsc(eqmEtiquetaFila(x.idx))+'</b> → '+eqEsc(x.d)+
+      '<button type="button" onclick="eqmQuitarExtra('+i+')" style="border:none;background:none;cursor:pointer;color:#7c3aed;font-size:14px">×</button>'+
+    '</div>').join(''); }
+}
+function eqmAddExtra(){
+  const sel=document.getElementById('eqm-extra-unidad'); const inp=document.getElementById('eqm-extra-acc');
+  const idx=Number(sel.value); const t=inp.value.trim(); if(isNaN(idx)||!t) return;
+  const match = EQ_ACCESORIOS.find(a=>a.d.toLowerCase()===t.toLowerCase() || a.c.toLowerCase()===t.toLowerCase());
+  const item = match ? {c:match.c,d:match.d} : {c:'',d:t.toUpperCase()};
+  eqmExtras.push({idx:idx, c:item.c, d:item.d});
+  inp.value=''; eqmRenderExtras(); inp.focus();
+}
+function eqmQuitarExtra(i){ eqmExtras.splice(i,1); eqmRenderExtras(); }
+
+// --- guardar: crea un pedido especial por camioneta ---
+async function eqmGuardar(){
+  const err=document.getElementById('eqm-err'); err.style.display='none';
+  const empresa=document.getElementById('eqm-empresa').value.trim();
+  const filas=eqmFilas.map(f=>({preor:String(f.preor||'').trim(),prosp:String(f.prosp||'').trim(),chasis:String(f.chasis||'').trim()}))
+                      .filter(f=>f.preor);
+  const mostrar=(m)=>{ err.textContent=m; err.style.display='block'; };
+  if(!empresa) return mostrar('Falta el nombre de la empresa.');
+  if(!eqmAccSel.length) return mostrar('Agregá al menos un accesorio base.');
+  if(!filas.length) return mostrar('Cargá al menos una camioneta con su N° de Pre-Or.');
+
+  const btn=document.getElementById('eqm-btn'); btn.disabled=true; const txt=btn.textContent; btn.textContent='Creando…';
+  try{
+    const lote='lote_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+    const base=eqmAccSel.map(a=>({c:a.c||'',d:a.d}));
+    // mapear extras por índice de fila VÁLIDA (las que tienen preor)
+    const idxValidas=[]; eqmFilas.forEach((f,i)=>{ if(String(f.preor||'').trim()) idxValidas.push(i); });
+    const registros=filas.map((f,pos)=>{
+      const filaIdx=idxValidas[pos];
+      const extras=eqmExtras.filter(x=>x.idx===filaIdx).map(x=>({c:x.c||'',d:x.d}));
+      const acc=base.concat(extras);
+      return {
+        cliente: empresa,
+        especial: true,
+        tipo_venta: 'particular',
+        trabajo: acc.map(a=>a.d).join(' + ').toUpperCase(),
+        accesorios: acc,
+        nro_preor: f.preor,
+        nro_prosp: f.prosp || null,
+        dominio: f.chasis ? f.chasis.toUpperCase() : null,
+        lote_id: lote,
+        creado_por: cu.nombre,
+      };
+    });
+    const {error}=await sb.from('equip_pedidos').insert(registros);
+    if(error) throw error;
+    eqmCerrar();
+    await cargarEquip();
+    showToast(registros.length+' camioneta'+(registros.length===1?'':'s')+' creada'+(registros.length===1?'':'s')+'.');
+  }catch(e){ mostrar('No se pudo crear: '+(e.message||'error')); }
+  finally{ btn.disabled=false; btn.textContent=txt; }
+}
+
+// ====================================================================
+//  VISTA POR EMPRESA (Ventas Especiales) — entregas parciales
+//  Agrupa los pedidos por empresa, colapsable, con stock rápido por unidad.
+// ====================================================================
+async function eqSetStockRapido(id, estado){
+  if(!(eqPuedeStock()||esAdmin())) return;
+  const p=eqPedidos.find(x=>x.id===id); if(!p) return;
+  if(p.estado_stock===estado) return;
+  const upd={ estado_stock:estado, stock_por:cu.nombre, stock_en:new Date().toISOString() };
+  if(estado!=='pedido') upd.eta_pieza=null;
+  try{
+    const {error}=await sb.from('equip_pedidos').update(upd).eq('id',id); if(error) throw error;
+    Object.assign(p,upd);
+    try{ await sb.from('equip_comentarios').insert([{pedido_id:id,texto:'Stock → '+eqStockLabel(estado),autor:cu.nombre,origen:'stock',automatico:true}]); }catch(e){}
+    showToast('Stock actualizado'); eqRender();
+  }catch(e){ alert('No se pudo guardar: '+(e.message||'error')); eqRender(); }
+}
+function eqEmpStockCell(p){
+  const puede = eqPuedeStock()||esAdmin();
+  const pill = eqStockPill(p.estado_stock);
+  if(!puede || eqPaso(p)==='turnado') return pill;
+  const b=(est,txt,bg,col)=>'<button class="btn-sm" onclick="eqSetStockRapido(\''+p.id+'\',\''+est+'\')" style="padding:3px 8px;background:'+bg+';color:'+col+';border:none">'+txt+'</button>';
+  return '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'+pill+
+    b('disponible','✓ Hay','#e6f4ec','#0f7b3f')+
+    b('faltante','✗ Falta','#fbeceb','#c62a27')+
+    '<button class="btn-sm" onclick="eqAbrir(\''+p.id+'\')" title="Pedida con fecha / más opciones" style="padding:3px 8px">Pedida…</button>'+
+    '</div>';
+}
+function eqTablaEmpresa(arr){
+  const g=new Map();
+  arr.forEach(p=>{ const k=(p.cliente||'—'); if(!g.has(k)) g.set(k,[]); g.get(k).push(p); });
+  const empresas=[...g.keys()].sort((a,b)=>a.localeCompare(b,'es'));
+  return empresas.map(emp=>{
+    const items=g.get(emp);
+    const hay=items.filter(p=>p.estado_stock==='disponible').length;
+    const pend=items.length-hay;
+    const filas=items.map(p=>
+      '<tr>'+
+        '<td><strong>'+eqEsc(p.dominio||'—')+'</strong>'+
+          (p.nro_preor?'<div class="eq-dias" style="color:var(--text-3)">Pre-Or '+eqEsc(p.nro_preor)+'</div>':'')+
+          (p.nro_prosp?'<div class="eq-dias">prospecto '+eqEsc(p.nro_prosp)+'</div>':'')+'</td>'+
+        '<td>'+eqEsc(p.trabajo)+'</td>'+
+        '<td>'+eqEmpStockCell(p)+'</td>'+
+        '<td style="white-space:nowrap">'+eqBtn(p)+'</td>'+
+      '</tr>').join('');
+    return '<details class="eq-emp" open style="margin-bottom:14px;border:1px solid var(--border-1);border-radius:12px;overflow:hidden">'+
+      '<summary style="cursor:pointer;list-style:none;padding:12px 16px;background:#faf5ff;font-weight:700;color:var(--text-1);display:flex;justify-content:space-between;align-items:center">'+
+        '<span><i class="ti ti-building" style="color:#7c3aed;font-size:15px;vertical-align:-2px;margin-right:6px"></i>'+eqEsc(emp)+'</span>'+
+        '<span style="font-size:12px;font-weight:600;color:var(--text-3)">'+items.length+' camioneta'+(items.length===1?'':'s')+' · <span style="color:#0f7b3f">'+hay+' con stock</span> · <span style="color:#c62a27">'+pend+' pendientes</span></span>'+
+      '</summary>'+
+      '<div class="table-wrap"><table><thead><tr><th style="width:18%">Chasis/Pat.</th><th>Qué se vendió</th><th style="width:28%">Stock</th><th style="width:12%"></th></tr></thead><tbody>'+filas+'</tbody></table></div>'+
+    '</details>';
+  }).join('');
 }
 
 function eqBtn(p){
