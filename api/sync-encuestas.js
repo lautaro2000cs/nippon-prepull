@@ -123,10 +123,11 @@ async function chequearEstado(token, exportId) {
   const estado = String(data.status || "").toLowerCase();
   const url = data.report_url || data.url || data.download_url;
 
-  if (["failed", "error"].includes(estado)) {
+  if (["failed", "error", "cancelled", "canceled", "expired"].includes(estado)) {
     return { listo: false, fallo: true, estado, raw: txt };
   }
-  if (["done", "completed", "finished", "success", "ok"].includes(estado)) {
+  // Si ya hay URL de descarga, está listo aunque el status no esté en la lista.
+  if (url || ["done", "completed", "finished", "success", "ok", "ready", "available"].includes(estado)) {
     return { listo: true, estado, url };
   }
   return { listo: false, estado: estado || "processing" };
@@ -596,13 +597,15 @@ export default async function handler(req, res) {
     // ===== FASE 1 (manual): iniciar export y devolver export_id al toque =====
     if (action === "start") {
       const AHORA = Date.now();
+      const fresh = req.query.fresh === "1";   // fuerza exportación nueva (ignora el cache)
       const cache = await leerConfig("wise_last_export");
 
-      // Si hay una exportación reciente del MISMO rango (< 30 min), la reutilizamos
+      // Si hay una exportación reciente del MISMO rango (< 10 min), la reutilizamos
       // en vez de pedir una nueva. Esto evita gastar el cupo de Wise con reintentos.
-      if (cache && cache.export_id &&
+      // Con fresh=1 NO reutilizamos (sirve para recuperarse de un export caído/vencido).
+      if (!fresh && cache && cache.export_id &&
           cache.date_from === dateFrom && cache.date_to === dateTo &&
-          cache.ts && (AHORA - cache.ts) < 30 * 60 * 1000) {
+          cache.ts && (AHORA - cache.ts) < 10 * 60 * 1000) {
         return res.status(200).json({
           ok: true, phase: "started", export_id: cache.export_id, reutilizado: true,
           rango_pedido: { date_from: dateFrom, date_to: dateTo },
@@ -645,8 +648,9 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: false, phase: "failed", error: "La exportación falló en Wise." });
       }
       if (!est.listo) {
-        // todavía procesando (o aún no registrado) -> el navegador reintenta
-        return res.status(200).json({ ok: true, phase: "pending", status: est.estado });
+        // notFound = el export no existe en Wise (vencido o nunca se registró).
+        // Lo informamos aparte para que el navegador pueda reintentar con uno nuevo.
+        return res.status(200).json({ ok: true, phase: est.notFound ? "notfound" : "pending", status: est.estado });
       }
       if (!est.url) {
         return res.status(200).json({ ok: false, phase: "failed", error: "Reporte listo pero sin URL de descarga." });
