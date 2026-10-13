@@ -5795,15 +5795,14 @@ async function sincronizarEncuestas(){
       const j2 = await r2.json();
       if(j2.phase === 'done'){ guardadas = j2.registros_guardados ?? j2.respondidas ?? 0; break; }
       if(j2.phase === 'failed' || j2.ok === false) throw new Error(j2.error || 'La exportación falló en Wise.');
-      // Recuperación: export inexistente, o trabado > 75s -> pedimos uno nuevo (una vez)
-      const trabado = j2.phase === 'notfound' || seg > 75;
-      if(trabado && !reinicioFresh){
+      // Recuperación SOLO si la exportación está caída (no existe en Wise). No
+      // reintentamos por lentitud, para no gastar el cupo de exportaciones.
+      if(j2.phase === 'notfound' && !reinicioFresh){
         reinicioFresh = true;
-        setTxt('Reintentando con un reporte nuevo…');
-        try{ exportId = await iniciar(true); inicio = Date.now(); }
-        catch(e){ throw e; }
+        setTxt('El reporte anterior venció. Pidiendo uno nuevo…');
+        exportId = await iniciar(true); inicio = Date.now();
       }
-      // phase === 'pending' => seguir esperando
+      // phase === 'pending' => seguir esperando (Wise está generando el reporte)
     }
     if(guardadas === null){
       throw new Error('Wise está tardando más de lo normal. El reporte ya se está generando: esperá un minuto y volvé a sincronizar.');
@@ -5818,8 +5817,12 @@ async function sincronizarEncuestas(){
     // solo olvidamos la clave si el problema fue de autorización (no si Wise tardó)
     if(/no autorizado|401|clave/i.test(String(err.message||''))) sessionStorage.removeItem('sync_key');
     btn.innerHTML = '<i class="ti ti-alert-triangle"></i> Error';
-    alert('No se pudo sincronizar: ' + err.message
-      + '\n\nSi dice REPORT_LIMIT_EXCEEDED, esperá unos minutos.');
+    const m = String(err.message||'');
+    if(/REPORT_LIMIT_EXCEEDED|límite de exportaciones|Export limit/i.test(m)){
+      alert('Wise alcanzó el límite de exportaciones de la cuenta. No es un error del sistema.\n\nEsperá unos minutos y volvé a intentar. No toques Sincronizar repetidamente: cada intento consume cupo y alarga la espera.');
+    } else {
+      alert('No se pudo sincronizar: ' + m);
+    }
     setTimeout(()=>{ btn.innerHTML = orig; btn.disabled=false; }, 2500);
   }
 }
