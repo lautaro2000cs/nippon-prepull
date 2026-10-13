@@ -3410,7 +3410,10 @@ function renderDetenidos(){
   document.getElementById('det-tab-hist')?.classList.toggle('act', detVista==='historico');
 
   // filtrar por sucursal elegida (si hay)
-  const enSuc = v => !detSucSel || normUbic(v.ubicacion)===normUbic(detSucSel);
+  // "Sin ubicación" agrupa los vehículos con sucursal vacía: hay que matchear
+  // por ubicación en blanco, no por el texto "Sin ubicación".
+  const sinUbic = (u) => !String(u||'').trim();
+  const enSuc = v => !detSucSel || (detSucSel==='Sin ubicación' ? sinUbic(v.ubicacion) : normUbic(v.ubicacion)===normUbic(detSucSel));
   const base = (detVista==='historico' ? histn : activos).filter(enSuc);
 
   if(cards){
