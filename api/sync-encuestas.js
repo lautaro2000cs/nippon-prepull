@@ -533,7 +533,10 @@ async function leerConfig(clave){
 async function guardarConfig(clave, valor){
   try{
     const url = `${process.env.SUPABASE_URL}/rest/v1/app_config?on_conflict=clave`;
-    await fetch(url, {
+    // IMPORTANTE: incluir actualizado_en/por como hace la web; si esas columnas
+    // son NOT NULL y las omitimos, la escritura falla y el enfriamiento no se
+    // guarda (cada sync volvería a crear un export y agotaría el cupo de Wise).
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -541,9 +544,10 @@ async function guardarConfig(clave, valor){
         "Content-Type": "application/json",
         Prefer: "resolution=merge-duplicates,return=minimal",
       },
-      body: JSON.stringify([{ clave, valor }]),
+      body: JSON.stringify([{ clave, valor, actualizado_en: new Date().toISOString(), actualizado_por: "sync-encuestas" }]),
     });
-  }catch(e){ /* best-effort: si falla, no rompe la sync */ }
+    if(!res.ok){ console.warn("guardarConfig falló:", res.status, await res.text()); }
+  }catch(e){ console.warn("guardarConfig error:", e.message); }
 }
 
 // Descarga las filas del reporte, mapea, filtra respondidas y guarda en Supabase.
