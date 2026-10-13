@@ -2744,9 +2744,21 @@ function cargaCitasPorNombre(nombre){
   return CARGAN_CITAS_EXTRA.map(_normNom).includes(_normNom(nombre));
 }
 async function cargarTurnos(){
-  const {data,error}=await sb.from('turnos').select('*').order('fecha',{ascending:true}).order('id',{ascending:true});
-  if(error){console.error('Error al cargar turnos:',error);turnos=[];return;}
-  turnos=data;
+  // Supabase devuelve como máximo 1000 filas por request. Como la tabla ya
+  // superó los 1000 turnos, paginamos en bloques de 1000 para traerlos TODOS;
+  // si no, los turnos nuevos (al final del orden) no se cargaban y "no aparecían".
+  const paso=1000; let desde=0; let todos=[];
+  for(;;){
+    const {data,error}=await sb.from('turnos').select('*')
+      .order('fecha',{ascending:true}).order('id',{ascending:true})
+      .range(desde, desde+paso-1);
+    if(error){ console.error('Error al cargar turnos:',error); if(!todos.length){ turnos=[]; return; } break; }
+    todos=todos.concat(data||[]);
+    if(!data || data.length<paso) break;   // última página
+    desde+=paso;
+    if(desde>100000) break;                // tope de seguridad
+  }
+  turnos=todos;
 }
 function usuariosQueCarganCitas(){
   const extra = CARGAN_CITAS_EXTRA.map(_normNom);
@@ -2840,7 +2852,7 @@ function marcarPedidosVistos(){
 async function cargarBandejaDesest(){
   // asegurarnos de tener las encuestas cargadas (para mostrar datos de cada una)
   if(!encCargadas){
-    const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
+    const { data } = await fetchEncuestasPag(ENC_COLS);
     encuestas = aplicarAsesorOverride(data || []);
     normalizarSucursales();
     encCargadas = true;
@@ -3173,7 +3185,7 @@ function swSubTabEnc(t, el){
 // Relee encuestas + desestimaciones y re-renderiza (sin recargar la página)
 async function refrescarYRender(){
   try{
-    const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
+    const { data } = await fetchEncuestasPag(ENC_COLS);
     if(data){ encuestas = aplicarAsesorOverride(data); normalizarSucursales(); }
     await cargarDesestimaciones();
   }catch(e){ /* si falla, igual renderizamos lo que hay */ }
@@ -3195,7 +3207,7 @@ async function editarAsesorEnc(wiseId){
       .update({ asesor_override: val || null })
       .eq('wise_id', wiseId);
     if(error) throw error;
-    const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
+    const { data } = await fetchEncuestasPag(ENC_COLS);
     if(data){ encuestas = aplicarAsesorOverride(data); normalizarSucursales(); }
     renderEncuestas();
   }catch(err){ alert('No se pudo corregir el asesor: '+(err.message||'error')); }
@@ -3232,7 +3244,7 @@ async function editarSucursalEnc(wiseId){
     showToast(val ? 'Sucursal corregida a '+e.sucursal : 'Sucursal vuelta a la de Wise');
     // Y refresco desde la base para dejar todo consistente.
     try{
-      const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
+      const { data } = await fetchEncuestasPag(ENC_COLS);
       if(data){ encuestas = aplicarAsesorOverride(data); normalizarSucursales(); renderEncuestas(); }
     }catch(e2){/* si el refresco falla, ya se ve el cambio optimista */}
   }catch(err){
@@ -3521,6 +3533,21 @@ async function reabrirDetenido(id){
   }catch(err){ alert('No se pudo reabrir: '+(err.message||'error')); }
 }
 
+// Trae TODAS las encuestas paginando de a 1000 (Supabase corta en 1000 por
+// request). Sin esto, promedios y comisiones solo veían las 1000 más recientes.
+async function fetchEncuestasPag(cols){
+  const paso=1000; let desde=0; let todos=[];
+  for(;;){
+    const {data,error}=await sb.from('encuestas').select(cols)
+      .order('fecha',{ascending:false}).range(desde, desde+paso-1);
+    if(error){ if(!todos.length) return {data:null,error}; break; }
+    todos=todos.concat(data||[]);
+    if(!data || data.length<paso) break;
+    desde+=paso; if(desde>200000) break;
+  }
+  return {data:todos, error:null};
+}
+
 async function cargarEncuestas(){
   // Ajustes de UI según el rol (asesor vs admin/supervisor)
   ajustarUIEncuestas();
@@ -3529,17 +3556,14 @@ async function cargarEncuestas(){
   // cambiado (desestimaciones aplicadas, pedidos resueltos) para que el
   // asesor vea la resolución del admin sin tener que apretar F5.
   if(encCargadas){
-    const { data } = await sb.from('encuestas').select(ENC_COLS).order('fecha',{ascending:false});
+    const { data } = await fetchEncuestasPag(ENC_COLS);
     if(data){ encuestas = aplicarAsesorOverride(data); normalizarSucursales(); }
     await cargarDesestimaciones();
     renderEncuestas();
     return;
   }
   const cont = document.getElementById('enc-tabla-asesores');
-  const { data, error } = await sb
-    .from('encuestas')
-    .select('*')
-    .order('fecha', { ascending:false });
+  const { data, error } = await fetchEncuestasPag('*');
   if(error){
     console.error('Error al cargar encuestas:', error);
     cont.innerHTML = '<div class="access-note" style="color:#b91c1c"><i class="ti ti-alert-triangle"></i> No se pudieron cargar las encuestas. ¿Creaste la tabla en Supabase?</div>';
