@@ -612,6 +612,24 @@ export default async function handler(req, res) {
         });
       }
 
+      // Enfriamiento: no crear una exportación nueva si se creó una hace muy poco.
+      // Protege el cupo de Wise de los clicks repetidos. (fresh igual lo respeta.)
+      const COOLDOWN_MS = 8 * 60 * 1000;
+      if (cache && cache.ts && (AHORA - cache.ts) < COOLDOWN_MS) {
+        const faltan = Math.ceil((COOLDOWN_MS - (AHORA - cache.ts)) / 60000);
+        // si todavía tenemos el export anterior, lo devolvemos para poder descargarlo
+        if (cache.export_id) {
+          return res.status(200).json({
+            ok: true, phase: "started", export_id: cache.export_id, reutilizado: true,
+            rango_pedido: { date_from: cache.date_from, date_to: cache.date_to },
+          });
+        }
+        return res.status(200).json({
+          ok: false, phase: "cooldown",
+          error: "Se pidió un reporte hace muy poco. Esperá ~" + faltan + " min para no agotar el cupo de Wise.",
+        });
+      }
+
       const token = await autenticar();
       try {
         const { exportId } = await iniciarExport(token, dateFrom, dateTo);
