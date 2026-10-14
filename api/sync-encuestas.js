@@ -146,7 +146,7 @@ function parseCSV(texto) {
     out.push(cur);
     return out;
   };
-  const headers = parseLinea(lineas[0]).map((h) => h.trim());
+  const headers = parseLinea(lineas[0]).map((h) => h.replace(/^\uFEFF/, "").trim());
   const filas = [];
   for (let i = 1; i < lineas.length; i++) {
     const celdas = parseLinea(lineas[i]);
@@ -157,23 +157,69 @@ function parseCSV(texto) {
   return filas;
 }
 
-// --- Detección automática de columnas ------------------------
+// ------------------------------------------------------------
+//  Detección de columnas (misma lógica que el import manual del portal,
+//  para que el sync automático y el import produzcan lo mismo)
+// ------------------------------------------------------------
 const _norm = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-function buscarClave(obj, terminos) {
-  const claves = Object.keys(obj);
-  for (const t of terminos) {
-    const found = claves.find((k) => _norm(k).includes(t));
-    if (found) return found;
-  }
-  return null;
+// Una columna cuyo título es una pregunta no puede ser un campo de texto
+const esPregunta = (h) => /[¿?]/.test(String(h));
+
+// "[Sin Asignar]", "S/D", "-" son relleno, no datos reales
+function esRelleno(v) {
+  const s = _norm(v).trim();
+  return !s || s === "s/d" || s === "sd" || s === "n/a" || s === "-" || s === "--" || /^\[.*\]$/.test(s);
 }
-function claveConPalabras(obj, palabras) {
-  return Object.keys(obj).find((k) => {
-    const nk = _norm(k);
-    return palabras.every((p) => nk.includes(_norm(p)));
-  }) || null;
+
+function detectarColumnas(filas) {
+  const headers = filas.length ? Object.keys(filas[0]) : [];
+  const conDatos = (h) => filas.some((f) => !esRelleno(f[h]));
+  const noPreg = headers.filter((h) => h && !esPregunta(h));
+  const todas = headers.filter(Boolean);
+
+  const elegir = (cands, grupos, exigirDatos) => {
+    for (const g of grupos) {
+      for (const h of cands) {
+        const nh = _norm(h);
+        if (g.every((t) => nh.includes(_norm(t)))) {
+          if (exigirDatos && !conDatos(h)) continue;
+          return h;
+        }
+      }
+    }
+    return null;
+  };
+
+  return {
+    asesor:   elegir(noPreg, [["contacto", "agente"], ["agente"], ["asesor"], ["usuario", "nombre"], ["usuario"], ["user"]], true),
+    sucursal: elegir(noPreg, [["sucursal"], ["branch"]], true),
+    servicio: elegir(noPreg, [["servicio"], ["service"]], true),
+    dominio:  elegir(noPreg, [["dominio"], ["patente"], ["domain"]], true),
+    telefono: elegir(noPreg, [["contacto", "telefono"], ["telefono"], ["celular"], ["phone"]], true),
+    empresa:  elegir(noPreg.filter((h) => !/telefono|phone/.test(_norm(h))),
+                     [["contacto", "nombre"], ["empresa", "nombre"], ["cliente"], ["nombre"], ["empresa"]], true),
+    encuesta: elegir(noPreg, [["encuesta"], ["survey"]], true),
+    nroOrden: elegir(noPreg.filter((h) => !_norm(h).includes("grupo")),
+                     [["n° orden"], ["n orden"], ["nro", "orden"], ["contacto", "orden"], ["orden"]], true),
+    fechaEnvio: elegir(noPreg, [["fecha", "envio"], ["survey", "sent"], ["fecha", "creado"]], true),
+    fechaResp:  elegir(noPreg, [["fecha", "respuesta"], ["response", "date"]], true),
+    respondida: elegir(noPreg, [["respondida"], ["responded"]], true),
+
+    p_amabilidad:  elegir(todas, [["amabilidad"]], false),
+    p_atencion:    elegir(todas, [["atencion", "solicitudes"]], false),
+    p_puntualidad: elegir(todas, [["puntualidad"]], false),
+    p_explicacion: elegir(todas, [["explicacion"]], false),
+    p_limpieza:    elegir(todas, [["limpieza"]], false),
+    p_turnos:      elegir(todas, [["facilidad", "turnos"]], false),
+    p_espera:      elegir(todas, [["tiempo", "espera"]], false),
+    p_calidad:     elegir(todas, [["calidad", "servicio", "prestado"]], false),
+    p_recomienda:  elegir(todas, [["recomiende"]], false),
+    funciono:      elegir(todas, [["funcionando correctamente"]], false),
+    comentario:    elegir(todas, [["sugerencias"], ["comentario"]], false),
+  };
 }
+
 function aNota(v) {
   if (v == null) return null;
   const s = String(v).trim().replace(",", ".");
@@ -181,106 +227,72 @@ function aNota(v) {
   const n = Number(s);
   return (!isNaN(n) && n >= 0 && n <= 10) ? n : null;
 }
-function notaPorPalabras(fila, palabras) {
-  for (const [k, v] of Object.entries(fila)) {
-    const nk = _norm(k);
-    if (palabras.every((p) => nk.includes(_norm(p)))) return aNota(v);
-  }
-  return null;
-}
-function extraerPreguntas(fila) {
-  return {
-    p_amabilidad:  notaPorPalabras(fila, ["amabilidad"]),
-    p_atencion:    notaPorPalabras(fila, ["atencion", "solicitudes"]),
-    p_puntualidad: notaPorPalabras(fila, ["puntualidad"]),
-    p_explicacion: notaPorPalabras(fila, ["explicacion"]),
-    p_limpieza:    notaPorPalabras(fila, ["limpieza"]),
-    p_turnos:      notaPorPalabras(fila, ["facilidad", "turnos"]),
-    p_espera:      notaPorPalabras(fila, ["tiempo", "espera"]),
-    p_calidad:     notaPorPalabras(fila, ["calidad", "servicio", "prestado"]),
-    p_recomienda:  notaPorPalabras(fila, ["recomiende"]),
-  };
-}
-function extraerComentario(fila) {
-  for (const [k, v] of Object.entries(fila)) {
-    const nk = _norm(k);
-    if ((nk.includes("sugerencias") || nk.includes("comentario")) &&
-        String(v).trim() && String(v).trim() !== "S/D") return String(v).trim();
-  }
-  return null;
-}
-function extraerFunciono(fila) {
-  for (const [k, v] of Object.entries(fila)) {
-    if (_norm(k).includes("funcionando correctamente")) {
-      const s = String(v).trim();
-      return s || null;
-    }
-  }
-  return null;
-}
 
-function mapearFila(fila) {
-  const kAsesor   = buscarClave(fila, ["agente", "asesor", "usuario", "user"]);
-  const kSucursal = buscarClave(fila, ["sucursal", "branch"]);
-  const kServicio = buscarClave(fila, ["servicio", "service"]);
-  const kDominio  = buscarClave(fila, ["dominio", "patente", "domain"]);
-  const kEmpresa  = buscarClave(fila, ["empresa", "telefono", "phone", "cliente", "nombre"]);
-  const kTelefono = claveConPalabras(fila, ["contacto", "telefono"]) || buscarClave(fila, ["telefono", "phone", "celular"]);
-  const claves = Object.keys(fila);
-  const kNroOrden =
-    claves.find(k => { const n = _norm(k); return n.includes("orden") && !n.includes("grupo") && (n.includes("n° orden") || n.includes("n orden") || n.includes("nro")); })
-    || claves.find(k => { const n = _norm(k); return n.includes("contacto") && n.includes("orden") && !n.includes("grupo"); })
-    || null;
-  const kEncuesta = buscarClave(fila, ["encuesta", "survey"]);
+const PREGUNTAS = ["p_amabilidad", "p_atencion", "p_puntualidad", "p_explicacion", "p_limpieza",
+                   "p_turnos", "p_espera", "p_calidad", "p_recomienda"];
 
-  const kFechaResp  = claveConPalabras(fila, ["fecha", "respuesta"]) || claveConPalabras(fila, ["response", "date"]);
-  const kFechaEnvio = claveConPalabras(fila, ["fecha", "envio"]) || claveConPalabras(fila, ["survey", "sent"]) || claveConPalabras(fila, ["fecha", "creado"]);
-  const kFecha = kFechaEnvio || buscarClave(fila, ["fecha", "date", "survey_sent", "created"]);
+// Arma el registro SOLO con los campos que el reporte realmente trae:
+// lo que no viene se omite y el upsert no lo pisa.
+function armarRegistro(fila, d) {
+  const val = (col) => (col ? String(fila[col] ?? "").trim() : "");
+  const txt = (col) => { const v = val(col); return esRelleno(v) ? null : v; };
+  const r = {};
 
-  const preguntas = extraerPreguntas(fila);
-  const cinco = [preguntas.p_amabilidad, preguntas.p_atencion, preguntas.p_puntualidad,
-                 preguntas.p_explicacion, preguntas.p_limpieza].filter(n => n != null);
-  const promedioAsesor = cinco.length
-    ? Math.round((cinco.reduce((a, b) => a + b, 0) / cinco.length) * 100) / 100 : null;
+  const orden = val(d.nroOrden);
+  const dom   = val(d.dominio);
+  const envio = val(d.fechaEnvio);
+  const resp  = val(d.fechaResp);
+  const nid   = (v) => String(v ?? "").trim().toLowerCase();
 
-  const ordenRaw = kNroOrden ? fila[kNroOrden] : null;
-  const domRaw   = kDominio  ? fila[kDominio]  : null;
-  const envioRaw = kFecha    ? fila[kFecha]    : null;
-  const respRaw  = kFechaResp ? fila[kFechaResp] : null;
-  const normId = (v) => String(v ?? "").trim().toLowerCase();
-
-  const claveId = (ordenRaw && String(ordenRaw).trim())
-    ? "ord|" + normId(ordenRaw)
-    : "sin-orden|" + normId(domRaw) + "|" + normId(envioRaw) + "|" + normId(respRaw);
-  const wiseId = "enc_" + crypto.createHash("md5").update(claveId).digest("hex");
-
-  const parseFecha = (val) => {
-    if (!val) return null;
-    const d = new Date(String(val).replace(" ", "T"));
-    return isNaN(d.getTime()) ? null : d.toISOString();
+  const parseFecha = (v) => {
+    if (!v) return null;
+    const dd = new Date(String(v).replace(" ", "T"));
+    return isNaN(dd.getTime()) ? null : dd.toISOString();
   };
 
-  return {
-    wise_id: wiseId,
-    fecha: parseFecha(kFecha && fila[kFecha]),
-    fecha_respuesta: parseFecha(kFechaResp && fila[kFechaResp]),
-    asesor: kAsesor ? fila[kAsesor] : null,
-    ...preguntas,
-    promedio_asesor: promedioAsesor,
-    comentario: extraerComentario(fila),
-    funciono_ok: extraerFunciono(fila),
-    puntuacion_prom: promedioAsesor,
-    puntuacion: promedioAsesor,
-    sucursal: kSucursal ? fila[kSucursal] : null,
-    servicio: kServicio ? fila[kServicio] : null,
-    dominio: kDominio ? fila[kDominio] : null,
-    telefono: kTelefono ? fila[kTelefono] : null,
-    nro_orden: kNroOrden ? fila[kNroOrden] : null,
-    empresa: kEmpresa ? fila[kEmpresa] : null,
-    encuesta: kEncuesta ? fila[kEncuesta] : null,
-    raw: fila,
-    sincronizado_en: new Date().toISOString(),
-  };
+  if (d.fechaEnvio) r.fecha = parseFecha(envio);
+  if (d.fechaResp)  r.fecha_respuesta = parseFecha(resp);
+
+  const claveId = orden ? "ord|" + nid(orden)
+                        : "sin-orden|" + nid(dom) + "|" + nid(envio) + "|" + nid(resp);
+  r.wise_id = "enc_" + crypto.createHash("md5").update(claveId).digest("hex");
+
+  if (d.asesor)   r.asesor    = txt(d.asesor);
+  if (d.sucursal) r.sucursal  = txt(d.sucursal);
+  if (d.servicio) r.servicio  = txt(d.servicio);
+  if (d.dominio)  r.dominio   = txt(d.dominio);
+  if (d.telefono) r.telefono  = txt(d.telefono);
+  if (d.nroOrden) r.nro_orden = txt(d.nroOrden);
+  if (d.empresa)  r.empresa   = txt(d.empresa);
+  if (d.encuesta) r.encuesta  = txt(d.encuesta);
+
+  for (const p of PREGUNTAS) if (d[p]) r[p] = aNota(fila[d[p]]);
+
+  if (d.funciono) r.funciono_ok = txt(d.funciono);
+  if (d.comentario) {
+    const c = val(d.comentario);
+    r.comentario = (c && !esRelleno(c)) ? c : null;
+  }
+
+  const cinco = ["p_amabilidad", "p_atencion", "p_puntualidad", "p_explicacion", "p_limpieza"]
+    .filter((p) => d[p]).map((p) => r[p]).filter((n) => n != null);
+  if (cinco.length) {
+    const prom = Math.round((cinco.reduce((a, b) => a + b, 0) / cinco.length) * 100) / 100;
+    r.promedio_asesor = prom; r.puntuacion_prom = prom; r.puntuacion = prom;
+  }
+
+  r.raw = fila;
+  r.sincronizado_en = new Date().toISOString();
+  return r;
+}
+
+function esRespondida(fila, d, reg) {
+  if (d.respondida) {
+    const s = String(fila[d.respondida] ?? "").trim().toLowerCase();
+    return s === "si" || s === "sí" || s === "1" || s === "yes" || s === "true";
+  }
+  if (reg.fecha_respuesta) return true;
+  return reg.promedio_asesor != null;
 }
 
 function limpiarNulos(valor) {
@@ -292,19 +304,6 @@ function limpiarNulos(valor) {
     return out;
   }
   return valor;
-}
-
-function esRespondida(registro) {
-  const raw = registro.raw || {};
-  for (const [k, v] of Object.entries(raw)) {
-    const nk = _norm(k);
-    if (nk.includes("respondida") || nk.includes("responded") || nk === "is_responsed") {
-      const s = String(v).trim().toLowerCase();
-      return s === "si" || s === "sí" || s === "1" || s === "yes" || s === "true";
-    }
-  }
-  if (registro.fecha_respuesta) return true;
-  return registro.promedio_asesor != null;
 }
 
 // --- 5) Upsert a Supabase (merge por wise_id) ----------------
@@ -375,14 +374,21 @@ async function guardarEstado(valor) {
 // Descarga + mapea + guarda, y devuelve el resumen
 async function bajarYGuardar(reportUrl) {
   const filas = await descargarFilas(reportUrl);
-  let registros = filas.map(mapearFila);
-  const recibidas = registros.length;
-  registros = registros.filter(esRespondida);
+  if (!filas.length) return { filas_recibidas: 0, respondidas: 0, registros_guardados: 0 };
+
+  const det = detectarColumnas(filas);
+  const pares = filas.map((f) => ({ f, r: armarRegistro(f, det) }));
+  const registros = pares.filter((x) => esRespondida(x.f, det, x.r)).map((x) => x.r);
   const r = await guardarEnSupabase(registros);
+
   return {
-    filas_recibidas: recibidas,
+    filas_recibidas: filas.length,
     respondidas: registros.length,
     registros_guardados: r.insertados,
+    columnas_detectadas: {
+      asesor: det.asesor, sucursal: det.sucursal, nro_orden: det.nroOrden,
+      servicio: det.servicio, dominio: det.dominio, telefono: det.telefono,
+    },
   };
 }
 
