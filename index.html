@@ -5782,6 +5782,33 @@ function toggleEncDetalle(rid){
 // (el backend usa "últimos 7 días" cuando no le mandamos fechas) y recarga.
 // Sincronización en UNA sola llamada (como estaba antes): el backend inicia el
 // export, espera el reporte y guarda, todo en la misma invocación. Más simple.
+// --- helpers de fecha para la sincronización por tramos ---
+// Suma n días a un 'YYYY-MM-DD' sin que la zona horaria corra el día.
+function _syncAddDias(iso, n){
+  const [a,m,d] = String(iso).split('-').map(Number);
+  const dt = new Date(a, m-1, d);
+  dt.setDate(dt.getDate() + n);
+  const p = x => String(x).padStart(2,'0');
+  return dt.getFullYear() + '-' + p(dt.getMonth()+1) + '-' + p(dt.getDate());
+}
+function _syncHoyISO(){
+  const d = new Date(); const p = x => String(x).padStart(2,'0');
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+}
+// Parte un rango en ventanas de `dias` días (inclusive). 'YYYY-MM-DD' se compara como texto.
+function _syncVentanas(desde, hasta, dias){
+  const out = []; let ini = desde; let guard = 0;
+  while(ini <= hasta && guard++ < 200){
+    let fin = _syncAddDias(ini, dias - 1);
+    if(fin > hasta) fin = hasta;
+    out.push({ from: ini, to: fin });
+    ini = _syncAddDias(fin, 1);
+  }
+  return out;
+}
+
+// Sincroniza DE A 7 DÍAS: cada export es chico, Wise lo genera rápido y entra
+// en el minuto que da Vercel. No duplica: el backend hace upsert por wise_id.
 async function sincronizarEncuestas(){
   const btn = document.getElementById('enc-sync-btn');
   if(!btn) return;
@@ -5794,28 +5821,68 @@ async function sincronizarEncuestas(){
       key = prompt('Clave de sincronización (SYNC_SECRET de Vercel):') || '';
       if(key) sessionStorage.setItem('sync_key', key);
     }
-    // sin ?action => el backend hace todo de una (últimos 7 días)
-    const r = await fetch('/api/sync-encuestas?key=' + encodeURIComponent(key));
-    const j = await r.json();
-    if(!r.ok || !j.ok) throw new Error(j.error || ('HTTP '+r.status));
+    if(!key){ btn.innerHTML = orig; btn.disabled = false; return; }
+
+    // Rango: el que esté puesto en los filtros Desde/Hasta. Si no hay, últimos 7 días.
+    const hoyISO = _syncHoyISO();
+    let desde = document.getElementById('enc-desde')?.value || '';
+    let hasta = document.getElementById('enc-hasta')?.value || '';
+    if(!desde || !hasta){ hasta = hoyISO; desde = _syncAddDias(hoyISO, -7); }
+    if(desde > hasta){ const t = desde; desde = hasta; hasta = t; }
+
+    const ventanas = _syncVentanas(desde, hasta, 7);
+
+    let guardadas = 0;
+    const errores = [];
+    for(let i = 0; i < ventanas.length; i++){
+      const v = ventanas[i];
+      btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> '
+        + (ventanas.length > 1 ? ('Tramo ' + (i+1) + '/' + ventanas.length + '…') : 'Sincronizando…');
+      try{
+        const url = '/api/sync-encuestas?key=' + encodeURIComponent(key)
+                  + '&date_from=' + v.from + '&date_to=' + v.to;
+        const r = await fetch(url);
+        const j = await r.json();
+        if(!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        guardadas += (j.registros_guardados || 0);
+      }catch(e){
+        console.error('Tramo', v, e);
+        errores.push({ rango: v.from + ' → ' + v.to, msg: String(e.message || e) });
+      }
+      // respiro entre tramos para no amontonar exportaciones en Wise
+      if(i < ventanas.length - 1) await new Promise(r => setTimeout(r, 1200));
+    }
+
     encCargadas = false;
     await cargarEncuestas();
-    const cuantas = j.registros_guardados ?? j.respondidas ?? 0;
-    btn.innerHTML = '<i class="ti ti-check"></i> ' + cuantas + ' actualizadas';
-    setTimeout(()=>{ btn.innerHTML = orig; btn.disabled=false; }, 2500);
+
+    if(errores.length && guardadas === 0){
+      const m = errores[0].msg;
+      btn.innerHTML = '<i class="ti ti-alert-triangle"></i> Error';
+      if(/REPORT_NOT_FOUND/i.test(m)){
+        alert('Wise no encuentra el reporte configurado.\n\nRevisá la variable WISE_REPORT_ID en Vercel: tiene que ser el ID del reporte que hoy está vigente en Wise.');
+      } else if(/REPORT_LIMIT_EXCEEDED|límite de exportaciones|Export limit/i.test(m)){
+        alert('Wise alcanzó el límite de exportaciones de la cuenta. Esperá unos minutos y probá de nuevo.');
+      } else if(/Timeout|tardando/i.test(m)){
+        alert('Wise tardó demasiado en generar el reporte. Probá con un rango más corto (por ejemplo una semana).');
+      } else {
+        alert('No se pudo sincronizar: ' + m);
+      }
+    } else if(errores.length){
+      btn.innerHTML = '<i class="ti ti-check"></i> ' + guardadas + ' actualizadas';
+      alert('Se sincronizaron ' + guardadas + ' encuestas.\n\nEstos tramos no se pudieron traer (volvé a sincronizar solo esas fechas):\n'
+            + errores.map(e => '• ' + e.rango).join('\n'));
+    } else {
+      btn.innerHTML = '<i class="ti ti-check"></i> ' + guardadas + ' actualizadas';
+    }
+    setTimeout(()=>{ btn.innerHTML = orig; btn.disabled = false; }, 3000);
   }catch(err){
     console.error(err);
-    const m = String(err.message||'');
+    const m = String(err.message || '');
     if(/no autorizado|401|clave/i.test(m)) sessionStorage.removeItem('sync_key');
     btn.innerHTML = '<i class="ti ti-alert-triangle"></i> Error';
-    if(/REPORT_LIMIT_EXCEEDED|límite de exportaciones|Export limit/i.test(m)){
-      alert('Wise alcanzó el límite de exportaciones de la cuenta. Esperá unos minutos.');
-    } else if(/Timeout|tardando/i.test(m)){
-      alert('Wise tardó demasiado en generar el reporte (más de ~1 minuto). Probá de nuevo en un momento.');
-    } else {
-      alert('No se pudo sincronizar: ' + m);
-    }
-    setTimeout(()=>{ btn.innerHTML = orig; btn.disabled=false; }, 2500);
+    alert('No se pudo sincronizar: ' + m);
+    setTimeout(()=>{ btn.innerHTML = orig; btn.disabled = false; }, 2500);
   }
 }
 
