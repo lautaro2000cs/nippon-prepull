@@ -1,43 +1,27 @@
 // ============================================================
 //  /api/sync-encuestas.js
-//  Vercel Serverless Function (Node.js)
+//  Vercel Serverless Function (Node.js) — VERSIÓN SIMPLE (un solo tiro)
 //
-//  Flujo:
-//   1) GET  /authenticate          -> obtiene token JWT (dura 1h)
+//  Flujo (igual que cuando funcionaba):
+//   1) GET  /authenticate          -> token JWT (dura 1h)
 //   2) POST /analytics/export/{id} -> inicia la exportación del reporte
-//   3) GET  /analytics/export/{export_id}/status -> espera a que termine
-//   4) descarga report_url (CSV o JSON) con las encuestas
-//   5) parsea, detecta columnas de puntuación, y hace upsert en Supabase
+//   3) GET  /analytics/export/{id}/status -> espera a que termine
+//   4) descarga report_url (ZIP->CSV o JSON) con las encuestas
+//   5) parsea, detecta columnas, y hace upsert en Supabase (por wise_id)
 //
-//  DOS MODOS DE USO:
-//   A) Cron / una sola pasada (sin ?action): inicia, espera y guarda todo
-//      en la misma invocación. Sirve para el cron diario (lote chico de 7 días).
-//   B) Manual desde la web, EN DOS FASES, para no chocar con el límite de
-//      tiempo de Vercel cuando Wise tarda en generar el reporte:
-//        - ?action=start            -> inicia el export y devuelve export_id
-//        - ?action=status&export_id -> consulta UNA vez; si está listo,
-//                                       descarga + guarda; si no, "pending".
-//      El navegador repite la fase status cada pocos segundos. Así cada
-//      llamada es corta y Wise puede tardar minutos sin cortar nada.
-//
-//  Se dispara por el Vercel Cron (ver vercel.json) o manualmente con
-//  ?key=TU_SECRETO.
+//  Se dispara por el Vercel Cron (ver vercel.json) o manualmente con ?key=SECRETO.
+//  Rango por defecto: últimos 7 días (se puede pasar ?date_from=&date_to=).
 // ============================================================
 
 const crypto = require("crypto");
 const WISE_BASE = "https://api.wcx.cloud/core/v1";
 const REPORT_ID = process.env.WISE_REPORT_ID || "240327"; // reporte "Respuestas de Encuestas"
 
-// Tope de duración de la función (Vercel). Cada invocación individual es corta,
-// pero lo dejamos explícito por las dudas.
 export const config = { maxDuration: 60 };
 
 // --- helpers -------------------------------------------------
-
-// pausa N ms
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// headers comunes: x-api-key SIEMPRE + Bearer cuando ya tenemos token
 function wiseHeaders(token) {
   const h = {
     "x-api-key": process.env.WISE_API_KEY,
@@ -47,103 +31,66 @@ function wiseHeaders(token) {
   return h;
 }
 
-// 1) Autenticación -> devuelve el token JWT
-// Según la doc de Wise CX: GET /authenticate?user=USUARIO
-// con la cabecera x-api-key. NO lleva body.
+// 1) Autenticación -> token JWT
 async function autenticar() {
   const url = `${WISE_BASE}/authenticate?user=${encodeURIComponent(process.env.WISE_USER)}`;
-  const res = await fetch(url, {
-    method: "GET",
-    headers: wiseHeaders(null),
-  });
-
+  const res = await fetch(url, { method: "GET", headers: wiseHeaders(null) });
   const txt = await res.text();
-  if (!res.ok) {
-    throw new Error(`authenticate falló (${res.status}): ${txt}`);
-  }
+  if (!res.ok) throw new Error(`authenticate falló (${res.status}): ${txt}`);
   let data = {};
-  try { data = JSON.parse(txt); } catch { /* por si devuelve texto plano */ }
-
-  // el token puede venir con distintos nombres según la versión
-  const token =
-    data.token || data.jwt || data.access_token || data.accessToken || txt.trim();
+  try { data = JSON.parse(txt); } catch { /* texto plano */ }
+  const token = data.token || data.jwt || data.access_token || data.accessToken || txt.trim();
   if (!token) throw new Error("No se recibió token en /authenticate: " + txt);
   return token;
 }
 
-// 2) Inicia la exportación del reporte -> devuelve export_id
+// 2) Inicia la exportación del reporte -> export_id
 async function iniciarExport(token, dateFrom, dateTo) {
-  // Body base: todas las columnas del reporte
   const body = { columns: "all" };
-  // Si la web mandó un rango, lo pasamos como filtro (Wise filtra por
-  // fecha de ENVÍO / survey_sent_date). Si no, el reporte usa su filtro propio.
-  if (dateFrom && dateTo) {
-    body.filter = { date_from: dateFrom, date_to: dateTo };
-  }
+  if (dateFrom && dateTo) body.filter = { date_from: dateFrom, date_to: dateTo };
 
   const res = await fetch(`${WISE_BASE}/analytics/export/${REPORT_ID}`, {
     method: "POST",
     headers: wiseHeaders(token),
     body: JSON.stringify(body),
   });
-
   const txt = await res.text();
   if (!res.ok) throw new Error(`export falló (${res.status}): ${txt}`);
 
-  // Wise a veces devuelve un error en texto plano (no JSON). Lo detectamos
-  // para mostrar un mensaje claro en vez de "Unexpected token".
   let data;
-  try {
-    data = JSON.parse(txt);
-  } catch (e) {
-    throw new Error(`Wise respondió algo inesperado (no es JSON): ${txt.slice(0, 300)}`);
-  }
+  try { data = JSON.parse(txt); }
+  catch (e) { throw new Error(`Wise respondió algo inesperado (no es JSON): ${txt.slice(0, 300)}`); }
   const exportId = data.export_id || data.id || data.exportId;
   if (!exportId) throw new Error("No se recibió export_id: " + txt);
-  // devolvemos también el crudo para diagnóstico
   return { exportId, raw: txt };
 }
 
-// Consulta UNA sola vez el estado del export.
-// Devuelve { listo, estado, url, notFound, fallo }.
+// Consulta UNA vez el estado del export.
 async function chequearEstado(token, exportId) {
-  const res = await fetch(
-    `${WISE_BASE}/analytics/export/${exportId}/status`,
-    { method: "GET", headers: wiseHeaders(token) }
-  );
+  const res = await fetch(`${WISE_BASE}/analytics/export/${exportId}/status`,
+    { method: "GET", headers: wiseHeaders(token) });
   const txt = await res.text();
-
   if (!res.ok) {
-    // EXPORT_NOT_FOUND = Wise todavía no registró el export -> seguimos esperando
     if (txt.includes("EXPORT_NOT_FOUND")) return { listo: false, notFound: true, estado: "not_found" };
     throw new Error(`status falló (${res.status}): ${txt}`);
   }
-
   const data = JSON.parse(txt);
   const estado = String(data.status || "").toLowerCase();
   const url = data.report_url || data.url || data.download_url;
-
   if (["failed", "error", "cancelled", "canceled", "expired"].includes(estado)) {
     return { listo: false, fallo: true, estado, raw: txt };
   }
-  // Si ya hay URL de descarga, está listo aunque el status no esté en la lista.
   if (url || ["done", "completed", "finished", "success", "ok", "ready", "available"].includes(estado)) {
     return { listo: true, estado, url };
   }
   return { listo: false, estado: estado || "processing" };
 }
 
-// 3) (modo una-pasada / cron) Consulta el estado hasta que termine -> report_url
+// 3) Espera hasta que termine -> report_url (dentro del límite de 60s de Vercel)
 async function esperarReporte(token, exportId) {
-  // OJO: Vercel corta la función a los 60s. Ajustamos la espera para
-  // maximizar el tiempo útil dentro de ese límite. (Para rangos grandes
-  // conviene el modo en dos fases: ?action=start + ?action=status.)
-  const MAX_INTENTOS = 16;   // 16 intentos
-  const ESPERA_MS = 3000;    // cada 3s
-
-  // espera inicial: Wise necesita unos segundos para registrar el export
-  await sleep(3000);
-
+  const MAX_INTENTOS = 16;
+  const ESPERA_MS = 3000;
+  await sleep(3000); // Wise tarda unos segundos en registrar el export
   for (let i = 0; i < MAX_INTENTOS; i++) {
     const est = await chequearEstado(token, exportId);
     if (est.fallo) throw new Error("La exportación falló en Wise: " + (est.raw || est.estado));
@@ -156,28 +103,14 @@ async function esperarReporte(token, exportId) {
   throw new Error("Timeout esperando la exportación de Wise.");
 }
 
-// 4) Descarga el archivo del reporte y lo convierte a filas.
-// Wise entrega un ZIP que contiene el CSV adentro, así que primero
-// detectamos el ZIP, extraemos el CSV y recién ahí parseamos.
+// 4) Descarga el archivo (ZIP->CSV o JSON) y lo convierte a filas.
 async function descargarFilas(reportUrl) {
   const res = await fetch(reportUrl);
   if (!res.ok) throw new Error(`descarga falló (${res.status})`);
-
-  // leemos como binario (puede ser ZIP)
   const buf = Buffer.from(await res.arrayBuffer());
-
-  // firma de ZIP: los primeros 2 bytes son 'P' 'K' (0x50 0x4B)
   const esZip = buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b;
-
-  let texto;
-  if (esZip) {
-    texto = extraerCSVdeZip(buf);
-  } else {
-    texto = buf.toString("utf8");
-  }
-
+  let texto = esZip ? extraerCSVdeZip(buf) : buf.toString("utf8");
   const t = texto.trim();
-  // ¿es JSON?
   if (t.startsWith("[") || t.startsWith("{")) {
     const j = JSON.parse(t);
     if (Array.isArray(j)) return j;
@@ -185,75 +118,51 @@ async function descargarFilas(reportUrl) {
     if (Array.isArray(j.rows)) return j.rows;
     return [];
   }
-  // si no, es CSV
   return parseCSV(t);
 }
 
-// Extrae el primer archivo (el CSV) de un buffer ZIP, sin dependencias externas.
 function extraerCSVdeZip(buf) {
   const zlib = require("zlib");
   let offset = 0;
-
   while (offset + 4 <= buf.length) {
     const sig = buf.readUInt32LE(offset);
-    // 0x04034b50 = Local File Header (inicio de un archivo dentro del ZIP)
     if (sig !== 0x04034b50) break;
-
-    const metodo = buf.readUInt16LE(offset + 8);       // 0=stored, 8=deflate
-    const compSize = buf.readUInt32LE(offset + 18);    // tamaño comprimido
-    const nameLen = buf.readUInt16LE(offset + 26);     // largo del nombre
-    const extraLen = buf.readUInt16LE(offset + 28);    // largo del campo extra
-
+    const metodo = buf.readUInt16LE(offset + 8);
+    const compSize = buf.readUInt32LE(offset + 18);
+    const nameLen = buf.readUInt16LE(offset + 26);
+    const extraLen = buf.readUInt16LE(offset + 28);
     const nombre = buf.toString("utf8", offset + 30, offset + 30 + nameLen);
     const dataStart = offset + 30 + nameLen + extraLen;
     const dataEnd = dataStart + compSize;
     const comprimido = buf.subarray(dataStart, dataEnd);
-
     let contenido;
-    if (metodo === 0) {
-      contenido = comprimido;                          // sin compresión
-    } else if (metodo === 8) {
-      contenido = zlib.inflateRawSync(comprimido);     // deflate
-    } else {
-      // método desconocido: pasamos a la siguiente entrada
-      offset = dataEnd;
-      continue;
-    }
-
-    // nos quedamos con el primer archivo que parezca CSV (o el primero a secas)
+    if (metodo === 0) contenido = comprimido;
+    else if (metodo === 8) contenido = zlib.inflateRawSync(comprimido);
+    else { offset = dataEnd; continue; }
     if (nombre.toLowerCase().endsWith(".csv") || !nombre.includes("/")) {
       return contenido.toString("utf8");
     }
     offset = dataEnd;
   }
-
   throw new Error("No se pudo extraer el CSV del ZIP de Wise.");
 }
 
-// parser CSV simple pero que respeta comillas y comas internas
 function parseCSV(texto) {
   const lineas = texto.split(/\r?\n/).filter((l) => l.length > 0);
   if (lineas.length === 0) return [];
-
   const parseLinea = (linea) => {
-    const out = [];
-    let cur = "";
-    let dentroComillas = false;
+    const out = []; let cur = ""; let dentroComillas = false;
     for (let i = 0; i < linea.length; i++) {
       const c = linea[i];
       if (c === '"') {
         if (dentroComillas && linea[i + 1] === '"') { cur += '"'; i++; }
         else dentroComillas = !dentroComillas;
-      } else if ((c === "," || c === ";") && !dentroComillas) {
-        out.push(cur); cur = "";
-      } else {
-        cur += c;
-      }
+      } else if ((c === "," || c === ";") && !dentroComillas) { out.push(cur); cur = ""; }
+      else { cur += c; }
     }
     out.push(cur);
     return out;
   };
-
   const headers = parseLinea(lineas[0]).map((h) => h.trim());
   const filas = [];
   for (let i = 1; i < lineas.length; i++) {
@@ -268,21 +177,15 @@ function parseCSV(texto) {
 // ------------------------------------------------------------
 //  Detección automática de campos (a prueba de renombres)
 // ------------------------------------------------------------
-
-// busca la primera clave del objeto cuyo nombre "contenga" alguno de los términos
 function buscarClave(obj, terminos) {
   const claves = Object.keys(obj);
   for (const t of terminos) {
     const found = claves.find((k) =>
-      k.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
-        .includes(t)
-    );
+      k.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes(t));
     if (found) return found;
   }
   return null;
 }
-
-// Busca una clave cuyo nombre contenga TODAS las palabras dadas
 function claveConPalabras(obj, palabras) {
   const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   return Object.keys(obj).find((k) => {
@@ -290,46 +193,34 @@ function claveConPalabras(obj, palabras) {
     return palabras.every((p) => nk.includes(norm(p)));
   }) || null;
 }
-
-// Convierte un valor de celda a número 0-10, o null si no aplica (ej "S/D")
 function aNota(v) {
   if (v == null) return null;
   const s = String(v).trim().replace(",", ".");
-  if (s === "" || /^s\/?d$/i.test(s)) return null; // "S/D" = sin dato
+  if (s === "" || /^s\/?d$/i.test(s)) return null;
   const n = Number(s);
   return (!isNaN(n) && n >= 0 && n <= 10) ? n : null;
 }
-
-// Busca en la fila la columna cuyo NOMBRE contenga TODAS las palabras dadas
 function notaPorPalabras(fila, palabras) {
   const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   for (const [k, v] of Object.entries(fila)) {
     const nk = norm(k);
-    if (palabras.every((p) => nk.includes(norm(p)))) {
-      return aNota(v);
-    }
+    if (palabras.every((p) => nk.includes(norm(p)))) return aNota(v);
   }
   return null;
 }
-
-// Extrae las notas de cada pregunta identificándolas por palabras clave únicas
 function extraerPreguntas(fila) {
   return {
-    // --- las 5 del promedio del asesor ---
     p_amabilidad:  notaPorPalabras(fila, ["amabilidad"]),
     p_atencion:    notaPorPalabras(fila, ["atencion", "solicitudes"]),
     p_puntualidad: notaPorPalabras(fila, ["puntualidad"]),
     p_explicacion: notaPorPalabras(fila, ["explicacion"]),
     p_limpieza:    notaPorPalabras(fila, ["limpieza"]),
-    // --- otras preguntas (se muestran pero no cuentan al promedio) ---
     p_turnos:      notaPorPalabras(fila, ["facilidad", "turnos"]),
     p_espera:      notaPorPalabras(fila, ["tiempo", "espera"]),
     p_calidad:     notaPorPalabras(fila, ["calidad", "servicio", "prestado"]),
     p_recomienda:  notaPorPalabras(fila, ["recomiende"]),
   };
 }
-
-// Busca el comentario libre del cliente
 function extraerComentario(fila) {
   const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   for (const [k, v] of Object.entries(fila)) {
@@ -340,8 +231,6 @@ function extraerComentario(fila) {
   }
   return null;
 }
-
-// Busca el campo "¿el vehículo quedó funcionando correctamente?" (SI/NO)
 function extraerFunciono(fila) {
   const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   for (const [k, v] of Object.entries(fila)) {
@@ -353,48 +242,35 @@ function extraerFunciono(fila) {
   return null;
 }
 
-// convierte una fila cruda de Wise en el registro que guardamos en Supabase
-function mapearFila(fila, idx) {
+// convierte una fila cruda de Wise en el registro de Supabase
+function mapearFila(fila) {
   const kAsesor   = buscarClave(fila, ["agente", "asesor", "usuario", "user"]);
   const kSucursal = buscarClave(fila, ["sucursal", "branch"]);
   const kServicio = buscarClave(fila, ["servicio", "service"]);
   const kDominio  = buscarClave(fila, ["dominio", "patente", "domain"]);
   const kEmpresa  = buscarClave(fila, ["empresa", "telefono", "phone", "cliente", "nombre"]);
   const kTelefono = claveConPalabras(fila, ["contacto", "telefono"]) || buscarClave(fila, ["telefono", "phone", "celular"]);
-  // N° de Orden (viene de Wise como "Contacto: N° orden").
   const _claves = Object.keys(fila);
-  const _norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+  const _norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const kNroOrden =
-    _claves.find(k => { const n=_norm(k); return n.includes("orden") && !n.includes("grupo") && (n.includes("n° orden")||n.includes("n orden")||n.includes("nro")); })
-    || _claves.find(k => { const n=_norm(k); return n.includes("contacto") && n.includes("orden") && !n.includes("grupo"); })
+    _claves.find(k => { const n = _norm(k); return n.includes("orden") && !n.includes("grupo") && (n.includes("n° orden") || n.includes("n orden") || n.includes("nro")); })
+    || _claves.find(k => { const n = _norm(k); return n.includes("contacto") && n.includes("orden") && !n.includes("grupo"); })
     || null;
   const kEncuesta = buscarClave(fila, ["encuesta", "survey"]);
-  const kId       = buscarClave(fila, ["id", "caso", "case", "#"]);
 
-  // Fechas: buscamos por separado la de RESPUESTA y la de ENVÍO.
-  const kFechaResp  = claveConPalabras(fila, ["fecha", "respuesta"])
-                   || claveConPalabras(fila, ["response", "date"]);
-  const kFechaEnvio = claveConPalabras(fila, ["fecha", "envio"])
-                   || claveConPalabras(fila, ["survey", "sent"])
-                   || claveConPalabras(fila, ["fecha", "creado"]);
+  const kFechaResp  = claveConPalabras(fila, ["fecha", "respuesta"]) || claveConPalabras(fila, ["response", "date"]);
+  const kFechaEnvio = claveConPalabras(fila, ["fecha", "envio"]) || claveConPalabras(fila, ["survey", "sent"]) || claveConPalabras(fila, ["fecha", "creado"]);
   const kFecha = kFechaEnvio || buscarClave(fila, ["fecha", "date", "survey_sent", "created"]);
 
-  // extraer cada pregunta a su columna
   const preguntas = extraerPreguntas(fila);
-
-  // promedio del asesor = promedio de las 5 preguntas que le corresponden
   const cincoDelAsesor = [
-    preguntas.p_amabilidad,
-    preguntas.p_atencion,
-    preguntas.p_puntualidad,
-    preguntas.p_explicacion,
-    preguntas.p_limpieza,
+    preguntas.p_amabilidad, preguntas.p_atencion, preguntas.p_puntualidad,
+    preguntas.p_explicacion, preguntas.p_limpieza,
   ].filter((n) => n != null);
   const promedioAsesor = cincoDelAsesor.length
     ? Math.round((cincoDelAsesor.reduce((a, b) => a + b, 0) / cincoDelAsesor.length) * 100) / 100
     : null;
 
-  // wise_id: UNA ORDEN = UNA ENCUESTA (clave estable entre corridas)
   const ordenRaw = kNroOrden ? fila[kNroOrden] : null;
   const domRaw   = kDominio  ? fila[kDominio]  : null;
   const envioRaw = kFecha    ? fila[kFecha]    : null;
@@ -402,56 +278,44 @@ function mapearFila(fila, idx) {
   const normId = (v) => String(v ?? "").trim().toLowerCase();
 
   let claveId;
-  if (ordenRaw && String(ordenRaw).trim()) {
-    claveId = "ord|" + normId(ordenRaw);
-  } else {
-    claveId = "sin-orden|" + normId(domRaw) + "|" + normId(envioRaw) + "|" + normId(respRaw);
-  }
+  if (ordenRaw && String(ordenRaw).trim()) claveId = "ord|" + normId(ordenRaw);
+  else claveId = "sin-orden|" + normId(domRaw) + "|" + normId(envioRaw) + "|" + normId(respRaw);
   const wiseId = "enc_" + crypto.createHash("md5").update(claveId).digest("hex");
 
-  // parseo de fechas tolerante
   const parseFecha = (val) => {
     if (!val) return null;
     const d = new Date(String(val).replace(" ", "T"));
     return isNaN(d.getTime()) ? null : d.toISOString();
   };
-  const fecha          = parseFecha(kFecha       && fila[kFecha]);
-  const fechaRespuesta = parseFecha(kFechaResp   && fila[kFechaResp]);
 
   return {
     wise_id: wiseId,
-    fecha,
-    fecha_respuesta: fechaRespuesta,
-    asesor:    kAsesor   ? fila[kAsesor]   : null,
-    // las 9 preguntas en columnas separadas
+    fecha: parseFecha(kFecha && fila[kFecha]),
+    fecha_respuesta: parseFecha(kFechaResp && fila[kFechaResp]),
+    asesor: kAsesor ? fila[kAsesor] : null,
     ...preguntas,
-    // el promedio del asesor (5 preguntas) y el comentario
     promedio_asesor: promedioAsesor,
     comentario: extraerComentario(fila),
     funciono_ok: extraerFunciono(fila),
-    // compatibilidad: mantenemos puntuacion_prom apuntando al nuevo promedio
     puntuacion_prom: promedioAsesor,
     puntuacion: promedioAsesor,
-    sucursal:  kSucursal ? fila[kSucursal] : null,
-    servicio:  kServicio ? fila[kServicio] : null,
-    dominio:   kDominio  ? fila[kDominio]  : null,
-    telefono:  kTelefono ? fila[kTelefono] : null,
+    sucursal: kSucursal ? fila[kSucursal] : null,
+    servicio: kServicio ? fila[kServicio] : null,
+    dominio: kDominio ? fila[kDominio] : null,
+    telefono: kTelefono ? fila[kTelefono] : null,
     nro_orden: kNroOrden ? fila[kNroOrden] : null,
-    empresa:   kEmpresa  ? fila[kEmpresa]  : null,
-    encuesta:  kEncuesta ? fila[kEncuesta] : null,
+    empresa: kEmpresa ? fila[kEmpresa] : null,
+    encuesta: kEncuesta ? fila[kEncuesta] : null,
     raw: fila,
     sincronizado_en: new Date().toISOString(),
   };
 }
 
-// Limpia recursivamente los caracteres nulos que Postgres no acepta
 function limpiarNulos(valor) {
   if (typeof valor === "string") {
     return valor.replace(/\u0000/g, "").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
   }
-  if (Array.isArray(valor)) {
-    return valor.map(limpiarNulos);
-  }
+  if (Array.isArray(valor)) return valor.map(limpiarNulos);
   if (valor && typeof valor === "object") {
     const out = {};
     for (const [k, v] of Object.entries(valor)) out[k] = limpiarNulos(v);
@@ -460,8 +324,7 @@ function limpiarNulos(valor) {
   return valor;
 }
 
-// ¿La encuesta fue respondida?
-function esRespondida(registro){
+function esRespondida(registro) {
   const raw = registro.raw || {};
   for (const [k, v] of Object.entries(raw)) {
     const nk = k.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -474,11 +337,9 @@ function esRespondida(registro){
   return registro.promedio_asesor != null;
 }
 
-// 5) Upsert a Supabase vía REST
+// 5) Upsert a Supabase vía REST (merge por wise_id)
 async function guardarEnSupabase(registros) {
   if (registros.length === 0) return { insertados: 0 };
-
-  // de-duplicar por wise_id quedándonos con la RESPUESTA MÁS RECIENTE
   const ordenados = registros.slice().sort((a, b) => {
     const fa = a.fecha_respuesta || a.fecha || "";
     const fb = b.fecha_respuesta || b.fecha || "";
@@ -486,17 +347,9 @@ async function guardarEnSupabase(registros) {
   });
   const porId = new Map();
   for (const r of ordenados) porId.set(r.wise_id, r);
-  registros = Array.from(porId.values());
+  registros = Array.from(porId.values()).map(limpiarNulos);
 
-  // limpieza en el objeto (byte nulo real y otros de control)
-  registros = registros.map(limpiarNulos);
-
-  // limpieza del TEXTO final (byte nulo real + secuencia escapada "\u0000")
-  let payload = JSON.stringify(registros);
-  payload = payload
-    .replace(/\\u0000/g, "")
-    .replace(/\u0000/g, "");
-
+  let payload = JSON.stringify(registros).replace(/\\u0000/g, "").replace(/\u0000/g, "");
   const url = `${process.env.SUPABASE_URL}/rest/v1/encuestas?on_conflict=wise_id`;
   const res = await fetch(url, {
     method: "POST",
@@ -508,86 +361,20 @@ async function guardarEnSupabase(registros) {
     },
     body: payload,
   });
-
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`Supabase upsert falló (${res.status}): ${t}`);
-  }
+  if (!res.ok) throw new Error(`Supabase upsert falló (${res.status}): ${await res.text()}`);
   return { insertados: registros.length };
 }
 
-// --- app_config (Supabase): recordar la última exportación para reutilizarla ---
-// Evita pedir una exportación nueva en cada intento (Wise limita por cuenta).
-async function leerConfig(clave){
-  try{
-    const url = `${process.env.SUPABASE_URL}/rest/v1/app_config?clave=eq.${encodeURIComponent(clave)}&select=valor`;
-    const res = await fetch(url, { headers: {
-      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY,
-    }});
-    if(!res.ok) return null;
-    const arr = await res.json();
-    return (arr && arr[0] && arr[0].valor) ? arr[0].valor : null;
-  }catch(e){ return null; }
-}
-async function guardarConfig(clave, valor){
-  try{
-    const url = `${process.env.SUPABASE_URL}/rest/v1/app_config?on_conflict=clave`;
-    // IMPORTANTE: incluir actualizado_en/por como hace la web; si esas columnas
-    // son NOT NULL y las omitimos, la escritura falla y el enfriamiento no se
-    // guarda (cada sync volvería a crear un export y agotaría el cupo de Wise).
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates,return=minimal",
-      },
-      body: JSON.stringify([{ clave, valor, actualizado_en: new Date().toISOString(), actualizado_por: "sync-encuestas" }]),
-    });
-    if(!res.ok){ console.warn("guardarConfig falló:", res.status, await res.text()); }
-  }catch(e){ console.warn("guardarConfig error:", e.message); }
-}
-
-// Descarga las filas del reporte, mapea, filtra respondidas y guarda en Supabase.
-// (compartido por el modo una-pasada y por la fase "status" del modo en 2 fases)
-async function descargarMapearYGuardar(reportUrl) {
-  const filas = await descargarFilas(reportUrl);
-  let registros = filas.map(mapearFila);
-  const antesDeFiltrar = registros.length;
-  registros = registros.filter(esRespondida);
-  const respondidasCrudas = registros.length;
-  const idsUnicos = new Set(registros.map(r => r.wise_id)).size;
-  const sinNroOrden = registros.filter(r => !r.nro_orden || !String(r.nro_orden).trim()).length;
-  const r = await guardarEnSupabase(registros);
-  return {
-    filas_recibidas: antesDeFiltrar,
-    respondidas: respondidasCrudas,
-    ids_unicos: idsUnicos,
-    colapsadas_por_orden_repetida: respondidasCrudas - idsUnicos,
-    sin_nro_orden: sinNroOrden,
-    registros_guardados: r.insertados,
-    muestra: registros.slice(0, 2),
-  };
-}
-
 // ------------------------------------------------------------
-//  Handler principal
+//  Handler principal — UN SOLO TIRO
 // ------------------------------------------------------------
 export default async function handler(req, res) {
-  // Protección: solo corre si viene del cron de Vercel o con el secreto correcto
   const esCron = req.headers["x-vercel-cron"] === "1";
   const keyOk = req.query.key && req.query.key === process.env.SYNC_SECRET;
-  if (!esCron && !keyOk) {
-    return res.status(401).json({ ok: false, error: "No autorizado" });
-  }
-
-  const action = String(req.query.action || "").toLowerCase();
+  if (!esCron && !keyOk) return res.status(401).json({ ok: false, error: "No autorizado" });
 
   try {
-    // Rango de fechas (por fecha de ENVÍO). Formato yyyy-MM-dd.
-    // Si no vienen, se usan "últimos 7 días" (lote chico para el cron).
+    // Rango por fecha de ENVÍO (yyyy-MM-dd). Default: últimos 7 días.
     let dateFrom = req.query.date_from || null;
     let dateTo   = req.query.date_to   || null;
     if (!dateFrom || !dateTo) {
@@ -598,98 +385,13 @@ export default async function handler(req, res) {
       dateFrom = hace7.toISOString().slice(0, 10);
     }
 
-    // ===== FASE 1 (manual): iniciar export y devolver export_id al toque =====
-    if (action === "start") {
-      const AHORA = Date.now();
-      const fresh = req.query.fresh === "1";   // fuerza exportación nueva (ignora el cache)
-      const cache = await leerConfig("wise_last_export");
-
-      // Si hay una exportación reciente del MISMO rango (< 10 min), la reutilizamos
-      // en vez de pedir una nueva. Esto evita gastar el cupo de Wise con reintentos.
-      // Con fresh=1 NO reutilizamos (sirve para recuperarse de un export caído/vencido).
-      if (!fresh && cache && cache.export_id &&
-          cache.date_from === dateFrom && cache.date_to === dateTo &&
-          cache.ts && (AHORA - cache.ts) < 10 * 60 * 1000) {
-        return res.status(200).json({
-          ok: true, phase: "started", export_id: cache.export_id, reutilizado: true,
-          rango_pedido: { date_from: dateFrom, date_to: dateTo },
-        });
-      }
-
-      // Enfriamiento: no crear una exportación nueva si se creó una hace muy poco.
-      // Protege el cupo de Wise de los clicks repetidos. (fresh igual lo respeta.)
-      const COOLDOWN_MS = 8 * 60 * 1000;
-      if (cache && cache.ts && (AHORA - cache.ts) < COOLDOWN_MS) {
-        const faltan = Math.ceil((COOLDOWN_MS - (AHORA - cache.ts)) / 60000);
-        // si todavía tenemos el export anterior, lo devolvemos para poder descargarlo
-        if (cache.export_id) {
-          return res.status(200).json({
-            ok: true, phase: "started", export_id: cache.export_id, reutilizado: true,
-            rango_pedido: { date_from: cache.date_from, date_to: cache.date_to },
-          });
-        }
-        return res.status(200).json({
-          ok: false, phase: "cooldown",
-          error: "Se pidió un reporte hace muy poco. Esperá ~" + faltan + " min para no agotar el cupo de Wise.",
-        });
-      }
-
-      const token = await autenticar();
-      try {
-        const { exportId } = await iniciarExport(token, dateFrom, dateTo);
-        await guardarConfig("wise_last_export", {
-          export_id: exportId, date_from: dateFrom, date_to: dateTo, ts: AHORA,
-        });
-        return res.status(200).json({
-          ok: true, phase: "started", export_id: exportId,
-          rango_pedido: { date_from: dateFrom, date_to: dateTo },
-        });
-      } catch (e) {
-        const msg = String(e.message || e);
-        // Si Wise rechaza por límite de cuenta, reutilizamos la última exportación
-        // conocida (aunque sea de otro rango) para poder al menos descargar algo.
-        if (msg.includes("REPORT_LIMIT_EXCEEDED") && cache && cache.export_id) {
-          return res.status(200).json({
-            ok: true, phase: "started", export_id: cache.export_id, reutilizado: true,
-            aviso: "Wise alcanzó su límite de exportaciones; se reutilizó la última.",
-            rango_pedido: { date_from: cache.date_from, date_to: cache.date_to },
-          });
-        }
-        throw e;
-      }
-    }
-
-    // ===== FASE 2 (manual): consultar estado; si está listo, descargar+guardar =====
-    if (action === "status") {
-      const exportId = req.query.export_id;
-      if (!exportId) return res.status(400).json({ ok: false, error: "Falta export_id" });
-      const token = await autenticar();
-      const est = await chequearEstado(token, exportId);
-
-      if (est.fallo) {
-        return res.status(200).json({ ok: false, phase: "failed", error: "La exportación falló en Wise." });
-      }
-      if (!est.listo) {
-        // notFound = el export no existe en Wise (vencido o nunca se registró).
-        // Lo informamos aparte para que el navegador pueda reintentar con uno nuevo.
-        return res.status(200).json({ ok: true, phase: est.notFound ? "notfound" : "pending", status: est.estado });
-      }
-      if (!est.url) {
-        return res.status(200).json({ ok: false, phase: "failed", error: "Reporte listo pero sin URL de descarga." });
-      }
-      const resumen = await descargarMapearYGuardar(est.url);
-      return res.status(200).json({ ok: true, phase: "done", ...resumen });
-    }
-
-    // ===== MODO UNA-PASADA (cron o compatibilidad): inicia, espera y guarda =====
     const token = await autenticar();
     const { exportId, raw: exportRaw } = await iniciarExport(token, dateFrom, dateTo);
 
-    // modo diagnóstico: ?debug=1 (muestra qué devolvió el export, sin esperar)
+    // ?debug=1 -> muestra qué devolvió el export, sin esperar
     if (req.query.debug === "1") {
       return res.status(200).json({
-        ok: true,
-        modo: "debug",
+        ok: true, modo: "debug",
         rango_pedido: { date_from: dateFrom, date_to: dateTo },
         export_id_detectado: exportId,
         respuesta_cruda_del_export: exportRaw,
@@ -699,39 +401,10 @@ export default async function handler(req, res) {
     const reportUrl = await esperarReporte(token, exportId);
     const filas = await descargarFilas(reportUrl);
 
-    // debug de columnas / orden (igual que antes)
-    if (req.query.debug === "orden") {
-      const cols = filas.length ? Object.keys(filas[0]) : [];
-      const resumen = cols.map(c => {
-        let conDato = 0; const ejemplos = [];
-        for (const f of filas) {
-          const v = (f[c] ?? "").toString().trim();
-          if (v) { conDato++; if (ejemplos.length < 3) ejemplos.push(v); }
-        }
-        return { columna: c, filas_con_dato: conDato, ejemplos };
-      }).filter(x => x.filas_con_dato > 0);
-      resumen.sort((a,b)=>{
-        const oa = /orden/i.test(a.columna)?1:0, ob = /orden/i.test(b.columna)?1:0;
-        if(oa!==ob) return ob-oa;
-        return b.filas_con_dato - a.filas_con_dato;
-      });
-      return res.status(200).json({ ok:true, modo:"debug-orden", total_filas:filas.length, columnas_con_datos:resumen });
-    }
-
+    // ?debug=cols -> lista las columnas detectadas
     if (req.query.debug === "cols") {
       const cols = filas.length ? Object.keys(filas[0]) : [];
-      const kTel = filas.length
-        ? (claveConPalabras(filas[0], ["contacto", "telefono"]) ||
-           buscarClave(filas[0], ["telefono", "phone", "celular"]))
-        : null;
-      return res.status(200).json({
-        ok: true,
-        modo: "debug-columnas",
-        total_columnas: cols.length,
-        columnas: cols,
-        columna_telefono_detectada: kTel,
-        ejemplo_valor_telefono: kTel && filas[0] ? filas[0][kTel] : null,
-      });
+      return res.status(200).json({ ok: true, modo: "debug-columnas", total_columnas: cols.length, columnas: cols });
     }
 
     let registros = filas.map(mapearFila);
@@ -739,7 +412,6 @@ export default async function handler(req, res) {
     registros = registros.filter(esRespondida);
     const respondidasCrudas = registros.length;
     const idsUnicos = new Set(registros.map(r => r.wise_id)).size;
-    const sinNroOrden = registros.filter(r => !r.nro_orden || !String(r.nro_orden).trim()).length;
 
     const r = await guardarEnSupabase(registros);
 
@@ -749,8 +421,6 @@ export default async function handler(req, res) {
       filas_recibidas: antesDeFiltrar,
       respondidas: respondidasCrudas,
       ids_unicos: idsUnicos,
-      colapsadas_por_orden_repetida: respondidasCrudas - idsUnicos,
-      sin_nro_orden: sinNroOrden,
       registros_guardados: r.insertados,
       muestra: registros.slice(0, 2),
     });
