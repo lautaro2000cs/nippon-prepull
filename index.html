@@ -5795,11 +5795,18 @@ async function sincronizarEncuestas(){
     }
     const base = '/api/sync-encuestas?key=' + encodeURIComponent(key);
 
+    // Ventana corta para el pull manual (últimos N días). Si Wise aplica el
+    // filtro, el reporte es chico y rápido. El cron sigue trayendo 7 días.
+    const _hoy = new Date();
+    const _desde = new Date(_hoy); _desde.setDate(_desde.getDate() - 3);
+    const _d = (x)=>x.toISOString().slice(0,10);
+    const rango = '&date_from=' + _d(_desde) + '&date_to=' + _d(_hoy);
+
     // Pide a Wise generar el reporte y devuelve el export_id al toque.
     // fresh=1 fuerza una exportación NUEVA (ignora la que quedó cacheada).
     async function iniciar(fresh){
       setTxt(fresh ? 'Pidiendo a Wise (nuevo)…' : 'Pidiendo a Wise…');
-      const r = await fetch(base + '&action=start' + (fresh ? '&fresh=1' : ''));
+      const r = await fetch(base + '&action=start' + rango + (fresh ? '&fresh=1' : ''));
       const j = await r.json();
       if(!r.ok || !j.ok) throw new Error(j.error || ('HTTP '+r.status));
       if(!j.export_id) throw new Error('Wise no devolvió el export_id.');
