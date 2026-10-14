@@ -5780,80 +5780,38 @@ function toggleEncDetalle(rid){
 
 // Botón "Sincronizar" -> trae de Wise las respondidas de los últimos días
 // (el backend usa "últimos 7 días" cuando no le mandamos fechas) y recarga.
+// Sincronización en UNA sola llamada (como estaba antes): el backend inicia el
+// export, espera el reporte y guarda, todo en la misma invocación. Más simple.
 async function sincronizarEncuestas(){
   const btn = document.getElementById('enc-sync-btn');
   if(!btn) return;
   const orig = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Sincronizando…';
-  const setTxt = (t)=>{ btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> ' + t; };
   try{
     let key = sessionStorage.getItem('sync_key');
     if(!key){
       key = prompt('Clave de sincronización (SYNC_SECRET de Vercel):') || '';
       if(key) sessionStorage.setItem('sync_key', key);
     }
-    const base = '/api/sync-encuestas?key=' + encodeURIComponent(key);
-
-    // Ventana corta para el pull manual (últimos N días). Si Wise aplica el
-    // filtro, el reporte es chico y rápido. El cron sigue trayendo 7 días.
-    const _hoy = new Date();
-    const _desde = new Date(_hoy); _desde.setDate(_desde.getDate() - 3);
-    const _d = (x)=>x.toISOString().slice(0,10);
-    const rango = '&date_from=' + _d(_desde) + '&date_to=' + _d(_hoy);
-
-    // Pide a Wise generar el reporte y devuelve el export_id al toque.
-    // fresh=1 fuerza una exportación NUEVA (ignora la que quedó cacheada).
-    async function iniciar(fresh){
-      setTxt(fresh ? 'Pidiendo a Wise (nuevo)…' : 'Pidiendo a Wise…');
-      const r = await fetch(base + '&action=start' + rango + (fresh ? '&fresh=1' : ''));
-      const j = await r.json();
-      if(!r.ok || !j.ok) throw new Error(j.error || ('HTTP '+r.status));
-      if(!j.export_id) throw new Error('Wise no devolvió el export_id.');
-      return j.export_id;
-    }
-
-    let exportId = await iniciar(false);
-
-    // Consultamos el estado cada pocos segundos hasta que esté listo.
-    // Si la exportación reutilizada está caída (notfound) o se traba demasiado,
-    // reintentamos UNA vez pidiendo una exportación nueva (fresh).
-    const TOPE_MS = 5 * 60 * 1000;   // el navegador espera hasta 5 minutos en total
-    let inicio = Date.now();
-    let guardadas = null, reinicioFresh = false;
-    while(Date.now() - inicio < TOPE_MS){
-      await new Promise(res => setTimeout(res, 4000));
-      const seg = Math.round((Date.now()-inicio)/1000);
-      setTxt('Procesando en Wise… ' + seg + 's');
-      const r2 = await fetch(base + '&action=status&export_id=' + encodeURIComponent(exportId));
-      const j2 = await r2.json();
-      if(j2.phase === 'done'){ guardadas = j2.registros_guardados ?? j2.respondidas ?? 0; break; }
-      if(j2.phase === 'failed' || j2.ok === false) throw new Error(j2.error || 'La exportación falló en Wise.');
-      // Recuperación SOLO si la exportación está caída (no existe en Wise). No
-      // reintentamos por lentitud, para no gastar el cupo de exportaciones.
-      if(j2.phase === 'notfound' && !reinicioFresh){
-        reinicioFresh = true;
-        setTxt('El reporte anterior venció. Pidiendo uno nuevo…');
-        exportId = await iniciar(true); inicio = Date.now();
-      }
-      // phase === 'pending' => seguir esperando (Wise está generando el reporte)
-    }
-    if(guardadas === null){
-      throw new Error('Wise está tardando más de lo normal. El reporte ya se está generando: esperá un minuto y volvé a sincronizar.');
-    }
-
+    // sin ?action => el backend hace todo de una (últimos 7 días)
+    const r = await fetch('/api/sync-encuestas?key=' + encodeURIComponent(key));
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || ('HTTP '+r.status));
     encCargadas = false;
     await cargarEncuestas();
-    btn.innerHTML = '<i class="ti ti-check"></i> ' + guardadas + ' actualizadas';
+    const cuantas = j.registros_guardados ?? j.respondidas ?? 0;
+    btn.innerHTML = '<i class="ti ti-check"></i> ' + cuantas + ' actualizadas';
     setTimeout(()=>{ btn.innerHTML = orig; btn.disabled=false; }, 2500);
   }catch(err){
     console.error(err);
-    // solo olvidamos la clave si el problema fue de autorización (no si Wise tardó)
-    if(/no autorizado|401|clave/i.test(String(err.message||''))) sessionStorage.removeItem('sync_key');
-    btn.innerHTML = '<i class="ti ti-alert-triangle"></i> Error';
     const m = String(err.message||'');
+    if(/no autorizado|401|clave/i.test(m)) sessionStorage.removeItem('sync_key');
+    btn.innerHTML = '<i class="ti ti-alert-triangle"></i> Error';
     if(/REPORT_LIMIT_EXCEEDED|límite de exportaciones|Export limit/i.test(m)){
-      alert('Wise alcanzó el límite de exportaciones de la cuenta. No es un error del sistema.\n\nEsperá unos minutos y volvé a intentar. No toques Sincronizar repetidamente: cada intento consume cupo y alarga la espera.');
+      alert('Wise alcanzó el límite de exportaciones de la cuenta. Esperá unos minutos.');
+    } else if(/Timeout|tardando/i.test(m)){
+      alert('Wise tardó demasiado en generar el reporte (más de ~1 minuto). Probá de nuevo en un momento.');
     } else {
       alert('No se pudo sincronizar: ' + m);
     }
