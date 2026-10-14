@@ -5991,20 +5991,61 @@ function _md5(str){
 
 const _impNorm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 
-function _impBuscarClave(obj, terminos){
-  const claves = Object.keys(obj);
-  for(const t of terminos){
-    const f = claves.find(k => _impNorm(k).includes(t));
-    if(f) return f;
-  }
-  return null;
+// Una columna cuyo título es una PREGUNTA ("¿Cómo calificaría la amabilidad
+// por parte del asesor(a)?") nunca puede ser un campo de texto como asesor o
+// servicio: si no, se guarda el puntaje en vez del nombre.
+const _impEsPregunta = h => /[¿?]/.test(String(h));
+
+// Detecta qué columna del archivo corresponde a cada campo.
+// Devuelve null para los campos que el archivo NO trae: esos después se
+// omiten al guardar, así no pisan lo que ya está cargado.
+function _impDetectar(headers, filas){
+  const conDatos = h => filas.some(f => String(f[h] ?? '').trim() !== '');
+  const noPreg = headers.filter(h => h && !_impEsPregunta(h));
+  const todas  = headers.filter(Boolean);
+
+  const elegir = (cands, grupos, exigirDatos) => {
+    for(const g of grupos){
+      for(const h of cands){
+        const nh = _impNorm(h);
+        if(g.every(t => nh.includes(_impNorm(t)))){
+          if(exigirDatos && !conDatos(h)) continue;   // la columna existe pero viene vacía
+          return h;
+        }
+      }
+    }
+    return null;
+  };
+
+  return {
+    asesor:   elegir(noPreg, [['usuario'],['agente'],['asesor'],['user']], true),
+    sucursal: elegir(noPreg, [['sucursal'],['branch']], true),
+    servicio: elegir(noPreg, [['servicio'],['service']], true),
+    dominio:  elegir(noPreg, [['dominio'],['patente'],['domain']], true),
+    telefono: elegir(noPreg, [['contacto','telefono'],['telefono'],['celular'],['phone']], true),
+    empresa:  elegir(noPreg.filter(h => !/telefono|phone/.test(_impNorm(h))),
+                     [['contacto','nombre'],['empresa','nombre'],['cliente'],['nombre'],['empresa']], true),
+    encuesta: elegir(noPreg, [['encuesta'],['survey']], true),
+    nroOrden: elegir(noPreg.filter(h => !_impNorm(h).includes('grupo')),
+                     [['n° orden'],['n orden'],['nro','orden'],['contacto','orden'],['orden']], true),
+    fechaEnvio: elegir(noPreg, [['fecha','envio'],['survey','sent'],['fecha','creado']], true),
+    fechaResp:  elegir(noPreg, [['fecha','respuesta'],['response','date']], true),
+    respondida: elegir(noPreg, [['respondida'],['responded']], true),
+
+    p_amabilidad:  elegir(todas, [['amabilidad']], false),
+    p_atencion:    elegir(todas, [['atencion','solicitudes']], false),
+    p_puntualidad: elegir(todas, [['puntualidad']], false),
+    p_explicacion: elegir(todas, [['explicacion']], false),
+    p_limpieza:    elegir(todas, [['limpieza']], false),
+    p_turnos:      elegir(todas, [['facilidad','turnos']], false),
+    p_espera:      elegir(todas, [['tiempo','espera']], false),
+    p_calidad:     elegir(todas, [['calidad','servicio','prestado']], false),
+    p_recomienda:  elegir(todas, [['recomiende']], false),
+    funciono:      elegir(todas, [['funcionando correctamente']], false),
+    comentario:    elegir(todas, [['sugerencias'],['comentario']], false),
+  };
 }
-function _impClavePalabras(obj, palabras){
-  return Object.keys(obj).find(k => {
-    const nk = _impNorm(k);
-    return palabras.every(p => nk.includes(_impNorm(p)));
-  }) || null;
-}
+
 function _impNota(v){
   if(v == null) return null;
   const s = String(v).trim().replace(',', '.');
@@ -6012,116 +6053,115 @@ function _impNota(v){
   const n = Number(s);
   return (!isNaN(n) && n >= 0 && n <= 10) ? n : null;
 }
-function _impNotaPalabras(fila, palabras){
-  for(const [k,v] of Object.entries(fila)){
-    const nk = _impNorm(k);
-    if(palabras.every(p => nk.includes(_impNorm(p)))) return _impNota(v);
-  }
-  return null;
+
+const _impPreguntasLista = ['p_amabilidad','p_atencion','p_puntualidad','p_explicacion','p_limpieza',
+                            'p_turnos','p_espera','p_calidad','p_recomienda'];
+
+// Arma el registro SOLO con los campos que el archivo realmente trae.
+// Lo que no viene se omite: el upsert no lo pisa y queda el valor actual.
+// Índice de las encuestas ya cargadas, por (fecha de envío + fecha de respuesta).
+// Sirve para enganchar un archivo que NO trae el N° de orden con las encuestas
+// que ya están, en vez de duplicarlas.
+function _impMs(v){
+  if(!v) return '';
+  const d = new Date(String(v).replace(' ', 'T'));
+  return isNaN(d.getTime()) ? '' : String(d.getTime());
 }
-function _impPreguntas(fila){
-  return {
-    p_amabilidad:  _impNotaPalabras(fila, ['amabilidad']),
-    p_atencion:    _impNotaPalabras(fila, ['atencion','solicitudes']),
-    p_puntualidad: _impNotaPalabras(fila, ['puntualidad']),
-    p_explicacion: _impNotaPalabras(fila, ['explicacion']),
-    p_limpieza:    _impNotaPalabras(fila, ['limpieza']),
-    p_turnos:      _impNotaPalabras(fila, ['facilidad','turnos']),
-    p_espera:      _impNotaPalabras(fila, ['tiempo','espera']),
-    p_calidad:     _impNotaPalabras(fila, ['calidad','servicio','prestado']),
-    p_recomienda:  _impNotaPalabras(fila, ['recomiende']),
+// Sucursal de cada asesor, según las encuestas que ya tiene cargadas.
+// Si un archivo trae el asesor pero no la sucursal, la completamos con esta.
+function _impSucursalPorAsesor(){
+  const cuenta = new Map();   // asesor -> Map(sucursal -> veces)
+  for(const e of (encuestas || [])){
+    const a = _impNorm(e._asesor_wise || e.asesor || '').trim();
+    const s = String(e.sucursal || '').trim();
+    if(!a || !s) continue;
+    if(!cuenta.has(a)) cuenta.set(a, new Map());
+    const m = cuenta.get(a);
+    m.set(s, (m.get(s) || 0) + 1);
+  }
+  const mapa = new Map();
+  for(const [a, m] of cuenta){
+    let mejor = null, max = 0;
+    for(const [s, n] of m) if(n > max){ max = n; mejor = s; }
+    if(mejor) mapa.set(a, mejor);
+  }
+  return mapa;
+}
+
+function _impIndicePorFechas(){
+  const idx = new Map();
+  for(const e of (encuestas || [])){
+    const k = _impMs(e.fecha) + '|' + _impMs(e.fecha_respuesta);
+    if(k !== '|' && !idx.has(k)) idx.set(k, e.wise_id);
+  }
+  return idx;
+}
+
+function _impArmar(fila, d, idx){
+  const val = col => col ? String(fila[col] ?? '').trim() : '';
+  const r = {};
+
+  const orden = val(d.nroOrden);
+  const dom   = val(d.dominio);
+  const envio = val(d.fechaEnvio);
+  const resp  = val(d.fechaResp);
+  const nid   = v => String(v ?? '').trim().toLowerCase();
+
+  const parseFecha = (v) => {
+    if(!v) return null;
+    const dd = new Date(String(v).replace(' ', 'T'));
+    return isNaN(dd.getTime()) ? null : dd.toISOString();
   };
-}
-function _impComentario(fila){
-  for(const [k,v] of Object.entries(fila)){
-    const nk = _impNorm(k);
-    if((nk.includes('sugerencias') || nk.includes('comentario')) &&
-       String(v).trim() && String(v).trim() !== 'S/D') return String(v).trim();
-  }
-  return null;
-}
-function _impFunciono(fila){
-  for(const [k,v] of Object.entries(fila)){
-    if(_impNorm(k).includes('funcionando correctamente')){
-      const s = String(v).trim();
-      return s || null;
+
+  if(d.fechaEnvio) r.fecha = parseFecha(envio);
+  if(d.fechaResp)  r.fecha_respuesta = parseFecha(resp);
+
+  // 1º por N° de orden (igual que el sync). 2º, si el archivo no lo trae,
+  // buscamos la encuesta ya cargada que tenga las mismas fechas.
+  let wid = null;
+  if(orden){
+    wid = 'enc_' + _md5('ord|' + nid(orden));
+  }else{
+    if(idx){
+      const k = _impMs(envio) + '|' + _impMs(resp);
+      if(k !== '|' && idx.has(k)){ wid = idx.get(k); r._engancheFechas = true; }
     }
+    if(!wid) wid = 'enc_' + _md5('sin-orden|' + nid(dom) + '|' + nid(envio) + '|' + nid(resp));
   }
-  return null;
+  r.wise_id = wid;
+  if(d.asesor)   r.asesor   = val(d.asesor)   || null;
+  if(d.sucursal) r.sucursal = val(d.sucursal) || null;
+  if(d.servicio) r.servicio = val(d.servicio) || null;
+  if(d.dominio)  r.dominio  = val(d.dominio)  || null;
+  if(d.telefono) r.telefono = val(d.telefono) || null;
+  if(d.nroOrden) r.nro_orden = orden || null;
+  if(d.empresa)  r.empresa  = val(d.empresa)  || null;
+  if(d.encuesta) r.encuesta = val(d.encuesta) || null;
+
+  for(const p of _impPreguntasLista) if(d[p]) r[p] = _impNota(fila[d[p]]);
+
+  if(d.funciono) r.funciono_ok = val(d.funciono) || null;
+  if(d.comentario){
+    const c = val(d.comentario);
+    r.comentario = (c && c !== 'S/D') ? c : null;
+  }
+
+  const cinco = ['p_amabilidad','p_atencion','p_puntualidad','p_explicacion','p_limpieza']
+    .filter(p => d[p]).map(p => r[p]).filter(n => n != null);
+  if(cinco.length){
+    const prom = Math.round((cinco.reduce((a,b)=>a+b,0)/cinco.length)*100)/100;
+    r.promedio_asesor = prom; r.puntuacion_prom = prom; r.puntuacion = prom;
+  }
+
+  r.raw = fila;
+  r.sincronizado_en = new Date().toISOString();
+  return r;
 }
 
-function _impMapear(fila){
-  const kAsesor   = _impBuscarClave(fila, ['agente','asesor','usuario','user']);
-  const kSucursal = _impBuscarClave(fila, ['sucursal','branch']);
-  const kServicio = _impBuscarClave(fila, ['servicio','service']);
-  const kDominio  = _impBuscarClave(fila, ['dominio','patente','domain']);
-  const kEmpresa  = _impBuscarClave(fila, ['empresa','telefono','phone','cliente','nombre']);
-  const kTelefono = _impClavePalabras(fila, ['contacto','telefono']) || _impBuscarClave(fila, ['telefono','phone','celular']);
-  const claves = Object.keys(fila);
-  const kNroOrden =
-    claves.find(k => { const n=_impNorm(k); return n.includes('orden') && !n.includes('grupo') && (n.includes('n° orden')||n.includes('n orden')||n.includes('nro')); })
-    || claves.find(k => { const n=_impNorm(k); return n.includes('contacto') && n.includes('orden') && !n.includes('grupo'); })
-    || null;
-  const kEncuesta = _impBuscarClave(fila, ['encuesta','survey']);
-
-  const kFechaResp  = _impClavePalabras(fila, ['fecha','respuesta']) || _impClavePalabras(fila, ['response','date']);
-  const kFechaEnvio = _impClavePalabras(fila, ['fecha','envio']) || _impClavePalabras(fila, ['survey','sent']) || _impClavePalabras(fila, ['fecha','creado']);
-  const kFecha = kFechaEnvio || _impBuscarClave(fila, ['fecha','date','survey_sent','created']);
-
-  const preguntas = _impPreguntas(fila);
-  const cinco = [preguntas.p_amabilidad, preguntas.p_atencion, preguntas.p_puntualidad,
-                 preguntas.p_explicacion, preguntas.p_limpieza].filter(n => n != null);
-  const promedioAsesor = cinco.length
-    ? Math.round((cinco.reduce((a,b)=>a+b,0) / cinco.length) * 100) / 100 : null;
-
-  const ordenRaw = kNroOrden ? fila[kNroOrden] : null;
-  const domRaw   = kDominio  ? fila[kDominio]  : null;
-  const envioRaw = kFecha    ? fila[kFecha]    : null;
-  const respRaw  = kFechaResp ? fila[kFechaResp] : null;
-  const normId = v => String(v ?? '').trim().toLowerCase();
-
-  const claveId = (ordenRaw && String(ordenRaw).trim())
-    ? 'ord|' + normId(ordenRaw)
-    : 'sin-orden|' + normId(domRaw) + '|' + normId(envioRaw) + '|' + normId(respRaw);
-  const wiseId = 'enc_' + _md5(claveId);
-
-  const parseFecha = (val) => {
-    if(!val) return null;
-    const d = new Date(String(val).replace(' ', 'T'));
-    return isNaN(d.getTime()) ? null : d.toISOString();
-  };
-
-  return {
-    wise_id: wiseId,
-    fecha: parseFecha(kFecha && fila[kFecha]),
-    fecha_respuesta: parseFecha(kFechaResp && fila[kFechaResp]),
-    asesor: kAsesor ? fila[kAsesor] : null,
-    ...preguntas,
-    promedio_asesor: promedioAsesor,
-    comentario: _impComentario(fila),
-    funciono_ok: _impFunciono(fila),
-    puntuacion_prom: promedioAsesor,
-    puntuacion: promedioAsesor,
-    sucursal: kSucursal ? fila[kSucursal] : null,
-    servicio: kServicio ? fila[kServicio] : null,
-    dominio: kDominio ? fila[kDominio] : null,
-    telefono: kTelefono ? fila[kTelefono] : null,
-    nro_orden: kNroOrden ? fila[kNroOrden] : null,
-    empresa: kEmpresa ? fila[kEmpresa] : null,
-    encuesta: kEncuesta ? fila[kEncuesta] : null,
-    raw: fila,
-    sincronizado_en: new Date().toISOString(),
-  };
-}
-
-function _impRespondida(reg){
-  const raw = reg.raw || {};
-  for(const [k,v] of Object.entries(raw)){
-    const nk = _impNorm(k);
-    if(nk.includes('respondida') || nk.includes('responded') || nk === 'is_responsed'){
-      const s = String(v).trim().toLowerCase();
-      return s==='si' || s==='sí' || s==='1' || s==='yes' || s==='true';
-    }
+function _impRespondida(fila, d, reg){
+  if(d.respondida){
+    const s = String(fila[d.respondida] ?? '').trim().toLowerCase();
+    return s==='si' || s==='sí' || s==='1' || s==='yes' || s==='true';
   }
   if(reg.fecha_respuesta) return true;
   return reg.promedio_asesor != null;
@@ -6169,7 +6209,8 @@ async function encImpLeer(){
     const aoa = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
     if(!aoa.length) return _impError('El archivo está vacío.');
 
-    const headers = (aoa[0] || []).map(h => String(h ?? '').trim());
+    // el .replace quita el BOM que Wise pone al principio del archivo
+    const headers = (aoa[0] || []).map(h => String(h ?? '').replace(/^﻿/, '').trim());
     if(headers.filter(Boolean).length < 2)
       return _impError('No se reconocieron los títulos de las columnas en la primera fila.');
 
@@ -6186,18 +6227,33 @@ async function encImpLeer(){
     }
     if(!filas.length) return _impError('El archivo no tiene filas de datos.');
 
-    // ¿Parece el reporte de encuestas?
-    const muestra = filas[0];
-    const tieneAsesor = !!_impBuscarClave(muestra, ['agente','asesor','usuario','user']);
-    const tienePregunta = Object.keys(muestra).some(k => {
-      const n = _impNorm(k);
-      return n.includes('amabilidad') || n.includes('puntualidad') || n.includes('limpieza') || n.includes('recomiende');
-    });
-    if(!tieneAsesor && !tienePregunta)
-      return _impError('Este archivo no parece el reporte de respuestas de encuestas de Wise: no se encontraron ni el asesor ni las preguntas.');
+    // Detectamos qué columna es cada campo (y cuáles no vienen en el archivo)
+    const det = _impDetectar(headers, filas);
 
-    const todos = filas.map(_impMapear);
-    const respondidas = todos.filter(_impRespondida);
+    const preguntasOk = _impPreguntasLista.filter(p => det[p]).length;
+    if(preguntasOk < 3)
+      return _impError('Este archivo no parece el reporte de respuestas de encuestas de Wise: no se encontraron las preguntas de la encuesta.');
+    if(!det.nroOrden && !det.fechaResp)
+      return _impError('No se encontró ni el N° de orden ni la fecha de respuesta, así que no se puede identificar cada encuesta.');
+
+    // Si el archivo no trae N° de orden, enganchamos por fechas con lo ya cargado
+    const idx = det.nroOrden ? null : _impIndicePorFechas();
+    const todos = filas.map(f => ({ f, r: _impArmar(f, det, idx) }));
+    const respondidas = todos.filter(x => _impRespondida(x.f, det, x.r)).map(x => x.r);
+    const enganchadas = respondidas.filter(r => r._engancheFechas).length;
+    respondidas.forEach(r => { delete r._engancheFechas; });
+
+    // Si el archivo trae asesor pero NO sucursal, la completamos con la
+    // sucursal que ese asesor tiene en sus encuestas ya cargadas.
+    let sucCompletadas = 0;
+    if(det.asesor && !det.sucursal){
+      const mapaSuc = _impSucursalPorAsesor();
+      for(const r of respondidas){
+        const a = _impNorm(r.asesor || '').trim();
+        const s = a ? mapaSuc.get(a) : null;
+        if(s){ r.sucursal = s; sucCompletadas++; }
+      }
+    }
     // de-duplicar por wise_id, quedándonos con la respuesta más reciente
     const porId = new Map();
     respondidas
@@ -6220,16 +6276,45 @@ async function encImpLeer(){
     const asesores = new Set(encImpRegistros.map(r => (r.asesor||'').trim()).filter(Boolean)).size;
     const yaEstaban = encImpRegistros.filter(r => encuestas.some(e => e.wise_id === r.wise_id)).length;
 
+    // Campos que el archivo NO trae: esos no se tocan al importar
+    const faltantes = [];
+    if(!det.asesor)   faltantes.push('asesor');
+    if(!det.sucursal && !sucCompletadas) faltantes.push('sucursal');
+    if(!det.servicio) faltantes.push('servicio');
+    if(!det.dominio)  faltantes.push('patente');
+    if(!det.telefono) faltantes.push('teléfono');
+
     res.style.display = 'block';
     res.innerHTML =
       '<div style="background:var(--bg-3,#f6f7f9);border-radius:10px;padding:12px 14px;font-size:12.5px;line-height:1.9">'
       + '<b>' + encImpRegistros.length + '</b> encuestas respondidas listas para importar<br>'
       + '<span style="color:var(--text-4)">Período:</span> ' + fDe + ' → ' + fA + '<br>'
-      + '<span style="color:var(--text-4)">Asesores:</span> ' + asesores + '<br>'
       + '<span style="color:var(--text-4)">Ya cargadas (se actualizan):</span> ' + yaEstaban
       + ' &nbsp;·&nbsp; <span style="color:var(--text-4)">Nuevas:</span> ' + (encImpRegistros.length - yaEstaban)
       + '<br><span style="color:var(--text-4);font-size:11.5px">Se leyeron ' + filas.length + ' filas en total.</span>'
-      + '</div>';
+      + '</div>'
+      + (faltantes.length
+          ? '<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:10px 13px;margin-top:9px;font-size:12px;line-height:1.75;color:#92400e">'
+            + '<b>Este archivo no trae: ' + faltantes.join(', ') + '.</b><br>'
+            + 'Esos campos <b>no se tocan</b>: lo que ya esté cargado se mantiene como está.'
+            + '</div>'
+          : '')
+      + (sucCompletadas
+          ? '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:10px 13px;margin-top:9px;font-size:12px;line-height:1.75;color:#166534">'
+            + 'El archivo no trae sucursal, así que se completó con <b>la sucursal de cada asesor</b>: '
+            + '<b>' + sucCompletadas + '</b> de ' + encImpRegistros.length + '.'
+            + '</div>'
+          : '')
+      + (idx
+          ? '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:10px 13px;margin-top:9px;font-size:12px;line-height:1.75;color:#1e40af">'
+            + 'El archivo <b>no trae el N° de orden</b>, así que se engancha con las encuestas ya cargadas '
+            + 'por fecha de envío y de respuesta.<br>'
+            + '<b>' + enganchadas + '</b> de ' + encImpRegistros.length + ' encontraron su encuesta — esas se completan.'
+            + (encImpRegistros.length - enganchadas > 0
+                ? ' Las otras ' + (encImpRegistros.length - enganchadas) + ' se cargan como nuevas.'
+                : '')
+            + '</div>'
+          : '');
     btn.disabled = false;
   }catch(e){
     console.error(e);
