@@ -5830,8 +5830,6 @@ async function sincronizarEncuestas(){
     if(!desde || !hasta){ hasta = hoyISO; desde = _syncAddDias(hoyISO, -7); }
     if(desde > hasta){ const t = desde; desde = hasta; hasta = t; }
 
-    // UNA SOLA exportación por clic: Wise procesa de a una y rechaza la
-    // segunda si se le pide seguida (queda en 0% y la cancela).
     // El tramo son los 7 días que terminan en la fecha en la que estamos
     // (o en el "Hasta" elegido, si es anterior a hoy).
     let fin = (hasta && hasta < hoyISO) ? hasta : hoyISO;
@@ -5840,14 +5838,40 @@ async function sincronizarEncuestas(){
     if(ini < desde) ini = desde;
 
     const fmtD = s => s.split('-').reverse().join('/');
-    btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> '
-                  + fmtD(ini) + ' → ' + fmtD(fin) + '…';
+    const girar = (txt) =>
+      btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> ' + txt;
 
-    const r = await fetch('/api/sync-encuestas?key=' + encodeURIComponent(key)
-                        + '&date_from=' + ini + '&date_to=' + fin);
-    let j = {};
-    try{ j = await r.json(); }catch(e){ throw new Error('HTTP ' + r.status); }
-    if(!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    // Wise procesa UNA exportación por vez y puede tardar varios minutos.
+    // El backend guarda la exportación en curso: cada llamada consulta su
+    // estado (gratis) y solo crea una nueva si no hay ninguna pendiente.
+    // Por eso acá insistimos tranquilos, sin generar pedidos nuevos.
+    const url = '/api/sync-encuestas?key=' + encodeURIComponent(key)
+              + '&date_from=' + ini + '&date_to=' + fin;
+    const INTENTOS = 10, ESPERA = 20000;
+    const t0 = Date.now();
+    let j = null;
+
+    girar(fmtD(ini) + ' → ' + fmtD(fin) + '…');
+
+    for(let intento = 0; intento < INTENTOS; intento++){
+      const r = await fetch(url);
+      try{ j = await r.json(); }catch(e){ throw new Error('HTTP ' + r.status); }
+      if(!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      if(j.fase === 'listo') break;
+      // fase 'generando': Wise sigue armando el reporte, no se perdió nada
+      const seg = Math.round((Date.now() - t0) / 1000);
+      girar('Wise generando… ' + (seg < 60 ? seg + 's' : Math.floor(seg/60) + 'm ' + (seg%60) + 's'));
+      if(intento < INTENTOS - 1) await new Promise(r => setTimeout(r, ESPERA));
+    }
+
+    if(!j || j.fase !== 'listo'){
+      btn.innerHTML = '<i class="ti ti-clock"></i> Generando…';
+      alert('Wise sigue generando el reporte ' + fmtD(ini) + ' → ' + fmtD(fin) + '.\n\n'
+          + 'No se perdió nada: la exportación quedó guardada. Esperá un par de minutos\n'
+          + 'y tocá Sincronizar otra vez — se descarga al toque, sin volver a pedirla.');
+      setTimeout(()=>{ btn.innerHTML = orig; btn.disabled = false; }, 2500);
+      return;
+    }
 
     const guardadas = j.registros_guardados || 0;
     encCargadas = false;
