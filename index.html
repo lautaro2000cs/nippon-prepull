@@ -5830,72 +5830,37 @@ async function sincronizarEncuestas(){
     if(!desde || !hasta){ hasta = hoyISO; desde = _syncAddDias(hoyISO, -7); }
     if(desde > hasta){ const t = desde; desde = hasta; hasta = t; }
 
-    const ventanas = _syncVentanas(desde, hasta, 7);
+    // UNA SOLA exportación por clic: Wise procesa de a una y rechaza la
+    // segunda si se le pide seguida (queda en 0% y la cancela).
+    // El tramo son los 7 días que terminan en la fecha en la que estamos
+    // (o en el "Hasta" elegido, si es anterior a hoy).
+    let fin = (hasta && hasta < hoyISO) ? hasta : hoyISO;
+    if(fin < desde) fin = desde;
+    let ini = _syncAddDias(fin, -6);
+    if(ini < desde) ini = desde;
 
-    // Wise limita cuántas exportaciones se le piden seguidas: le damos aire
-    // entre tramos y, si alguno falla, se reintenta una vez al final.
-    const PAUSA_MS   = 8000;
-    const ESPERA_RET = 20000;
+    const fmtD = s => s.split('-').reverse().join('/');
+    btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> '
+                  + fmtD(ini) + ' → ' + fmtD(fin) + '…';
 
-    const girar = (txt) =>
-      btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> ' + txt;
+    const r = await fetch('/api/sync-encuestas?key=' + encodeURIComponent(key)
+                        + '&date_from=' + ini + '&date_to=' + fin);
+    let j = {};
+    try{ j = await r.json(); }catch(e){ throw new Error('HTTP ' + r.status); }
+    if(!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
 
-    async function traerTramo(v){
-      const url = '/api/sync-encuestas?key=' + encodeURIComponent(key)
-                + '&date_from=' + v.from + '&date_to=' + v.to;
-      const r = await fetch(url);
-      let j = {};
-      try{ j = await r.json(); }catch(e){ throw new Error('HTTP ' + r.status); }
-      if(!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
-      return (j.registros_guardados || 0);
-    }
-
-    let guardadas = 0;
-    let errores = [];
-    let pendientes = ventanas.slice();
-
-    for(let pasada = 0; pasada < 2 && pendientes.length; pasada++){
-      const fallaron = [];
-      for(let i = 0; i < pendientes.length; i++){
-        const v = pendientes[i];
-        girar((pasada === 0 ? 'Tramo ' : 'Reintento ') + (i+1) + '/' + pendientes.length + '…');
-        try{
-          guardadas += await traerTramo(v);
-        }catch(e){
-          console.error('Tramo', v.from, '→', v.to, e);
-          fallaron.push({ v, msg: String(e.message || e) });
-        }
-        if(i < pendientes.length - 1) await new Promise(r => setTimeout(r, PAUSA_MS));
-      }
-      errores = fallaron.map(f => ({ rango: f.v.from + ' → ' + f.v.to, msg: f.msg }));
-      pendientes = fallaron.map(f => f.v);
-      if(pendientes.length && pasada === 0){
-        girar('Esperando a Wise…');
-        await new Promise(r => setTimeout(r, ESPERA_RET));
-      }
-    }
-
+    const guardadas = j.registros_guardados || 0;
     encCargadas = false;
     await cargarEncuestas();
+    btn.innerHTML = '<i class="ti ti-check"></i> ' + guardadas + ' actualizadas';
 
-    // Mostramos el MOTIVO real (sin repetirlo si es el mismo en todos los tramos)
-    const motivos = Array.from(new Set(errores.map(e => e.msg)));
-    const pista = (m) =>
-        /REPORT_NOT_FOUND/i.test(m)      ? '\n\n→ Wise no encuentra el reporte: revisá WISE_REPORT_ID en Vercel.'
-      : /REPORT_LIMIT|Export limit/i.test(m) ? '\n\n→ Wise limita las exportaciones por cuenta. Sincronizá de a una semana por vez, o esperá unos minutos.'
-      : /Timeout|tardando/i.test(m)      ? '\n\n→ Wise tardó más de un minuto en generar ese tramo. Probá ese rango solo.'
-      : '';
-
-    if(errores.length && guardadas === 0){
-      btn.innerHTML = '<i class="ti ti-alert-triangle"></i> Error';
-      alert('No se pudo sincronizar.\n\nMotivo:\n' + motivos.join('\n') + pista(motivos[0] || ''));
-    } else if(errores.length){
-      btn.innerHTML = '<i class="ti ti-check"></i> ' + guardadas + ' actualizadas';
-      alert('Se sincronizaron ' + guardadas + ' encuestas.\n\nQuedaron sin traer:\n'
-            + errores.map(e => '• ' + e.rango).join('\n')
-            + '\n\nMotivo:\n' + motivos.join('\n') + pista(motivos[0] || ''));
-    } else {
-      btn.innerHTML = '<i class="ti ti-check"></i> ' + guardadas + ' actualizadas';
+    // Si el rango elegido abarca semanas anteriores, explicamos cómo traerlas.
+    if(desde < ini){
+      const anterior = _syncAddDias(ini, -1);
+      setTimeout(()=>alert(
+        'Se trajo la semana ' + fmtD(ini) + ' → ' + fmtD(fin) + ' (' + guardadas + ' encuestas).\n\n'
+      + 'Wise procesa una exportación por vez, así que va de a una semana.\n\n'
+      + 'Para traer la semana anterior: poné en "Hasta" el ' + fmtD(anterior) + ' y tocá Sincronizar de nuevo.'), 60);
     }
     setTimeout(()=>{ btn.innerHTML = orig; btn.disabled = false; }, 3000);
   }catch(err){
@@ -5903,7 +5868,12 @@ async function sincronizarEncuestas(){
     const m = String(err.message || '');
     if(/no autorizado|401|clave/i.test(m)) sessionStorage.removeItem('sync_key');
     btn.innerHTML = '<i class="ti ti-alert-triangle"></i> Error';
-    alert('No se pudo sincronizar: ' + m);
+    const pista =
+        /REPORT_NOT_FOUND/i.test(m)        ? '\n\n→ Wise no encuentra el reporte: revisá WISE_REPORT_ID en Vercel.'
+      : /REPORT_LIMIT|Export limit/i.test(m) ? '\n\n→ Wise ya tiene una exportación en curso o llegó a su cupo. Esperá unos minutos y sincronizá de nuevo.'
+      : /Timeout|tardando/i.test(m)        ? '\n\n→ Wise todavía estaba generando el reporte. Esperá un minuto y tocá Sincronizar otra vez: suele salir en el segundo intento.'
+      : '';
+    alert('No se pudo sincronizar: ' + m + pista);
     setTimeout(()=>{ btn.innerHTML = orig; btn.disabled = false; }, 2500);
   }
 }
