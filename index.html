@@ -1054,6 +1054,10 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
                   Sincronizar
                 </button>
+                <button class="btn-sm" id="enc-import-btn" onclick="abrirImportWise()" title="Subir el archivo del reporte bajado del portal de Wise (CSV o Excel)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+                  Importar de Wise
+                </button>
               </div>
             </div>
             <div class="suc-slicer" id="enc-suc-chips-resumen" style="display:none"></div>
@@ -1609,6 +1613,29 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
 </div>
 
 <!-- CARGA MASIVA · VENTAS ESPECIALES -->
+<div class="modal-ov" id="enc-import">
+  <div class="modal">
+    <h3><i class="ti ti-file-upload" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#2563eb"></i> Importar encuestas de Wise</h3>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem">
+      Bajá el reporte de respuestas desde el portal de Wise (CSV o Excel) y subilo acá.
+      No pasa por la exportación por API, así que funciona siempre.
+      Las encuestas que ya estén cargadas se actualizan, no se duplican.
+    </div>
+    <div class="mgrid">
+      <div class="full">
+        <label>Archivo del reporte <span style="color:var(--accent)">*</span></label>
+        <input type="file" id="enc-imp-file" accept=".csv,.xlsx,.xls,.txt" onchange="encImpLeer()" style="font-size:13px"/>
+      </div>
+      <div class="full" id="enc-imp-resumen" style="display:none"></div>
+    </div>
+    <p class="login-err" id="enc-imp-err" style="display:none"></p>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="encImpCerrar()">Cancelar</button>
+      <button class="btn-save" id="enc-imp-btn" onclick="encImpGuardar()" disabled>Importar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-ov" id="eq-masiva">
   <div class="modal">
     <h3><i class="ti ti-building-warehouse" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#7c3aed"></i> Carga masiva · Ventas Especiales</h3>
@@ -5899,6 +5926,347 @@ async function sincronizarEncuestas(){
       : '';
     alert('No se pudo sincronizar: ' + m + pista);
     setTimeout(()=>{ btn.innerHTML = orig; btn.disabled = false; }, 2500);
+  }
+}
+
+// ============================================================
+//  IMPORTAR ENCUESTAS DESDE EL ARCHIVO DE WISE (CSV / Excel)
+//  No usa la exportación por API: se baja el reporte del portal
+//  de Wise y se sube acá. Usa EXACTAMENTE el mismo mapeo y el
+//  mismo wise_id (MD5) que /api/sync-encuestas, así una encuesta
+//  ya cargada se actualiza en vez de duplicarse.
+// ============================================================
+let encImpRegistros = [];
+
+// MD5 — debe dar idéntico a crypto.createHash('md5') del backend
+function _md5(str){
+  function utf8(s){
+    const out=[];
+    for(let i=0;i<s.length;i++){
+      let c=s.charCodeAt(i);
+      if(c<0x80) out.push(c);
+      else if(c<0x800){ out.push(0xc0|(c>>6),0x80|(c&0x3f)); }
+      else if(c>=0xd800&&c<=0xdbff){
+        const c2=s.charCodeAt(++i);
+        const cp=0x10000+((c&0x3ff)<<10)+(c2&0x3ff);
+        out.push(0xf0|(cp>>18),0x80|((cp>>12)&0x3f),0x80|((cp>>6)&0x3f),0x80|(cp&0x3f));
+      } else { out.push(0xe0|(c>>12),0x80|((c>>6)&0x3f),0x80|(c&0x3f)); }
+    }
+    return out;
+  }
+  const S=[7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,
+           5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,
+           4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,
+           6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21];
+  const K=new Array(64);
+  for(let i=0;i<64;i++) K[i]=(Math.floor(Math.abs(Math.sin(i+1))*4294967296))>>>0;
+  const bytes=utf8(str);
+  const bitLen=bytes.length*8;
+  bytes.push(0x80);
+  while(bytes.length%64!==56) bytes.push(0);
+  const lo=bitLen>>>0, hi=Math.floor(bitLen/4294967296)>>>0;
+  bytes.push(lo&0xff,(lo>>>8)&0xff,(lo>>>16)&0xff,(lo>>>24)&0xff);
+  bytes.push(hi&0xff,(hi>>>8)&0xff,(hi>>>16)&0xff,(hi>>>24)&0xff);
+  let a0=0x67452301,b0=0xefcdab89,c0=0x98badcfe,d0=0x10325476;
+  const rol=(x,c)=>((x<<c)|(x>>>(32-c)))>>>0;
+  for(let off=0;off<bytes.length;off+=64){
+    const M=new Array(16);
+    for(let i=0;i<16;i++){ const j=off+i*4;
+      M[i]=(bytes[j]|(bytes[j+1]<<8)|(bytes[j+2]<<16)|(bytes[j+3]<<24))>>>0; }
+    let A=a0,B=b0,C=c0,D=d0;
+    for(let i=0;i<64;i++){
+      let F,g;
+      if(i<16){ F=(B&C)|(~B&D); g=i; }
+      else if(i<32){ F=(D&B)|(~D&C); g=(5*i+1)%16; }
+      else if(i<48){ F=B^C^D; g=(3*i+5)%16; }
+      else { F=C^(B|~D); g=(7*i)%16; }
+      F=(F+A+K[i]+M[g])>>>0;
+      A=D; D=C; C=B; B=(B+rol(F,S[i]))>>>0;
+    }
+    a0=(a0+A)>>>0; b0=(b0+B)>>>0; c0=(c0+C)>>>0; d0=(d0+D)>>>0;
+  }
+  const hex=(n)=>{ let s=''; for(let i=0;i<4;i++) s+=((n>>>(i*8))&0xff).toString(16).padStart(2,'0'); return s; };
+  return hex(a0)+hex(b0)+hex(c0)+hex(d0);
+}
+
+const _impNorm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+
+function _impBuscarClave(obj, terminos){
+  const claves = Object.keys(obj);
+  for(const t of terminos){
+    const f = claves.find(k => _impNorm(k).includes(t));
+    if(f) return f;
+  }
+  return null;
+}
+function _impClavePalabras(obj, palabras){
+  return Object.keys(obj).find(k => {
+    const nk = _impNorm(k);
+    return palabras.every(p => nk.includes(_impNorm(p)));
+  }) || null;
+}
+function _impNota(v){
+  if(v == null) return null;
+  const s = String(v).trim().replace(',', '.');
+  if(s === '' || /^s\/?d$/i.test(s)) return null;
+  const n = Number(s);
+  return (!isNaN(n) && n >= 0 && n <= 10) ? n : null;
+}
+function _impNotaPalabras(fila, palabras){
+  for(const [k,v] of Object.entries(fila)){
+    const nk = _impNorm(k);
+    if(palabras.every(p => nk.includes(_impNorm(p)))) return _impNota(v);
+  }
+  return null;
+}
+function _impPreguntas(fila){
+  return {
+    p_amabilidad:  _impNotaPalabras(fila, ['amabilidad']),
+    p_atencion:    _impNotaPalabras(fila, ['atencion','solicitudes']),
+    p_puntualidad: _impNotaPalabras(fila, ['puntualidad']),
+    p_explicacion: _impNotaPalabras(fila, ['explicacion']),
+    p_limpieza:    _impNotaPalabras(fila, ['limpieza']),
+    p_turnos:      _impNotaPalabras(fila, ['facilidad','turnos']),
+    p_espera:      _impNotaPalabras(fila, ['tiempo','espera']),
+    p_calidad:     _impNotaPalabras(fila, ['calidad','servicio','prestado']),
+    p_recomienda:  _impNotaPalabras(fila, ['recomiende']),
+  };
+}
+function _impComentario(fila){
+  for(const [k,v] of Object.entries(fila)){
+    const nk = _impNorm(k);
+    if((nk.includes('sugerencias') || nk.includes('comentario')) &&
+       String(v).trim() && String(v).trim() !== 'S/D') return String(v).trim();
+  }
+  return null;
+}
+function _impFunciono(fila){
+  for(const [k,v] of Object.entries(fila)){
+    if(_impNorm(k).includes('funcionando correctamente')){
+      const s = String(v).trim();
+      return s || null;
+    }
+  }
+  return null;
+}
+
+function _impMapear(fila){
+  const kAsesor   = _impBuscarClave(fila, ['agente','asesor','usuario','user']);
+  const kSucursal = _impBuscarClave(fila, ['sucursal','branch']);
+  const kServicio = _impBuscarClave(fila, ['servicio','service']);
+  const kDominio  = _impBuscarClave(fila, ['dominio','patente','domain']);
+  const kEmpresa  = _impBuscarClave(fila, ['empresa','telefono','phone','cliente','nombre']);
+  const kTelefono = _impClavePalabras(fila, ['contacto','telefono']) || _impBuscarClave(fila, ['telefono','phone','celular']);
+  const claves = Object.keys(fila);
+  const kNroOrden =
+    claves.find(k => { const n=_impNorm(k); return n.includes('orden') && !n.includes('grupo') && (n.includes('n° orden')||n.includes('n orden')||n.includes('nro')); })
+    || claves.find(k => { const n=_impNorm(k); return n.includes('contacto') && n.includes('orden') && !n.includes('grupo'); })
+    || null;
+  const kEncuesta = _impBuscarClave(fila, ['encuesta','survey']);
+
+  const kFechaResp  = _impClavePalabras(fila, ['fecha','respuesta']) || _impClavePalabras(fila, ['response','date']);
+  const kFechaEnvio = _impClavePalabras(fila, ['fecha','envio']) || _impClavePalabras(fila, ['survey','sent']) || _impClavePalabras(fila, ['fecha','creado']);
+  const kFecha = kFechaEnvio || _impBuscarClave(fila, ['fecha','date','survey_sent','created']);
+
+  const preguntas = _impPreguntas(fila);
+  const cinco = [preguntas.p_amabilidad, preguntas.p_atencion, preguntas.p_puntualidad,
+                 preguntas.p_explicacion, preguntas.p_limpieza].filter(n => n != null);
+  const promedioAsesor = cinco.length
+    ? Math.round((cinco.reduce((a,b)=>a+b,0) / cinco.length) * 100) / 100 : null;
+
+  const ordenRaw = kNroOrden ? fila[kNroOrden] : null;
+  const domRaw   = kDominio  ? fila[kDominio]  : null;
+  const envioRaw = kFecha    ? fila[kFecha]    : null;
+  const respRaw  = kFechaResp ? fila[kFechaResp] : null;
+  const normId = v => String(v ?? '').trim().toLowerCase();
+
+  const claveId = (ordenRaw && String(ordenRaw).trim())
+    ? 'ord|' + normId(ordenRaw)
+    : 'sin-orden|' + normId(domRaw) + '|' + normId(envioRaw) + '|' + normId(respRaw);
+  const wiseId = 'enc_' + _md5(claveId);
+
+  const parseFecha = (val) => {
+    if(!val) return null;
+    const d = new Date(String(val).replace(' ', 'T'));
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  };
+
+  return {
+    wise_id: wiseId,
+    fecha: parseFecha(kFecha && fila[kFecha]),
+    fecha_respuesta: parseFecha(kFechaResp && fila[kFechaResp]),
+    asesor: kAsesor ? fila[kAsesor] : null,
+    ...preguntas,
+    promedio_asesor: promedioAsesor,
+    comentario: _impComentario(fila),
+    funciono_ok: _impFunciono(fila),
+    puntuacion_prom: promedioAsesor,
+    puntuacion: promedioAsesor,
+    sucursal: kSucursal ? fila[kSucursal] : null,
+    servicio: kServicio ? fila[kServicio] : null,
+    dominio: kDominio ? fila[kDominio] : null,
+    telefono: kTelefono ? fila[kTelefono] : null,
+    nro_orden: kNroOrden ? fila[kNroOrden] : null,
+    empresa: kEmpresa ? fila[kEmpresa] : null,
+    encuesta: kEncuesta ? fila[kEncuesta] : null,
+    raw: fila,
+    sincronizado_en: new Date().toISOString(),
+  };
+}
+
+function _impRespondida(reg){
+  const raw = reg.raw || {};
+  for(const [k,v] of Object.entries(raw)){
+    const nk = _impNorm(k);
+    if(nk.includes('respondida') || nk.includes('responded') || nk === 'is_responsed'){
+      const s = String(v).trim().toLowerCase();
+      return s==='si' || s==='sí' || s==='1' || s==='yes' || s==='true';
+    }
+  }
+  if(reg.fecha_respuesta) return true;
+  return reg.promedio_asesor != null;
+}
+
+// --- UI ---
+function abrirImportWise(){
+  encImpRegistros = [];
+  const f = document.getElementById('enc-imp-file'); if(f) f.value = '';
+  const res = document.getElementById('enc-imp-resumen');
+  if(res){ res.style.display = 'none'; res.innerHTML = ''; }
+  const err = document.getElementById('enc-imp-err');
+  if(err){ err.style.display = 'none'; err.textContent = ''; }
+  const btn = document.getElementById('enc-imp-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Importar'; }
+  document.getElementById('enc-import').classList.add('open');
+}
+function encImpCerrar(){ document.getElementById('enc-import').classList.remove('open'); }
+
+function _impError(msg){
+  const err = document.getElementById('enc-imp-err');
+  if(err){ err.textContent = msg; err.style.display = 'block'; }
+  const btn = document.getElementById('enc-imp-btn');
+  if(btn) btn.disabled = true;
+}
+
+async function encImpLeer(){
+  const input = document.getElementById('enc-imp-file');
+  const err = document.getElementById('enc-imp-err');
+  const res = document.getElementById('enc-imp-resumen');
+  const btn = document.getElementById('enc-imp-btn');
+  err.style.display = 'none'; res.style.display = 'none';
+  btn.disabled = true;
+  encImpRegistros = [];
+
+  const file = input.files && input.files[0];
+  if(!file) return;
+
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type:'array', raw:false, cellDates:false });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if(!ws) return _impError('El archivo no tiene ninguna hoja con datos.');
+
+    const aoa = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
+    if(!aoa.length) return _impError('El archivo está vacío.');
+
+    const headers = (aoa[0] || []).map(h => String(h ?? '').trim());
+    if(headers.filter(Boolean).length < 2)
+      return _impError('No se reconocieron los títulos de las columnas en la primera fila.');
+
+    const filas = [];
+    for(let i = 1; i < aoa.length; i++){
+      const fila = {}; let vacia = true;
+      headers.forEach((h, idx) => {
+        if(!h) return;
+        const v = String((aoa[i] || [])[idx] ?? '').trim();
+        fila[h] = v;
+        if(v) vacia = false;
+      });
+      if(!vacia) filas.push(fila);
+    }
+    if(!filas.length) return _impError('El archivo no tiene filas de datos.');
+
+    // ¿Parece el reporte de encuestas?
+    const muestra = filas[0];
+    const tieneAsesor = !!_impBuscarClave(muestra, ['agente','asesor','usuario','user']);
+    const tienePregunta = Object.keys(muestra).some(k => {
+      const n = _impNorm(k);
+      return n.includes('amabilidad') || n.includes('puntualidad') || n.includes('limpieza') || n.includes('recomiende');
+    });
+    if(!tieneAsesor && !tienePregunta)
+      return _impError('Este archivo no parece el reporte de respuestas de encuestas de Wise: no se encontraron ni el asesor ni las preguntas.');
+
+    const todos = filas.map(_impMapear);
+    const respondidas = todos.filter(_impRespondida);
+    // de-duplicar por wise_id, quedándonos con la respuesta más reciente
+    const porId = new Map();
+    respondidas
+      .slice()
+      .sort((a,b) => {
+        const fa = a.fecha_respuesta || a.fecha || '';
+        const fb = b.fecha_respuesta || b.fecha || '';
+        return fa < fb ? -1 : fa > fb ? 1 : 0;
+      })
+      .forEach(r => porId.set(r.wise_id, r));
+    encImpRegistros = Array.from(porId.values());
+
+    if(!encImpRegistros.length)
+      return _impError('Se leyeron ' + filas.length + ' filas, pero ninguna figura como respondida.');
+
+    // rango de fechas detectado
+    const fechas = encImpRegistros.map(r => r.fecha_respuesta || r.fecha).filter(Boolean).sort();
+    const fDe = fechas.length ? fechas[0].slice(0,10).split('-').reverse().join('/') : '—';
+    const fA  = fechas.length ? fechas[fechas.length-1].slice(0,10).split('-').reverse().join('/') : '—';
+    const asesores = new Set(encImpRegistros.map(r => (r.asesor||'').trim()).filter(Boolean)).size;
+    const yaEstaban = encImpRegistros.filter(r => encuestas.some(e => e.wise_id === r.wise_id)).length;
+
+    res.style.display = 'block';
+    res.innerHTML =
+      '<div style="background:var(--bg-3,#f6f7f9);border-radius:10px;padding:12px 14px;font-size:12.5px;line-height:1.9">'
+      + '<b>' + encImpRegistros.length + '</b> encuestas respondidas listas para importar<br>'
+      + '<span style="color:var(--text-4)">Período:</span> ' + fDe + ' → ' + fA + '<br>'
+      + '<span style="color:var(--text-4)">Asesores:</span> ' + asesores + '<br>'
+      + '<span style="color:var(--text-4)">Ya cargadas (se actualizan):</span> ' + yaEstaban
+      + ' &nbsp;·&nbsp; <span style="color:var(--text-4)">Nuevas:</span> ' + (encImpRegistros.length - yaEstaban)
+      + '<br><span style="color:var(--text-4);font-size:11.5px">Se leyeron ' + filas.length + ' filas en total.</span>'
+      + '</div>';
+    btn.disabled = false;
+  }catch(e){
+    console.error(e);
+    _impError('No se pudo leer el archivo: ' + (e.message || e));
+  }
+}
+
+async function encImpGuardar(){
+  if(!encImpRegistros.length) return;
+  const btn = document.getElementById('enc-imp-btn');
+  const err = document.getElementById('enc-imp-err');
+  err.style.display = 'none';
+  btn.disabled = true;
+
+  const total = encImpRegistros.length;
+  const LOTE = 200;
+  let hechas = 0;
+
+  try{
+    for(let i = 0; i < total; i += LOTE){
+      const lote = encImpRegistros.slice(i, i + LOTE);
+      btn.textContent = 'Importando ' + Math.min(i + LOTE, total) + '/' + total + '…';
+      const { error } = await sb.from('encuestas').upsert(lote, { onConflict:'wise_id' });
+      if(error) throw new Error(error.message || 'Error al guardar');
+      hechas += lote.length;
+    }
+    btn.textContent = 'Listo';
+    encCargadas = false;
+    await cargarEncuestas();
+    encImpCerrar();
+    alert('Se importaron ' + hechas + ' encuestas correctamente.');
+  }catch(e){
+    console.error(e);
+    err.textContent = 'Se guardaron ' + hechas + ' de ' + total + '. Error: ' + (e.message || e);
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Reintentar';
   }
 }
 
