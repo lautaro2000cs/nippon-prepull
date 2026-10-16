@@ -5337,18 +5337,17 @@ function renderEncDetalle(){
 
   // encabezado con orden por clic
   const flecha = k => encDetSort.key===k ? (encDetSort.dir==='asc'?' ▲':' ▼') : '';
-  const th = (k, lbl, alinear) => `<th onclick="sortEncDet('${k}')" style="padding:10px 12px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:${encDetSort.key===k?'var(--accent)':'var(--text-4)'};white-space:nowrap;cursor:pointer;user-select:none;text-align:${alinear||'left'}" title="Ordenar por ${lbl}">${lbl}${flecha(k)}</th>`;
+  const th = (k, lbl, alinear, compacto) => `<th onclick="sortEncDet('${k}')" style="padding:10px ${compacto?'6px':'12px'};font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:${encDetSort.key===k?'var(--accent)':'var(--text-4)'};white-space:nowrap;cursor:pointer;user-select:none;text-align:${alinear||'left'}" title="Ordenar por ${lbl}">${lbl}${flecha(k)}</th>`;
 
-  const numTh = ENC_NUM_COLS.map(([k,l]) => th(k,l,'center')).join('');
+  const numTh = ENC_NUM_COLS.map(([k,l]) => th(k,l,'center',true)).join('');
   const totalCols = 1 + 7 + ENC_NUM_COLS.length + 1; // arrow + fijas(+telefono+nro_orden) + numéricas + prom
 
   let html = card + `<div style="overflow-x:auto;background:#fff;border:1px solid var(--border-1);border-radius:14px">
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead><tr style="text-align:left;border-bottom:1px solid var(--border-1)">
         <th style="width:30px"></th>
-        ${th('fecha','Fecha')}${th('asesor','Asesor')}${th('sucursal','Sucursal')}${th('servicio','Servicio')}${th('dominio','Patente')}${th('telefono','Teléfono')}${th('nro_orden','N° Orden')}
+        ${th('fecha','Fecha')}${th('asesor','Asesor')}${th('prom','Prom.','center')}${th('sucursal','Sucursal')}${th('servicio','Servicio')}${th('dominio','Patente')}${th('telefono','Teléfono')}${th('nro_orden','N° Orden')}
         ${numTh}
-        ${th('prom','Prom. AS','center')}
       </tr></thead><tbody>`;
 
   arr.slice(0, 500).forEach((e, i) => {
@@ -5360,25 +5359,25 @@ function renderEncDetalle(){
     const numTds = ENC_NUM_COLS.map(([k]) => {
       // Limpieza no cuenta en Añelo/S.T.M./CDO Y HIACE: se muestra N/A tachado
       if(k === 'p_limpieza' && sinLavado(e)){
-        return `<td style="padding:9px 12px;text-align:center;font-family:var(--mono);color:var(--text-5);text-decoration:line-through;opacity:.6" title="Sin lavado en esta sucursal — no cuenta">N/A</td>`;
+        return `<td style="padding:9px 6px;text-align:center;font-family:var(--mono);color:var(--text-5);text-decoration:line-through;opacity:.6" title="Sin lavado en esta sucursal — no cuenta">N/A</td>`;
       }
       const v = e[k];
       const n = (v!=null && !isNaN(Number(v))) ? Number(v) : null;
       const tach = desest.includes(k);
-      return `<td style="padding:9px 12px;text-align:center;font-family:var(--mono);font-weight:600;color:${notaColor(n)};${tach?'text-decoration:line-through;opacity:.5':''}">${n!=null?n:'—'}</td>`;
+      return `<td style="padding:9px 6px;text-align:center;font-family:var(--mono);font-weight:600;color:${notaColor(n)};${tach?'text-decoration:line-through;opacity:.5':''}">${n!=null?n:'—'}</td>`;
     }).join('');
 
     html += `<tr style="border-bottom:1px solid var(--border-1);cursor:pointer;${critica?'background:#fff5f5':''}" onclick="toggleEncDetalle('${rid}')">
       <td style="padding:9px 12px;text-align:center;color:var(--text-4)"><span id="${rid}-arr" style="display:inline-block;transition:transform .15s">▸</span></td>
       <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap;font-family:var(--mono)">${f}</td>
       <td style="padding:9px 12px;font-weight:600;color:var(--text-1);white-space:nowrap">${escapeHtml(e.asesor||'—')}${e.asesor_override?' <span style="font-size:10px;color:#4f46e5" title="Asesor corregido manualmente">✎</span>':''}${(cu&&cu.rol==='admin')?` <button onclick="event.stopPropagation();editarAsesorEnc('${e.wise_id}')" title="Corregir asesor" style="border:none;background:none;color:#4f46e5;cursor:pointer;font-size:12px;padding:0;margin-left:2px"><i class="ti ti-edit"></i></button>`:''}</td>
+      <td style="padding:9px 10px;text-align:center;font-family:var(--mono);font-weight:700;font-size:15px;white-space:nowrap;color:${notaColor(nota)}">${nota!=null?nota.toFixed(2):'—'}${critica?' <i class="ti ti-alert-triangle" style="font-size:12px;color:#dc2626;vertical-align:1px"></i>':''}</td>
       <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap">${escapeHtml(e.sucursal||'—')}${e.sucursal_override?' <span style="font-size:10px;color:#4f46e5" title="Sucursal corregida manualmente">✎</span>':''}${(cu&&cu.rol==='admin')?` <button onclick="event.stopPropagation();editarSucursalEnc('${e.wise_id}')" title="Corregir sucursal" style="border:none;background:none;color:#4f46e5;cursor:pointer;font-size:12px;padding:0;margin-left:2px"><i class="ti ti-edit"></i></button>`:''}</td>
-      <td style="padding:9px 12px;color:var(--text-3);white-space:nowrap">${escapeHtml(e.servicio||'—')}</td>
-      <td style="padding:9px 12px;color:var(--text-3);font-family:var(--mono);white-space:nowrap">${escapeHtml(e.dominio||'—')}</td>
-      <td style="padding:9px 12px;color:var(--text-3);font-family:var(--mono);white-space:nowrap">${escapeHtml(e.telefono||'—')}</td>
-      <td style="padding:9px 12px;color:var(--text-3);font-family:var(--mono);white-space:nowrap">${escapeHtml(e.nro_orden||'—')}</td>
+      <td style="padding:9px 12px;color:var(--text-3);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(e.servicio||'')}">${escapeHtml(e.servicio||'—')}</td>
+      <td style="padding:9px 8px;color:var(--text-3);font-family:var(--mono);white-space:nowrap">${escapeHtml(e.dominio||'—')}</td>
+      <td style="padding:9px 8px;color:var(--text-3);font-family:var(--mono);font-size:12px;white-space:nowrap">${escapeHtml(e.telefono||'—')}</td>
+      <td style="padding:9px 8px;color:var(--text-3);font-family:var(--mono);white-space:nowrap">${escapeHtml(e.nro_orden||'—')}</td>
       ${numTds}
-      <td style="padding:9px 12px;text-align:center;font-family:var(--mono);font-weight:700;font-size:15px;color:${notaColor(nota)}">${nota!=null?nota.toFixed(2):'—'}${critica?' <i class="ti ti-alert-triangle" style="font-size:12px;color:#dc2626;vertical-align:1px"></i>':''}</td>
     </tr>`;
     html += `<tr id="${rid}" style="display:none;background:var(--bg-soft,#faf9f7)">
       <td colspan="${totalCols}" style="padding:0 14px 16px 44px">${encDetalleHtml(e)}</td>
@@ -5399,7 +5398,10 @@ function exportarEncuestasExcel(){
   const fmtFecha = fmtFechaCorta;
 
   const filas = arr.map(e => {
-    const ped = (desestimaciones || []).find(d => d.encuesta_id === e.wise_id);
+    // puede haber más de un pedido por encuesta: para el reporte mostramos el
+    // aprobado si existe, y si no, el más reciente
+    const peds = (desestimaciones || []).filter(d => d.encuesta_id === e.wise_id);
+    const ped = peds.find(d => d.estado === 'aprobado') || peds[peds.length - 1];
     const nota = (k) => (e[k]!=null && !isNaN(Number(e[k]))) ? Number(e[k]) : '';
     return {
       'Fecha': fmtFecha(e.fecha),
@@ -5580,21 +5582,29 @@ function encDetalleHtml(e){
 // Bloque del solicitante: pedir desestimación, ver estado, y cargar descargo
 function pedidoAsesorHtml(e){
   const wid = e.wise_id;
-  const pedido = (desestimaciones || []).find(d => d.encuesta_id === wid);
+  // Puede haber MÁS DE UN pedido por encuesta: por ejemplo el asesor y, además,
+  // el jefe de servicio o el supervisor. Cada uno se resuelve por separado.
+  const pedidos = (desestimaciones || []).filter(d => d.encuesta_id === wid);
   const puedePedir = puedePedirDesest(e);
+  const miUser = (cu && cu.username) || null;
+  const esAdmin = !!(cu && cu.rol === 'admin');
+  const yaPedi = pedidos.some(d => d.solicitante_username && d.solicitante_username === miUser);
 
-  if(pedido){
-    const colores = { pendiente:'#d97706', aprobado:'#16a34a', rechazado:'#dc2626', en_revision:'#2563eb' };
-    const etiquetas = { pendiente:'Pendiente de revisión', aprobado:'Aprobado', rechazado:'Rechazado', en_revision:'En revisión — descargo pendiente' };
+  const colores = { pendiente:'#d97706', aprobado:'#16a34a', rechazado:'#dc2626', en_revision:'#2563eb' };
+  const etiquetas = { pendiente:'Pendiente de revisión', aprobado:'Aprobado', rechazado:'Rechazado', en_revision:'En revisión — descargo pendiente' };
+
+  let html = pedidos.map((pedido, idx) => {
     const col = colores[pedido.estado] || '#6b7280';
-    const fid = 'desc-'+encodeURIComponent(wid).replace(/[^a-z0-9]/gi,'');
-    // ¿corresponde mostrar el formulario de descargo?
-    const puedeDescargar = pedido.estado === 'en_revision' && pedido.revision_abierta && !pedido.descargo && puedePedir;
+    const fid = 'desc-'+encodeURIComponent(wid).replace(/[^a-z0-9]/gi,'')+'-'+(pedido.id||idx);
+    // el descargo lo carga quien hizo ESE pedido (o el admin)
+    const esMio = pedido.solicitante_username && pedido.solicitante_username === miUser;
+    const puedeDescargar = pedido.estado === 'en_revision' && pedido.revision_abierta && !pedido.descargo && (esMio || esAdmin);
     return `
       <div style="margin-top:16px;padding:14px;background:#f8fafc;border:1px solid var(--border-1);border-radius:10px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-4);font-weight:700">Pedido de desestimación</span>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+          <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-4);font-weight:700">Pedido de desestimación${pedidos.length>1?` ${idx+1} de ${pedidos.length}`:''}</span>
           <span style="font-size:11px;padding:2px 9px;border-radius:20px;background:${col}22;color:${col};font-weight:700">${etiquetas[pedido.estado]||pedido.estado}</span>
+          ${esMio?'<span style="font-size:11px;padding:2px 9px;border-radius:20px;background:#eef2ff;color:#4f46e5;font-weight:700">Tu pedido</span>':''}
         </div>
         <div style="font-size:13px;color:var(--text-2);margin-bottom:6px"><b>Solicitante:</b> ${escapeHtml(pedido.solicitante_nombre||pedido.solicitante_username||'—')} · <b>Motivo:</b> ${escapeHtml(pedido.motivo)}</div>
         ${pedido.decision_admin ? `<div style="font-size:13px;color:var(--text-2);padding:8px 11px;background:#fff;border-radius:8px;border:1px solid var(--border-1)"><b>Respuesta del admin:</b> ${escapeHtml(pedido.decision_admin)}</div>` : ''}
@@ -5609,21 +5619,23 @@ function pedidoAsesorHtml(e){
           </div>` : ''}
       </div>
     `;
-  }
+  }).join('');
 
-  // sin pedido: mostrar el formulario solo si el usuario puede pedir sobre esta encuesta
-  if(!puedePedir) return '';
+  // ¿Puede este usuario pedir? Si ya pidió él mismo, no se le ofrece de nuevo;
+  // pero otro sector (jefe de servicio, supervisor) sí puede pedir aunque ya haya pedidos.
+  if(!puedePedir || yaPedi) return html;
+
   // corte de la ventana de desestimaciones (no aplica al admin)
-  if(!(cu && cu.rol==='admin') && !desestVentanaAbierta()){
-    return '<div style="margin-top:16px;padding:12px 14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;font-size:13px;color:#9a3412">'+
+  if(!esAdmin && !desestVentanaAbierta()){
+    return html + '<div style="margin-top:16px;padding:12px 14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;font-size:13px;color:#9a3412">'+
       '<i class="ti ti-lock" style="font-size:13px;vertical-align:-1px"></i> '+escapeHtml(desestEstadoTexto().txt)+'</div>';
   }
   const fid = 'ped-'+encodeURIComponent(wid).replace(/[^a-z0-9]/gi,'');
-  return `
+  return html + `
     <div style="margin-top:16px;padding:14px;background:#f8fafc;border:1px dashed var(--border-2);border-radius:10px">
       <button onclick="togglePedidoForm('${fid}')" id="${fid}-btn"
         style="font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid #4f46e5;background:#eef2ff;color:#4f46e5;font-weight:600">
-        Pedir desestimación de esta encuesta
+        ${pedidos.length ? 'Pedir también la desestimación' : 'Pedir desestimación de esta encuesta'}
       </button>
       <div id="${fid}" style="display:none;margin-top:12px">
         <label style="font-size:12px;color:var(--text-3);display:block;margin-bottom:4px">¿Por qué considerás que esta encuesta debería revisarse?</label>
