@@ -3258,7 +3258,7 @@ async function editarSucursalEnc(wiseId){
     const { data:upd, error } = await sb.from('encuestas')
       .update({ sucursal_override: val || null })
       .eq('wise_id', wiseId)
-      .select('id');
+      .select('wise_id');   // la tabla encuestas no tiene columna 'id': su clave es wise_id
     if(error) throw error;
     if(!upd || !upd.length){
       alert('No se actualizó ninguna encuesta. Puede ser un permiso (RLS) de la tabla o que el identificador no coincida.');
@@ -3280,8 +3280,9 @@ async function editarSucursalEnc(wiseId){
     console.error('editarSucursalEnc:', err);
     const m    = String(err.message || 'error');
     const det  = [err.code, err.details, err.hint].filter(Boolean).join(' · ');
-    const falta = /sucursal_override/i.test(m) || /PGRST204/i.test(String(err.code||'')) ||
-                  (/column/i.test(m) && /does not exist|no existe|schema cache/i.test(m));
+    // Solo sugerimos el SQL si el error habla de ESAS columnas, no de cualquiera
+    const falta = /sucursal_override|asesor_override/i.test(m) ||
+                  /PGRST204/i.test(String(err.code || ''));
     alert(
       'No se pudo corregir la sucursal.\n\n' +
       'Error: ' + m + (det ? '\n' + det : '') +
