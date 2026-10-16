@@ -9377,7 +9377,7 @@ function eqPorDia(arr, desc){
         '<td>'+(p.tiempo_trabajo?'<span class="eq-chip">'+eqEsc(p.tiempo_trabajo)+'</span>':'—')+'</td>'+
         '<td style="text-align:center">'+eqEquipCell(p)+'</td>'+
         '<td style="text-align:center">'+eqPreorCell(p)+'</td>'+
-        '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqDel(p)+'</td></tr>';
+        '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqMoverFila(p)+eqDel(p)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   }).join('');
 }
@@ -9438,7 +9438,7 @@ function eqFila(p){
     '<td>'+eqPrioPill(p.prioridad)+
       (p.motivo_prioridad?'<div style="font-size:10.5px;color:var(--text-5);margin-top:3px">'+eqEsc(p.motivo_prioridad)+'</div>':'')+'</td>'+
     '<td>'+eqStockPill(p.estado_stock)+eta+comHtml+'</td>'+
-    '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqDel(p)+'</td></tr>';
+    '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqMoverFila(p)+eqDel(p)+'</td></tr>';
 }
 
 // Papelera al final de cada fila, sólo para el admin.
@@ -9447,6 +9447,53 @@ function eqDel(p){
   return ' <button class="btn-sm" onclick="eqBorrarId(\''+p.id+'\')" title="Eliminar este pedido"'+
          ' style="color:var(--accent);border-color:rgba(224,50,47,.35);padding:5px 8px">'+
          '<i class="ti ti-trash" style="font-size:12px"></i></button>';
+}
+
+// ── Trasladar una venta entre Particulares y Ventas Especiales ──────
+// Pasa cuando se carga en el ámbito equivocado. Cambia solo el campo
+// 'especial' y deja constancia en el historial del pedido.
+const eqPuedeMover = () => esAdmin() || eqPuedeVender();
+
+async function eqMoverScope(id){
+  const p = eqPedidos.find(x => String(x.id) === String(id));
+  if(!p) return;
+  const eraEsp  = eqEsEspecial(p);
+  const destino = eraEsp ? 'Particulares' : 'Ventas Especiales';
+  const quien   = p.cliente || p.dominio || 'esta venta';
+
+  if(!confirm('¿Trasladar "'+quien+'" a '+destino+'?\n\n'+
+              'Se mantiene todo: accesorios, stock, turno y comentarios.\n'+
+              'Solo cambia de pestaña.')) return;
+
+  try{
+    const { error } = await sb.from('equip_pedidos')
+      .update({ especial: !eraEsp })
+      .eq('id', p.id);
+    if(error) throw error;
+
+    try{
+      await sb.from('equip_comentarios').insert([{
+        pedido_id: p.id,
+        texto: 'Trasladó la venta: '+(eraEsp?'Ventas Especiales':'Particulares')+' → '+destino,
+        autor: cu.nombre, origen: 'venta', automatico: true
+      }]);
+    }catch(e){}
+
+    await cargarEquip();
+    showToast('Trasladada a '+destino+'.');
+  }catch(e){
+    alert('No se pudo trasladar: '+(e.message||e));
+  }
+}
+
+// Botón de traslado en la fila
+function eqMoverFila(p){
+  if(!eqPuedeMover()) return '';
+  if(eqPaso(p) === 'anulado') return '';
+  const aEsp = !eqEsEspecial(p);
+  return ' <button class="btn-sm" onclick="event.stopPropagation();eqMoverScope(\''+p.id+'\')"'+
+         ' title="Trasladar a '+(aEsp?'Ventas Especiales':'Particulares')+'"'+
+         ' style="padding:5px 8px"><i class="ti ti-arrows-exchange" style="font-size:12px"></i></button>';
 }
 
 // Lápiz de edición en la fila, para quien carga ventas (no admin, que ya
