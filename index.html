@@ -3275,12 +3275,21 @@ async function editarSucursalEnc(wiseId){
       if(data){ encuestas = aplicarAsesorOverride(data); normalizarSucursales(); renderEncuestas(); }
     }catch(e2){/* si el refresco falla, ya se ve el cambio optimista */}
   }catch(err){
-    const m=String(err.message||'error');
-    if(/sucursal_override/.test(m) || /column/.test(m)){
-      alert('Falta la columna en la base. Corré el SQL "encuestas-sucursal-override.sql" en Supabase y volvé a intentar.');
-    }else{
-      alert('No se pudo corregir la sucursal: '+m);
-    }
+    // Mostramos SIEMPRE el error textual de Supabase: así se sabe si es una
+    // columna que falta, un permiso (RLS) o el caché del esquema sin recargar.
+    console.error('editarSucursalEnc:', err);
+    const m    = String(err.message || 'error');
+    const det  = [err.code, err.details, err.hint].filter(Boolean).join(' · ');
+    const falta = /sucursal_override/i.test(m) || /PGRST204/i.test(String(err.code||'')) ||
+                  (/column/i.test(m) && /does not exist|no existe|schema cache/i.test(m));
+    alert(
+      'No se pudo corregir la sucursal.\n\n' +
+      'Error: ' + m + (det ? '\n' + det : '') +
+      (falta
+        ? '\n\n→ Parece que falta la columna, o que Supabase todavía tiene el esquema viejo en caché.\n' +
+          'Corré "encuestas-sucursal-override.sql" (incluye el refresco del caché) y recargá con Ctrl+F5.'
+        : '')
+    );
   }
 }
 // Opciones oficiales de sucursal para el prompt de corrección.
