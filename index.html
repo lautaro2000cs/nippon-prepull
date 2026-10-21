@@ -3767,6 +3767,8 @@ const SUCURSAL_CANON = {
   'perticone':                'NEUQUEN',
   'perticone2095':            'NEUQUEN',
   'perticone2095casacentral': 'NEUQUEN',
+  'centenario':               'NEUQUEN',
+  'sucursalcentenario':       'NEUQUEN',
   'generalroca':         'ROCA',
   'sucursalroca':        'ROCA',
   'sanmartindelosandes': 'S.T.M.',
@@ -3782,6 +3784,7 @@ function canonSucursal(raw){
   const k = normSucursal(r);
   if(SUCURSAL_CANON[k]) return SUCURSAL_CANON[k];
   if(k.indexOf('perticone') === 0) return 'NEUQUEN';
+  if(k.indexOf('centenario') === 0) return 'NEUQUEN';   // "Centenario 1234", etc.
   return r.toUpperCase();
 }
 // Reescribe en memoria la sucursal de cada encuesta a su forma canónica.
