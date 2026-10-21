@@ -3839,11 +3839,12 @@ const PREGUNTAS_ASESOR = [
   ['p_limpieza',    'Limpieza del vehículo'],
 ];
 
-// Preguntas que el ADMIN puede desestimar: las 5 del asesor + Fac. para turnos.
-// (Turnos no afecta el promedio del asesor; se puede desestimar aparte.)
+// Preguntas que el ADMIN puede desestimar: las 5 del asesor + las que no
+// entran en su promedio pero igual se pueden quitar (turnos y tiempo de espera).
 const PREGUNTAS_DESESTIMABLES = [
   ...PREGUNTAS_ASESOR,
   ['p_turnos', 'Fac. para turnos'],
+  ['p_espera', 'Tiempo de espera'],
 ];
 
 // ¿la encuesta está anulada por el admin?
