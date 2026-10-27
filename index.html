@@ -1239,6 +1239,9 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
               <button class="btn-sm" id="eq-btn-nueva" onclick="eqAbrirAlta()" style="display:none">
                 <i class="ti ti-plus" style="font-size:13px;vertical-align:-2px"></i> Cargar venta
               </button>
+              <button class="btn-sm" id="eq-btn-export" onclick="eqExportarExcel()" title="Descargar los turnos en Excel" style="border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-weight:600">
+                <i class="ti ti-file-spreadsheet" style="font-size:14px;vertical-align:-2px"></i> Exportar Excel
+              </button>
               <button class="btn-sm" onclick="cargarEquip()" title="Actualizar">
                 <i class="ti ti-refresh" style="font-size:13px;vertical-align:-2px"></i>
               </button>
@@ -9426,6 +9429,57 @@ function eqPorDia(arr, desc){
       }).join('')+'</tbody></table></div>';
   }).join('');
 }
+// Exporta a Excel los turnos del ámbito actual (Equipamiento o Ventas
+// Especiales). Una fila por turno, con día, detalle, duración, si es externo
+// y si es venta especial o particular.
+function eqExportarExcel(){
+  if(typeof XLSX === 'undefined'){ alert('No se pudo cargar el generador de Excel. Recargá la página e intentá de nuevo.'); return; }
+
+  // turnos del ámbito actual que ya tienen fecha asignada (vigentes + históricos)
+  const arr = (eqPedidos||[])
+    .filter(p => eqEnScope(p) && eqPaso(p)==='turnado' && p.fecha)
+    .slice()
+    .sort((a,b) => {
+      if(a.fecha !== b.fecha) return a.fecha < b.fecha ? -1 : 1;
+      return String(a.codigo_turno||'').localeCompare(String(b.codigo_turno||''));
+    });
+
+  if(!arr.length){ alert('No hay turnos para exportar en esta vista.'); return; }
+
+  const ddmmyyyy = f => { const p=String(f).split('-'); return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : (f||''); };
+  const diaSemana = f => { const d=new Date(f+'T00:00:00'); return ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][d.getDay()] || ''; };
+
+  const filas = arr.map(p => ({
+    'Día del turno':   ddmmyyyy(p.fecha),
+    'Día':             diaSemana(p.fecha),
+    'Código de turno': p.codigo_turno || '',
+    'Cliente':         p.cliente || '',
+    'Chasis / Patente':p.dominio || '',
+    'Detalle (qué se vendió)': p.trabajo || '',
+    'Duración':        p.tiempo_trabajo || '',
+    'Externo':         eqEsExterno(p) ? 'Sí' : 'No',
+    'Ámbito':          eqEsEspecial(p) ? 'Venta especial' : 'Particular',
+    'Pre-Or':          p.nro_preor || '',
+    'Prospecto':       p.nro_prosp || '',
+    'Equipada':        p.equipada ? 'Sí' : 'No',
+    'Pre-Or SIAC':     p.preor_siac ? 'Sí' : 'No',
+    'Vendedor':        p.vendedor || '',
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(filas);
+  ws['!cols'] = [
+    {wch:13},{wch:11},{wch:14},{wch:26},{wch:14},{wch:40},
+    {wch:10},{wch:9},{wch:15},{wch:12},{wch:12},{wch:10},{wch:12},{wch:20},
+  ];
+  const wb = XLSX.utils.book_new();
+  const hojaNom = (eqScope==='especial') ? 'Ventas Especiales' : 'Equipamiento';
+  XLSX.utils.book_append_sheet(wb, ws, hojaNom);
+
+  const hoy = eqHoy().split('-').reverse().join('-');
+  const tag = (eqScope==='especial') ? 'ventas_especiales' : 'equipamiento';
+  XLSX.writeFile(wb, 'turnos_'+tag+'_'+hoy+'.xlsx');
+}
+
 function eqIrADia(f){
   const el=document.getElementById('eq-d-'+f);
   if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
