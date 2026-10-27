@@ -2854,7 +2854,8 @@ function actualizarBadgeDesest(){
   if(cu && cu.rol === 'admin'){
     n = desestimaciones.filter(d => d.estado === 'pendiente').length;
   }else if(cu){
-    const mios = desestDelUsuario();
+    // Sin los pedidos vencidos (mes de estudio ya cerrado).
+    const mios = desestDelUsuario().filter(d => !desestVencida(d));
     const vistos = pedidosVistos();
     n = mios.filter(d =>
       ['en_revision','aprobado','rechazado'].includes(d.estado) &&
@@ -2932,8 +2933,9 @@ function renderDesest(){
   const selModo = document.getElementById('desest-modo');
   if(selModo){ selModo.style.display = esAdmin ? '' : 'none'; if(esAdmin) selModo.value = desestModo; }
 
-  // Ámbito según rol
-  const mios = desestDelUsuario();
+  // Ámbito según rol. Los pedidos "en revisión" cuyo mes de estudio ya pasó
+  // se dan por vencidos y no se muestran (el mes de comisiones ya se cerró).
+  const mios = desestDelUsuario().filter(d => !desestVencida(d));
 
   // --- Panel de tarjetas de resumen (para asesor y jefe de servicio) ---
   if(cards){
@@ -3018,6 +3020,43 @@ function desestMesLabel(m){
   return (n||mm)+' '+y;
 }
 
+// Mes actual en formato YYYY-MM (hora local, no UTC).
+function mesActualLocal(){
+  const d = new Date(); const p = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1);
+}
+// Un pedido que quedó "en revisión" cuyo mes de estudio YA PASÓ se da por
+// vencido: ese mes ya se cerró, no tiene sentido seguir esperando el descargo.
+// Se saca de las listas (el dato sigue en la base, solo no se muestra).
+function desestVencida(d){
+  if(!d || d.estado !== 'en_revision') return false;
+  const m = desestMes(d);
+  return !!m && m < mesActualLocal();
+}
+
+// Bloque de descargo dentro de la tarjeta de Desestimaciones.
+// Si al usuario le corresponde responder, muestra el formulario ahí mismo;
+// si no, muestra el estado de la revisión.
+function bloqueDescargo(d, did){
+  if(d.estado !== 'en_revision') return '';
+  const esMio   = d.solicitante_username && cu && d.solicitante_username === cu.username;
+  const esAdmin = cu && cu.rol === 'admin';
+  const puede   = d.revision_abierta && !d.descargo && (esMio || esAdmin);
+  if(puede){
+    const fid = 'dcg-'+d.id;
+    return `
+      <div style="margin-top:10px;padding:14px;background:#eff6ff;border:1px solid #93c5fd;border-radius:10px">
+        <div style="font-size:13px;color:#1e40af;font-weight:700;margin-bottom:4px"><i class="ti ti-message-2-bolt" style="font-size:15px;vertical-align:-2px"></i> Te pidieron un descargo</div>
+        <div style="font-size:12.5px;color:var(--text-2);margin-bottom:10px">${escapeHtml(d.decision_admin || 'El revisor dejó el pedido abierto para que respondas o aportes evidencia.')}</div>
+        <textarea id="${fid}-txt" rows="3" placeholder="Escribí tu respuesta o descargo…" style="width:100%;padding:9px 11px;border:1px solid #93c5fd;border-radius:8px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
+        <label style="font-size:12px;color:var(--text-3);display:block;margin:8px 0 4px">Evidencia (opcional): foto o documento</label>
+        <input type="file" id="${fid}-file" accept="image/*,.pdf" style="font-size:12px">
+        <button onclick="enviarDescargo(${d.id},'${fid}')" style="margin-top:10px;font-size:13px;padding:8px 20px;border-radius:8px;cursor:pointer;border:none;background:#2563eb;color:#fff;font-weight:700">Enviar descargo</button>
+      </div>`;
+  }
+  return `<div style="margin-top:8px;padding:10px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;font-size:13px;color:var(--text-2)"><b>En revisión:</b> ${escapeHtml(d.decision_admin||'Se pidió descargo al solicitante.')} <span style="color:var(--text-4)">${d.descargo?'— descargo recibido':'— esperando descargo'}</span></div>`;
+}
+
 function filtrarDesestCard(key){
   desestCardFilter = key;
   renderDesest();
@@ -3072,7 +3111,7 @@ function tarjetaDesest(d){
       ${d.descargo ? `<div style="margin:10px 0;padding:10px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#2563eb;font-weight:700;margin-bottom:3px">Descargo del solicitante</div><div style="font-size:13px;color:var(--text-2);white-space:pre-wrap">${escapeHtml(d.descargo)}${d.descargo_por?` <span style="color:var(--text-4)">— ${escapeHtml(d.descargo_por)}${d.descargo_en?', '+new Date(d.descargo_en).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}):''}</span>`:''}</div>${urlEvidencia(d.descargo_path)?`<div style="margin-top:8px"><a href="${urlEvidencia(d.descargo_path)}" target="_blank" style="font-size:12px;color:#4f46e5;font-weight:600;text-decoration:none">📎 Ver evidencia del descargo</a></div>`:''}</div>` : ''}
 
       ${(cu && cu.rol==='admin') && d.estado === 'pendiente' && e ? bloqueResolver(d, e, did) : ''}
-      ${d.estado === 'en_revision' ? `<div style="margin-top:8px;padding:10px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;font-size:13px;color:var(--text-2)"><b>En revisión:</b> ${escapeHtml(d.decision_admin||'Se pidió descargo al solicitante.')} <span style="color:var(--text-4)">— esperando descargo</span></div>` : ''}
+      ${bloqueDescargo(d, did)}
       ${(d.estado === 'aprobado' || d.estado === 'rechazado') ? (
         (cu && cu.rol==='admin' && e && desestEditando.has(d.id))
           ? bloqueResolver(d, e, did, true)
@@ -5612,7 +5651,7 @@ function pedidoAsesorHtml(e){
     const fid = 'desc-'+encodeURIComponent(wid).replace(/[^a-z0-9]/gi,'')+'-'+(pedido.id||idx);
     // el descargo lo carga quien hizo ESE pedido (o el admin)
     const esMio = pedido.solicitante_username && pedido.solicitante_username === miUser;
-    const puedeDescargar = pedido.estado === 'en_revision' && pedido.revision_abierta && !pedido.descargo && (esMio || esAdmin);
+    const puedeDescargar = pedido.estado === 'en_revision' && pedido.revision_abierta && !pedido.descargo && (esMio || esAdmin) && !desestVencida(pedido);
     return `
       <div style="margin-top:16px;padding:14px;background:#f8fafc;border:1px solid var(--border-1);border-radius:10px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
@@ -5686,6 +5725,8 @@ async function enviarDescargo(id, fid){
     if(error) throw error;
     await cargarDesestimaciones();
     renderEncuestas();
+    if(typeof renderDesest === 'function' && document.getElementById('desest-cards')) renderDesest();
+    showToast('Descargo enviado.');
   }catch(err){
     alert('No se pudo enviar el descargo: ' + (err.message||'error'));
   }
