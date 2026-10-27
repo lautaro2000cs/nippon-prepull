@@ -1232,16 +1232,22 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
               <h2 id="eq-h2">Equipamiento</h2>
               <div class="tb-sub" id="eq-sub" style="margin-top:4px"></div>
             </div>
-            <div class="hdr-actions" style="display:flex;gap:8px;align-items:center">
+            <div class="hdr-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <button class="btn-sm" id="eq-btn-masiva" onclick="eqmAbrir()" style="display:none">
                 <i class="ti ti-building-warehouse" style="font-size:13px;vertical-align:-2px"></i> Carga masiva
               </button>
               <button class="btn-sm" id="eq-btn-nueva" onclick="eqAbrirAlta()" style="display:none">
                 <i class="ti ti-plus" style="font-size:13px;vertical-align:-2px"></i> Cargar venta
               </button>
-              <button class="btn-sm" id="eq-btn-export" onclick="eqExportarExcel()" title="Descargar los turnos en Excel" style="border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-weight:600">
-                <i class="ti ti-file-spreadsheet" style="font-size:14px;vertical-align:-2px"></i> Exportar Excel
-              </button>
+              <div style="display:flex;align-items:center;gap:5px;border-left:1px solid var(--border-1);padding-left:8px">
+                <label style="font-size:11px;color:var(--text-4)">Desde</label>
+                <input type="date" id="eq-exp-desde" class="filter-sel" style="padding:6px 8px;font-size:12px" title="Desde (para el Excel)">
+                <label style="font-size:11px;color:var(--text-4)">Hasta</label>
+                <input type="date" id="eq-exp-hasta" class="filter-sel" style="padding:6px 8px;font-size:12px" title="Hasta (para el Excel)">
+                <button class="btn-sm" id="eq-btn-export" onclick="eqExportarExcel()" title="Descargar los turnos en Excel (respeta el rango de fechas)" style="border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-weight:600">
+                  <i class="ti ti-file-spreadsheet" style="font-size:14px;vertical-align:-2px"></i> Exportar Excel
+                </button>
+              </div>
               <button class="btn-sm" onclick="cargarEquip()" title="Actualizar">
                 <i class="ti ti-refresh" style="font-size:13px;vertical-align:-2px"></i>
               </button>
@@ -9435,16 +9441,25 @@ function eqPorDia(arr, desc){
 function eqExportarExcel(){
   if(typeof XLSX === 'undefined'){ alert('No se pudo cargar el generador de Excel. Recargá la página e intentá de nuevo.'); return; }
 
+  // Rango de fechas (opcional). Si se completa, filtra por día del turno.
+  let desde = (document.getElementById('eq-exp-desde')||{}).value || '';
+  let hasta = (document.getElementById('eq-exp-hasta')||{}).value || '';
+  if(desde && hasta && desde > hasta){ const t=desde; desde=hasta; hasta=t; }
+
   // turnos del ámbito actual que ya tienen fecha asignada (vigentes + históricos)
   const arr = (eqPedidos||[])
     .filter(p => eqEnScope(p) && eqPaso(p)==='turnado' && p.fecha)
+    .filter(p => (!desde || p.fecha >= desde) && (!hasta || p.fecha <= hasta))
     .slice()
     .sort((a,b) => {
       if(a.fecha !== b.fecha) return a.fecha < b.fecha ? -1 : 1;
       return String(a.codigo_turno||'').localeCompare(String(b.codigo_turno||''));
     });
 
-  if(!arr.length){ alert('No hay turnos para exportar en esta vista.'); return; }
+  if(!arr.length){
+    alert(desde||hasta ? 'No hay turnos en ese rango de fechas.' : 'No hay turnos para exportar en esta vista.');
+    return;
+  }
 
   const ddmmyyyy = f => { const p=String(f).split('-'); return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : (f||''); };
   const diaSemana = f => { const d=new Date(f+'T00:00:00'); return ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][d.getDay()] || ''; };
@@ -9457,6 +9472,7 @@ function eqExportarExcel(){
     'Chasis / Patente':p.dominio || '',
     'Detalle (qué se vendió)': p.trabajo || '',
     'Duración':        p.tiempo_trabajo || '',
+    'Duración (h:mm)': eqAHoras(p.tiempo_trabajo) / 24,  // valor de tiempo de Excel (promediable)
     'Externo':         eqEsExterno(p) ? 'Sí' : 'No',
     'Ámbito':          eqEsEspecial(p) ? 'Venta especial' : 'Particular',
     'Pre-Or':          p.nro_preor || '',
@@ -9467,17 +9483,39 @@ function eqExportarExcel(){
   }));
 
   const ws = XLSX.utils.json_to_sheet(filas);
+
+  // La columna "Duración (h:mm)" (la 8va, índice 7) se formatea como tiempo real,
+  // así AVERAGE/SUM en Excel funcionan y se muestran como 0:30, 1:35, etc.
+  const COL_HMM = 7;
+  for(let i = 0; i < filas.length; i++){
+    const ref = XLSX.utils.encode_cell({ r: i+1, c: COL_HMM });
+    if(ws[ref]){ ws[ref].t = 'n'; ws[ref].z = '[h]:mm'; }
+  }
+
+  // Fila de resumen: promedio y total de duración, listos para usar.
+  const filaProm = filas.length + 3;           // header + filas + 1 fila en blanco
+  const rango = XLSX.utils.encode_cell({r:1,c:COL_HMM}) + ':' + XLSX.utils.encode_cell({r:filas.length,c:COL_HMM});
+  const colL = XLSX.utils.encode_col(COL_HMM-1); // etiqueta en la columna de "Duración" (texto)
+  const colV = XLSX.utils.encode_col(COL_HMM);
+  ws[colL+(filaProm)]   = { t:'s', v:'Promedio' };
+  ws[colV+(filaProm)]   = { t:'n', f:'AVERAGE('+rango+')', z:'[h]:mm' };
+  ws[colL+(filaProm+1)] = { t:'s', v:'Total' };
+  ws[colV+(filaProm+1)] = { t:'n', f:'SUM('+rango+')', z:'[h]:mm' };
+  // extender el rango de la hoja para que incluya las filas de resumen
+  const rangoHoja = XLSX.utils.decode_range(ws['!ref']);
+  if(rangoHoja.e.r < filaProm) { rangoHoja.e.r = filaProm; ws['!ref'] = XLSX.utils.encode_range(rangoHoja); }
+
   ws['!cols'] = [
     {wch:13},{wch:11},{wch:14},{wch:26},{wch:14},{wch:40},
-    {wch:10},{wch:9},{wch:15},{wch:12},{wch:12},{wch:10},{wch:12},{wch:20},
+    {wch:10},{wch:13},{wch:9},{wch:15},{wch:12},{wch:12},{wch:10},{wch:12},{wch:20},
   ];
   const wb = XLSX.utils.book_new();
   const hojaNom = (eqScope==='especial') ? 'Ventas Especiales' : 'Equipamiento';
   XLSX.utils.book_append_sheet(wb, ws, hojaNom);
 
-  const hoy = eqHoy().split('-').reverse().join('-');
   const tag = (eqScope==='especial') ? 'ventas_especiales' : 'equipamiento';
-  XLSX.writeFile(wb, 'turnos_'+tag+'_'+hoy+'.xlsx');
+  const suf = (desde||hasta) ? ('_'+(desde||'inicio')+'_a_'+(hasta||'hoy')) : ('_'+eqHoy());
+  XLSX.writeFile(wb, 'turnos_'+tag+suf+'.xlsx');
 }
 
 function eqIrADia(f){
