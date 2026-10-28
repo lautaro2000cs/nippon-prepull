@@ -1952,7 +1952,7 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
       <div><label>Nombre completo</label><input type="text" id="f-usr-nombre" placeholder="Apellido, Nombre"/></div>
       <div><label>Correo corporativo</label><input type="email" id="f-usr-email" placeholder="correo@nipponcarsrl.com.ar" autocomplete="off"/></div>
       <div><label>Rol / sector</label><select id="f-usr-rol" onchange="toggleSucUsr();renderExtrasUsr()"><option value="">Seleccionar...</option></select></div>
-      <div id="f-usr-suc-wrap"><label>Sucursal fija (opcional)</label><select id="f-usr-suc"><option value="">Sin sucursal fija — ve todas</option><option>Roca</option><option>Perticone</option><option>Aguado</option><option>Añelo</option><option>Bariloche</option></select></div>
+      <div id="f-usr-suc-wrap"><label>Sucursal fija (opcional)</label><select id="f-usr-suc"><option value="">Sin sucursal fija — ve todas</option><option value="Perticone">Neuquén (Perticone)</option><option value="Roca">Roca</option><option value="Bariloche">Bariloche</option><option value="Añelo">Añelo</option><option value="Aguado">Central Flotas (Aguado)</option><option value="S.T.M.">S.T.M. (incluye CDO y Hiace)</option><option value="CDO Y HIACE">CDO y Hiace</option></select></div>
       <div id="f-usr-asesor-wrap" style="display:none"><label>Nombre del asesor en Wise</label><select id="f-usr-asesorwise"><option value="">Seleccionar asesor…</option></select><div style="font-size:11px;color:var(--text-4);margin-top:3px">Vincula al asesor con sus encuestas (para pedir desestimación de las suyas).</div></div>
     </div>
     <div style="margin-top:14px">
@@ -3862,13 +3862,26 @@ const PREPULL_A_ENCUESTA = {
   'perticone': 'neuquen',
   'aguado':    'ctralflotas',   // Aguado (Pre Pull) = CTRAL FLOTAS (Wise)
 };
+// Agrupaciones de "servicio técnico": una jefatura cubre varias etiquetas de
+// sucursal en las encuestas. S.T.M. y CDO Y HIACE son el mismo servicio técnico,
+// así que el jefe que tenga una, ve las dos.
+const SUCURSAL_GRUPOS = [
+  ['stm', 'cdoyhiace'],
+];
+function expandirGruposSucursal(set){
+  SUCURSAL_GRUPOS.forEach(grupo => {
+    if(grupo.some(s => set.has(s))) grupo.forEach(s => set.add(s));
+  });
+  return set;
+}
 // Sucursales del usuario expresadas como aparecen en las encuestas
-// (las suyas + sus equivalencias de Pre Pull → Wise), normalizadas.
+// (las suyas + sus equivalencias de Pre Pull → Wise + su grupo de servicio),
+// normalizadas.
 function sucursalesJefeEnEncuestas(){
   const base = sucursalesJefe(); // ya normalizadas
   const sucs = new Set(base);
   base.forEach(s => { if(PREPULL_A_ENCUESTA[s]) sucs.add(PREPULL_A_ENCUESTA[s]); });
-  return sucs;
+  return expandirGruposSucursal(sucs);
 }
 function encuestaEnSucursalDelJefe(e){
   const sucs = sucursalesJefeEnEncuestas();
