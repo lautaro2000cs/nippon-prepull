@@ -2906,6 +2906,29 @@ function urlEvidencia(path){
   return data?.publicUrl || null;
 }
 
+// La evidencia puede ser 1 archivo (texto, formato viejo) o varios (JSON array).
+// Devuelve siempre la lista de rutas.
+function evidenciaLista(path){
+  if(!path) return [];
+  const s = String(path).trim();
+  if(s.startsWith('[')){
+    try{ const a = JSON.parse(s); return Array.isArray(a) ? a.filter(Boolean) : []; }
+    catch(e){ return [s]; }
+  }
+  return [s];
+}
+// Devuelve el HTML con un link por cada archivo adjunto.
+function linksEvidencia(path, label){
+  const arr = evidenciaLista(path);
+  if(!arr.length) return '';
+  return arr.map((p, i) => {
+    const u = urlEvidencia(p);
+    if(!u) return '';
+    const txt = arr.length > 1 ? `${label} ${i+1}` : label;
+    return `<a href="${u}" target="_blank" style="font-size:12px;color:#4f46e5;font-weight:600;text-decoration:none;margin-right:14px;white-space:nowrap">📎 ${txt}</a>`;
+  }).filter(Boolean).join('');
+}
+
 // Estado global del filtro por tarjeta (para asesor/jefe)
 let desestCardFilter = 'todos';
 
@@ -3078,7 +3101,7 @@ function tarjetaDesest(d){
   const colores = { pendiente:'#d97706', aprobado:'#16a34a', rechazado:'#dc2626', en_revision:'#2563eb' };
   const etiquetas = { pendiente:'Pendiente', aprobado:'Aprobado', rechazado:'Rechazado', en_revision:'En revisión' };
   const col = colores[d.estado] || '#6b7280';
-  const evUrl = urlEvidencia(d.evidencia_path);
+  const evLinks = linksEvidencia(d.evidencia_path, 'Ver evidencia adjunta');
   const did = 'desest-'+d.id;
 
   // datos de la encuesta
@@ -3114,7 +3137,7 @@ function tarjetaDesest(d){
       <div style="margin:12px 0;padding:10px 13px;background:#f8fafc;border-radius:9px">
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-4);font-weight:700;margin-bottom:3px">Motivo del asesor</div>
         <div style="font-size:13px;color:var(--text-2)">${escapeHtml(d.motivo)}</div>
-        ${evUrl ? `<div style="margin-top:8px"><a href="${evUrl}" target="_blank" style="font-size:12px;color:#4f46e5;font-weight:600;text-decoration:none">📎 Ver evidencia adjunta</a></div>` : '<div style="margin-top:6px;font-size:12px;color:var(--text-4)">Sin evidencia adjunta</div>'}
+        ${evLinks ? `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px 0">${evLinks}</div>` : '<div style="margin-top:6px;font-size:12px;color:var(--text-4)">Sin evidencia adjunta</div>'}
       </div>
 
       ${d.descargo ? `<div style="margin:10px 0;padding:10px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#2563eb;font-weight:700;margin-bottom:3px">Descargo del solicitante</div><div style="font-size:13px;color:var(--text-2);white-space:pre-wrap">${escapeHtml(d.descargo)}${d.descargo_por?` <span style="color:var(--text-4)">— ${escapeHtml(d.descargo_por)}${d.descargo_en?', '+new Date(d.descargo_en).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}):''}</span>`:''}</div>${urlEvidencia(d.descargo_path)?`<div style="margin-top:8px"><a href="${urlEvidencia(d.descargo_path)}" target="_blank" style="font-size:12px;color:#4f46e5;font-weight:600;text-decoration:none">📎 Ver evidencia del descargo</a></div>`:''}</div>` : ''}
@@ -5718,8 +5741,8 @@ function pedidoAsesorHtml(e){
       <div id="${fid}" style="display:none;margin-top:12px">
         <label style="font-size:12px;color:var(--text-3);display:block;margin-bottom:4px">¿Por qué considerás que esta encuesta debería revisarse?</label>
         <textarea id="${fid}-motivo" rows="3" placeholder="Explicá el motivo…" style="width:100%;padding:9px 11px;border:1px solid var(--border-2);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
-        <label style="font-size:12px;color:var(--text-3);display:block;margin:8px 0 4px">Evidencia (opcional): foto o documento</label>
-        <input type="file" id="${fid}-file" accept="image/*,.pdf" style="font-size:12px">
+        <label style="font-size:12px;color:var(--text-3);display:block;margin:8px 0 4px">Evidencia (opcional): podés adjuntar hasta 5 fotos o documentos</label>
+        <input type="file" id="${fid}-file" accept="image/*,.pdf" multiple style="font-size:12px">
         <div style="margin-top:10px;display:flex;gap:8px">
           <button onclick="enviarPedidoDesestimacion('${encodeURIComponent(wid)}','${fid}')"
             style="font-size:12px;padding:7px 16px;border-radius:8px;cursor:pointer;border:none;background:#4f46e5;color:#fff;font-weight:600">Enviar pedido</button>
@@ -5771,20 +5794,28 @@ async function enviarPedidoDesestimacion(widEnc, fid){
   const motivo = (document.getElementById(fid+'-motivo')?.value || '').trim();
   if(!motivo){ alert('Escribí un motivo para el pedido.'); return; }
   const fileInput = document.getElementById(fid+'-file');
-  const file = fileInput?.files?.[0] || null;
+  let archivos = Array.from(fileInput?.files || []);
+  const MAX_ARCHIVOS = 5;
+  if(archivos.length > MAX_ARCHIVOS){
+    alert('Podés adjuntar hasta '+MAX_ARCHIVOS+' archivos. Se tomarán los primeros '+MAX_ARCHIVOS+'.');
+    archivos = archivos.slice(0, MAX_ARCHIVOS);
+  }
 
   const btn = document.querySelector(`#${fid} button`);
   try{
-    let evidenciaPath = null;
-    // subir evidencia si hay archivo
-    if(file){
-      const ext = file.name.split('.').pop();
-      const nombre = `${cu.username}_${Date.now()}.${ext}`;
+    // subir cada evidencia y juntar las rutas
+    const rutas = [];
+    for(let i = 0; i < archivos.length; i++){
+      const f = archivos[i];
+      const ext = f.name.split('.').pop();
+      const nombre = `${cu.username}_${Date.now()}_${i}.${ext}`;
       const { data: up, error: upErr } = await sb.storage
-        .from('evidencias').upload(nombre, file, { upsert:false });
+        .from('evidencias').upload(nombre, f, { upsert:false });
       if(upErr) throw new Error('Al subir evidencia: ' + upErr.message);
-      evidenciaPath = up.path;
+      rutas.push(up.path);
     }
+    // 0 archivos -> null · 1 -> ruta (formato viejo) · varios -> JSON array
+    const evidenciaPath = rutas.length === 0 ? null : (rutas.length === 1 ? rutas[0] : JSON.stringify(rutas));
     // asesor al que corresponde la encuesta (para que el admin sepa a quién afecta).
     // Si lo pide el propio asesor, es él; si lo pide un jefe, es el asesor de la encuesta.
     const encRef = (encuestas || []).find(x => x.wise_id === wid);
