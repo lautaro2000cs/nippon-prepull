@@ -1275,6 +1275,11 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
               <div class="eq-sv" id="eq-v-turnado">0</div>
               <div class="eq-sd">Con fecha asignada</div>
             </button>
+            <button class="eq-step" id="eq-s-noshow" onclick="eqVer('noshow')">
+              <div class="eq-sn"><i class="ti ti-user-x"></i> No Show</div>
+              <div class="eq-sv" id="eq-v-noshow">0</div>
+              <div class="eq-sd">No vinieron al turno</div>
+            </button>
             <button class="eq-step" id="eq-s-hist" onclick="eqVer('hist')">
               <div class="eq-sn"><i class="ti ti-history"></i> Histórico</div>
               <div class="eq-sv" id="eq-v-hist">0</div>
@@ -9320,6 +9325,7 @@ function eqFmtHoras(h){
 // en qué paso del circuito está el pedido
 function eqPaso(p){
   if(p.anulado) return 'anulado';
+  if(p.no_show) return 'noshow';   // el cliente no vino: sale de los turnados
   if(p.fecha) return 'turnado';
   if(p.estado_stock==='disponible') return 'listo';
   // pedida con fecha de arribo conocida: ya se puede turnar
@@ -9348,7 +9354,7 @@ async function cargarEquip(){
 
 function eqVer(v){
   eqVista=v;
-  ['espera','listo','sin','turnado','hist'].forEach(x=>{
+  ['espera','listo','sin','turnado','noshow','hist'].forEach(x=>{
     const el=document.getElementById('eq-s-'+x);
     if(el) el.classList.toggle('act', x===v);
   });
@@ -9360,6 +9366,7 @@ const EQ_SUB={
   listo  :'Tienen la pieza confirmada (o pedida con fecha de arribo). Ya se pueden turnar.',
   sin    :'No hay stock o está pedida sin fecha. No se pueden turnar todavía.',
   turnado:'Ya tienen fecha y hora asignada.',
+  noshow :'Clientes que no vinieron a su turno. Quedan acá apartados para no mezclarse con los turnos vigentes.',
   hist   :'Turnos de días pasados ya marcados como equipados. Se ordenan del más reciente al más antiguo.'
 };
 const EQ_VACIO={
@@ -9367,6 +9374,7 @@ const EQ_VACIO={
   listo  :['package','Ningún pedido listo todavía','Los pedidos llegan acá cuando stock confirma que hay pieza, o que está pedida con fecha de arribo.'],
   sin    :['circle-check','Sin pedidos trabados','Ningún pedido está frenado por falta de pieza.'],
   turnado:['calendar','Sin turnos asignados','Los pedidos con pieza confirmada se turnan desde la solapa "Listos para turnar".'],
+  noshow :['user-x','Sin No Shows','Cuando un cliente no venga a su turno, marcalo como No Show y queda guardado acá.'],
   hist   :['history','Sin histórico todavía','Cuando un turno pasado se marca como equipado, se archiva acá y podés consultarlo por fecha.']
 };
 
@@ -9377,7 +9385,7 @@ function eqRender(){
   // Solo los pedidos del scope activo (normal vs ventas especiales)
   const base = eqPedidos.filter(eqEnScope);
 
-  const c={espera:0,listo:0,sin:0,turnado:0,hist:0};
+  const c={espera:0,listo:0,sin:0,turnado:0,noshow:0,hist:0};
   base.forEach(p=>{ const k=eqPaso(p); if(c[k]===undefined) return;
     if(k==='turnado' && !eqTurnadoVigente(p)){ c.hist++; return; }   // pasados y equipados -> histórico
     c[k]++; });
@@ -9426,8 +9434,8 @@ function eqRender(){
   // En Ventas Especiales, las vistas de stock (espera/listos/sin) se agrupan por
   // empresa para que Repuestos confirme stock por camioneta (entregas parciales).
   const porEmpresa = (eqScope==='especial' && (eqVista==='espera'||eqVista==='listo'||eqVista==='sin'));
-  cont.innerHTML = (eqVista==='turnado'||eqVista==='hist')
-      ? eqPorDia(arr, eqVista==='hist')
+  cont.innerHTML = (eqVista==='turnado'||eqVista==='hist'||eqVista==='noshow')
+      ? eqPorDia(arr, eqVista==='hist'||eqVista==='noshow')
       : (porEmpresa ? eqTablaEmpresa(arr) : eqTabla(arr));
 }
 
@@ -9478,7 +9486,7 @@ function eqPorDia(arr, desc){
         '<td>'+(p.tiempo_trabajo?'<span class="eq-chip">'+eqEsc(p.tiempo_trabajo)+'</span>':'—')+'</td>'+
         '<td style="text-align:center">'+eqEquipCell(p)+'</td>'+
         '<td style="text-align:center">'+eqPreorCell(p)+'</td>'+
-        '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqMoverFila(p)+eqDel(p)+'</td></tr>';
+        '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqMoverFila(p)+eqNoShowFila(p)+eqDel(p)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   }).join('');
 }
@@ -9622,7 +9630,7 @@ function eqFila(p){
     '<td>'+eqPrioPill(p.prioridad)+
       (p.motivo_prioridad?'<div style="font-size:10.5px;color:var(--text-5);margin-top:3px">'+eqEsc(p.motivo_prioridad)+'</div>':'')+'</td>'+
     '<td>'+eqStockPill(p.estado_stock)+eta+comHtml+'</td>'+
-    '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqMoverFila(p)+eqDel(p)+'</td></tr>';
+    '<td style="white-space:nowrap">'+eqBtn(p)+eqEditFila(p)+eqMoverFila(p)+eqNoShowFila(p)+eqDel(p)+'</td></tr>';
 }
 
 // Papelera al final de cada fila, sólo para el admin.
@@ -9678,6 +9686,45 @@ function eqMoverFila(p){
   return ' <button class="btn-sm" onclick="event.stopPropagation();eqMoverScope(\''+p.id+'\')"'+
          ' title="Trasladar a '+(aEsp?'Ventas Especiales':'Particulares')+'"'+
          ' style="padding:5px 8px"><i class="ti ti-arrows-exchange" style="font-size:12px"></i></button>';
+}
+
+// Botón No Show: en un turnado lo marca; en la solapa No Show, lo revierte.
+// Lo usa el vendedor (y el admin). Solo tiene sentido en turnados / no shows.
+const eqPuedeNoShow = () => esAdmin() || eqPuedeVender();
+function eqNoShowFila(p){
+  if(!eqPuedeNoShow()) return '';
+  const paso = eqPaso(p);
+  if(paso !== 'turnado' && paso !== 'noshow') return '';
+  if(p.no_show){
+    return ' <button class="btn-sm" onclick="event.stopPropagation();eqMarcarNoShow(\''+p.id+'\',false)"'+
+           ' title="Quitar No Show (vuelve a los turnos)" style="padding:5px 8px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d">'+
+           '<i class="ti ti-arrow-back-up" style="font-size:12px"></i></button>';
+  }
+  return ' <button class="btn-sm" onclick="event.stopPropagation();eqMarcarNoShow(\''+p.id+'\',true)"'+
+         ' title="Marcar No Show (el cliente no vino)" style="padding:5px 8px;border:1px solid #d97706;background:#fffbeb;color:#92400e">'+
+         '<i class="ti ti-user-x" style="font-size:12px"></i></button>';
+}
+async function eqMarcarNoShow(id, val){
+  const p = (eqPedidos||[]).find(x => String(x.id) === String(id));
+  if(!p) return;
+  if(val && !confirm('¿Marcar como No Show a "'+(p.cliente||'esta venta')+'"?\n\nSale de los turnos y queda apartado en la solapa "No Show". Se puede revertir.')) return;
+  try{
+    const { error } = await sb.from('equip_pedidos').update({ no_show: !!val }).eq('id', p.id);
+    if(error) throw error;
+    try{
+      await sb.from('equip_comentarios').insert([{
+        pedido_id: p.id,
+        texto: val ? 'Marcó No Show (el cliente no vino al turno)' : 'Quitó el No Show (vuelve a los turnos)',
+        autor: cu.nombre, origen: 'venta', automatico: true
+      }]);
+    }catch(e){}
+    await cargarEquip();
+    showToast(val ? 'Marcado como No Show.' : 'No Show quitado.');
+  }catch(e){
+    const m = String(e.message||e);
+    if(/no_show|column/i.test(m)) alert('Falta la columna en la base. Corré el SQL "equip-no-show.sql" en Supabase y volvé a intentar.');
+    else alert('No se pudo marcar: '+m);
+  }
 }
 
 // Lápiz de edición en la fila, para quien carga ventas (no admin, que ya
