@@ -4182,16 +4182,11 @@ function renderEncuestas(){
   else if(encSubTab === 'tablero') renderTableros();
   else if(encSubTab === 'fir') cargarFir();
   else renderEncDetalle();
-  // contadores de las sub-tabs
-  // conjunto base visible según el rol (jefe de servicio: solo su sucursal)
-  const baseVisible = esJefeServicio()
-    ? encuestas.filter(encuestaEnSucursalDelJefe)
-    : encuestas;
-  const misEncuestas = esAsesor()
-    ? encuestas.filter(e => normAsesor(e.asesor) === normAsesor(cu.asesorWise))
-    : baseVisible;
-  const total = misEncuestas.length;
-  const asesores = new Set(baseVisible.map(e=>e.asesor).filter(Boolean)).size;
+  // contadores de las sub-tabs: respetan los filtros activos (fecha + sucursal),
+  // así el número al lado de "Detalle" / "Por asesor" coincide con lo que se ve.
+  const filtradas = encuestasFiltradas(true);
+  const total = filtradas.length;
+  const asesores = new Set(filtradas.map(e=>e.asesor).filter(Boolean)).size;
   const cAses = document.getElementById('cnt-enc-asesores');
   const cDet  = document.getElementById('cnt-enc-detalle');
   if(cAses) cAses.textContent = asesores;
