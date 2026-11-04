@@ -4000,7 +4000,17 @@ function puedeFiltrarSucursal(){
 // Sucursales presentes en los datos (respeta el filtro del jefe de servicio),
 // devueltas como [{norm, label, count}] ordenadas alfabéticamente.
 function sucursalesDisponibles(){
-  const base = esJefeServicio() ? encuestas.filter(encuestaEnSucursalDelJefe) : encuestas;
+  let base = esJefeServicio() ? encuestas.filter(encuestaEnSucursalDelJefe) : encuestas;
+
+  // Respetar el filtro de fecha (Desde/Hasta) para que el contador de cada
+  // sucursal coincida con lo que se está viendo. NO se aplica el filtro de
+  // sucursal: los chips siempre muestran todas, con su total del período.
+  const fechaDe = (e) => e.fecha_respuesta || e.fecha;
+  const desde = document.getElementById('enc-desde')?.value;
+  const hasta = document.getElementById('enc-hasta')?.value;
+  if(desde) base = base.filter(e => { const f = fechaCalEnc(fechaDe(e)); return f && f >= desde; });
+  if(hasta) base = base.filter(e => { const f = fechaCalEnc(fechaDe(e)); return f && f <= hasta; });
+
   const mapa = new Map(); // norm -> {label, count}
   base.forEach(e => {
     const raw = (e.sucursal || '').trim();
