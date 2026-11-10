@@ -809,6 +809,10 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
           Vehículos Detenidos
         </button>
+        <button class="nav-item" id="tab-lavado" style="display:none" onclick="swTab('lavado',this)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13a9 9 0 0 1 18 0"/><path d="M12 13v8"/><path d="M8 17v4"/><path d="M16 17v4"/></svg>
+          Lavado
+        </button>
       </nav>
 
       <div class="sidebar-divider"></div>
@@ -1342,6 +1346,34 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
           </div>
           <div id="det-cards" style="margin-bottom:16px"></div>
           <div id="det-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
+        </div>
+
+        <!-- ===================== LAVADO ===================== -->
+        <div class="tc" id="tc-lavado">
+          <div class="sec-hdr">
+            <div class="sec-hdr-left">
+              <div class="sec-eyebrow">Lavadero · KPI por box</div>
+              <h2>Lavado de vehículos</h2>
+              <div class="tb-sub" id="lav-sub" style="margin-top:4px"></div>
+            </div>
+            <div class="hdr-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <label style="font-size:11px;color:var(--text-4)">Mes</label>
+              <input type="month" id="lav-mes" class="filter-sel" onchange="lavRender()" style="padding:7px 9px">
+              <button class="btn-sm" id="lav-btn-export" onclick="lavExportarExcel()" title="Descargar los lavados del mes en Excel" style="border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-weight:600">
+                <i class="ti ti-file-spreadsheet" style="font-size:14px;vertical-align:-2px"></i> Exportar Excel
+              </button>
+              <button class="btn-add" id="lav-btn-nuevo" onclick="lavAbrirAlta()"><i class="ti ti-plus"></i> Cargar lavado</button>
+            </div>
+          </div>
+          <div id="lav-cards" style="margin-bottom:14px"></div>
+          <div class="filters-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <input type="text" class="search-input" id="lav-q" style="flex:1;min-width:220px" placeholder="Buscar por dominio o modelo..." oninput="lavRender()">
+            <select id="lav-fbox" class="filter-sel" onchange="lavRender()">
+              <option value="">Todos los boxes</option>
+              <option>BOX 1</option><option>BOX 2</option><option>BOX 3</option><option>BOX 4</option>
+            </select>
+          </div>
+          <div id="lav-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
         </div>
 
       </div><!-- /main-inner -->
@@ -1975,6 +2007,26 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
   </div>
 </div>
 
+<div class="modal-ov" id="lav-modal">
+  <div class="modal">
+    <h3><i class="ti ti-droplet" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0891b2"></i><span id="lav-modal-tit">Cargar lavado</span></h3>
+    <div class="mgrid">
+      <div><label>Fecha <span style="color:var(--accent)">*</span></label><input type="date" id="lavf-fecha"></div>
+      <div><label>Box <span style="color:var(--accent)">*</span></label><select id="lavf-box"><option>BOX 1</option><option>BOX 2</option><option>BOX 3</option><option>BOX 4</option></select></div>
+      <div><label>Dominio <span style="color:var(--accent)">*</span></label><input id="lavf-dominio" placeholder="AB123CD" style="text-transform:uppercase"></div>
+      <div><label>Modelo</label><input id="lavf-modelo" placeholder="HILUX, COROLLA…" style="text-transform:uppercase"></div>
+      <div><label>Hora inicio <span style="color:var(--accent)">*</span></label><input type="time" id="lavf-ini" step="1" oninput="lavPreviewDur()"></div>
+      <div><label>Hora fin <span style="color:var(--accent)">*</span></label><input type="time" id="lavf-fin" step="1" oninput="lavPreviewDur()"></div>
+      <div class="full" id="lav-dur-prev" style="font-size:12.5px;color:var(--text-3)"></div>
+    </div>
+    <p class="login-err" id="lavf-err" style="display:none"></p>
+    <div class="mfooter">
+      <button class="btn-cancel" onclick="lavCerrar()">Cancelar</button>
+      <button class="btn-save" id="lavf-save" onclick="lavGuardar()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-ov" id="repov">
   <div class="modal">
     <h3><i class="ti ti-file-download" style="font-size:16px;vertical-align:-3px;margin-right:6px;color:#0C447C"></i>Descargar reporte</h3>
@@ -2421,6 +2473,13 @@ const MODULOS = {
     color: '#1d4ed8',
     icono: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>'
   },
+  lavado: {
+    id: 'lavado',
+    nombre: 'Lavado',
+    desc: 'Registro de lavados por box (fecha, dominio, horarios y duración) para las comisiones del lavadero.',
+    color: '#0891b2',
+    icono: '<path d="M3 13a9 9 0 0 1 18 0"/><path d="M12 13v8"/><path d="M8 17v4"/><path d="M16 17v4"/><path d="M7 5l1-2"/><path d="M12 4V2"/><path d="M17 5l-1-2"/>'
+  },
   admin: {
     id: 'admin',
     nombre: 'Administración',
@@ -2438,7 +2497,7 @@ const MODULOS = {
 // Roles creados después de la matriz de permisos de la base: todavía no tienen
 // filas en rol_permiso, así que se resuelven por la tabla de canFallback().
 // Cuando se siembren en la base, se los saca de acá y nada más cambia.
-const ROLES_SIN_MATRIZ = ['ambiente','equip_venta','equip_stock','equip_turnos','equip_turnos_esp','equip_ver','garantista'];
+const ROLES_SIN_MATRIZ = ['ambiente','equip_venta','equip_stock','equip_turnos','equip_turnos_esp','equip_ver','garantista','lavado_control'];
 
 function can(p){
   // El admin siempre tiene acceso a todo, sin depender de la matriz de la base.
@@ -2478,7 +2537,10 @@ function canFallback(p){
     equip_turnos_esp: ['equipamiento.especial.ver','equipamiento.turnar.especial','procedimientos.ver'],
     equip_ver:    ['equipamiento.ver','equipamiento.especial.ver','equipamiento.equipar'],
     garantista:   ['garantias.ver','garantias.cargar','procedimientos.ver'],
+    lavado_control: ['lavado.ver','lavado.cargar','procedimientos.ver'],
   };
+  // admin y supervisor también ven el módulo de lavado
+  if(cu.rol==='supervisor') M.supervisor.push('lavado.ver');
   const perms = new Set(M[cu.rol] || []);
   // overrides por usuario (mismos que en usuario_permiso)
   if(cu.username === 'repuestos.aguado'){ perms.add('prepull.compras.ver'); }
@@ -2566,7 +2628,7 @@ async function showApp(){
   document.getElementById('s-login').classList.remove('active');
   document.getElementById('s-app').classList.add('active');
   document.getElementById('tb-user').textContent=cu.nombre;
-  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene',ambiente:'Ambiente',equip_venta:'Equipamiento · Ventas',equip_stock:'Equipamiento · Stock',equip_turnos:'Equipamiento · Turnos',equip_turnos_esp:'Ventas Especiales · Turnos',equip_ver:'Equipamiento · Consulta',garantista:'Garantías',jefe_servicio:'Jefe de Servicio'}[cu.rol]||cu.rol;
+  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene',ambiente:'Ambiente',equip_venta:'Equipamiento · Ventas',equip_stock:'Equipamiento · Stock',equip_turnos:'Equipamiento · Turnos',equip_turnos_esp:'Ventas Especiales · Turnos',equip_ver:'Equipamiento · Consulta',garantista:'Garantías',jefe_servicio:'Jefe de Servicio',lavado_control:'Lavado · Control'}[cu.rol]||cu.rol;
   const sucEl=document.getElementById('tb-suc');
   if(cu.sucursalFija){sucEl.style.display='inline-flex';sucEl.innerHTML=`<i class="ti ti-map-pin" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${cu.sucursalFija}`;}
   else sucEl.style.display='none';
@@ -2587,6 +2649,7 @@ async function showApp(){
   const enEquip = cu.modulo === 'equipamiento';
   const enTsp = cu.modulo === 'tsp';
   const enGarantias = cu.modulo === 'garantias';
+  const enLavado = cu.modulo === 'lavado';
 
   document.getElementById('tab-dash').style.display=(enPrepull && can('prepull.dashboard.ver'))?'':'none';
   document.getElementById('tab-turnos').style.display=(enPrepull && can('prepull.turnos.ver'))?'':'none';
@@ -2614,6 +2677,8 @@ async function showApp(){
   if(tabTsp) tabTsp.style.display=enTsp?'':'none';
   const tabGar = document.getElementById('tab-garantias');
   if(tabGar) tabGar.style.display=enGarantias?'':'none';
+  const tabLav = document.getElementById('tab-lavado');
+  if(tabLav) tabLav.style.display=enLavado?'':'none';
   // el botón flotante "+" es de Pre Pull (crear turno): ocultarlo en otros módulos
   const fab = document.getElementById('fab-nuevo');
   if(fab && !enPrepull) fab.style.display='none';
@@ -2635,6 +2700,8 @@ async function showApp(){
     startTab = 'tsp';
   } else if(enGarantias){
     startTab = 'garantias';
+  } else if(enLavado){
+    startTab = 'lavado';
   } else if(enAdmin){
     startTab = 'usuarios';
   } else {
@@ -2684,6 +2751,8 @@ async function showApp(){
     cargarTsp();
   } else if(enGarantias){
     garModeloVista=null; cargarGarantias();
+  } else if(enLavado){
+    cargarLavados();
   } else if(enAdmin){
     await cargarUsuariosParaSelect();
     renderUsers();
@@ -7722,7 +7791,7 @@ function convertirAgente(id){
 function llenarRolesUsr(){
   const sel=document.getElementById('f-usr-rol');
   const roles = (RP_ROLES && RP_ROLES.length) ? RP_ROLES
-    : [{id:'admin',label:'Admin'},{id:'supervisor',label:'Supervisor'},{id:'citas',label:'Citas'},{id:'repuestos',label:'Repuestos'},{id:'compras',label:'Compras'},{id:'asesor',label:'Asesor'},{id:'jefe_servicio',label:'Jefe de Servicio'},{id:'seguridad',label:'Seguridad e Higiene'},{id:'equip_venta',label:'Equipamiento · Ventas'},{id:'equip_stock',label:'Equipamiento · Stock'},{id:'equip_turnos',label:'Equipamiento · Turnos'},{id:'equip_turnos_esp',label:'Ventas Especiales · Turnos'},{id:'equip_ver',label:'Equipamiento · Consulta'},{id:'garantista',label:'Garantías'},{id:'ambiente',label:'Ambiente'}];
+    : [{id:'admin',label:'Admin'},{id:'supervisor',label:'Supervisor'},{id:'citas',label:'Citas'},{id:'repuestos',label:'Repuestos'},{id:'compras',label:'Compras'},{id:'asesor',label:'Asesor'},{id:'jefe_servicio',label:'Jefe de Servicio'},{id:'seguridad',label:'Seguridad e Higiene'},{id:'equip_venta',label:'Equipamiento · Ventas'},{id:'equip_stock',label:'Equipamiento · Stock'},{id:'equip_turnos',label:'Equipamiento · Turnos'},{id:'equip_turnos_esp',label:'Ventas Especiales · Turnos'},{id:'equip_ver',label:'Equipamiento · Consulta'},{id:'garantista',label:'Garantías'},{id:'ambiente',label:'Ambiente'},{id:'lavado_control',label:'Lavado · Control'}];
   const actual = sel.value;
   sel.innerHTML='<option value="">Seleccionar...</option>'+roles.map(r=>`<option value="${r.id}">${escapeHtml(r.label)}</option>`).join('');
   if(actual) sel.value=actual;
@@ -9576,6 +9645,302 @@ function eqExportarExcel(){
   const tag = (eqScope==='especial') ? 'ventas_especiales' : 'equipamiento';
   const suf = (desde||hasta) ? ('_'+(desde||'inicio')+'_a_'+(hasta||'hoy')) : ('_'+eqHoy());
   XLSX.writeFile(wb, 'turnos_'+tag+suf+'.xlsx');
+}
+
+// ============================================================
+//  MÓDULO LAVADO — registro de lavados por box (para comisiones)
+//  El controller del lavadero carga cada lavado: fecha, dominio,
+//  box y los horarios de inicio/fin. El sistema calcula la duración
+//  y arma el resumen por box del mes (cantidad + tiempo promedio),
+//  base para liquidar las comisiones.
+// ============================================================
+let lavados = [];
+let lavEditId = null;
+const LAV_BOXES = ['BOX 1','BOX 2','BOX 3','BOX 4'];
+
+const lavPuedeVer    = () => esAdmin() || can('lavado.ver');
+const lavPuedeCargar = () => esAdmin() || can('lavado.cargar');
+
+function lavEsc(s){ return escapeHtml(String(s ?? '')); }
+
+// "HH:MM" o "HH:MM:SS" -> minutos del día (o null si no es válido)
+function lavMinDelDia(t){
+  if(!t) return null;
+  const m = String(t).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if(!m) return null;
+  return parseInt(m[1],10)*60 + parseInt(m[2],10) + (m[3]?parseInt(m[3],10)/60:0);
+}
+// duración en minutos entre inicio y fin. Si el fin es menor (pasó la
+// medianoche) se suma un día para que no dé negativo.
+function lavDurMin(hi, hf){
+  const a = lavMinDelDia(hi), b = lavMinDelDia(hf);
+  if(a===null || b===null) return null;
+  let d = b - a;
+  if(d < 0) d += 24*60;
+  return d;
+}
+// minutos -> "0:30", "1:35" (formato h:mm, promediable a la vista)
+function lavFmtDur(min){
+  if(min===null || min===undefined || isNaN(min)) return '—';
+  const tot = Math.round(min);
+  const h = Math.floor(tot/60), m = tot%60;
+  return h + ':' + String(m).padStart(2,'0');
+}
+function lavDdmmyyyy(f){ const p=String(f).split('-'); return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : (f||''); }
+function lavHoy(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function lavMesActual(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+
+async function cargarLavados(){
+  const sub=document.getElementById('lav-sub');
+  if(sub) sub.textContent = 'Lavados por box para el cálculo de comisiones. Cargá fecha, dominio, box y horarios; la duración se calcula sola.';
+  const btnN=document.getElementById('lav-btn-nuevo');
+  if(btnN) btnN.style.display = lavPuedeCargar() ? '' : 'none';
+  // mes por defecto: el actual
+  const mes=document.getElementById('lav-mes');
+  if(mes && !mes.value) mes.value = lavMesActual();
+
+  // Traer todo paginado (el REST de Supabase corta en 1000 filas)
+  const cont=document.getElementById('lav-cont');
+  try{
+    let todos=[], desde=0; const paso=1000;
+    for(;;){
+      const {data,error}=await sb.from('lavados')
+        .select('*').order('fecha',{ascending:false}).order('hora_inicio',{ascending:false})
+        .range(desde, desde+paso-1);
+      if(error) throw error;
+      todos=todos.concat(data||[]);
+      if(!data || data.length<paso) break;
+      desde+=paso;
+    }
+    lavados=todos;
+    lavRender();
+  }catch(e){
+    console.error(e);
+    if(cont) cont.innerHTML='<div class="eq-empty"><i class="ti ti-alert-triangle"></i><div class="t">No se pudieron cargar los lavados</div><div class="s">'+lavEsc(e.message||e)+'</div></div>';
+  }
+}
+
+// lavados del mes elegido (YYYY-MM)
+function lavDelMes(){
+  const mes=(document.getElementById('lav-mes')||{}).value || lavMesActual();
+  return lavados.filter(l => String(l.fecha||'').slice(0,7) === mes);
+}
+
+function lavRender(){
+  const cont=document.getElementById('lav-cont');
+  if(!cont) return;
+  const btnN=document.getElementById('lav-btn-nuevo');
+  if(btnN) btnN.style.display = lavPuedeCargar() ? '' : 'none';
+
+  const delMes = lavDelMes();
+
+  // ── Tarjetas resumen por box: cantidad + tiempo total + promedio ──
+  const cards=document.getElementById('lav-cards');
+  if(cards){
+    const resumen = LAV_BOXES.map(box=>{
+      const arr = delMes.filter(l=>l.box===box);
+      let suma=0, n=0;
+      arr.forEach(l=>{ const d=lavDurMin(l.hora_inicio,l.hora_fin); if(d!==null){ suma+=d; n++; } });
+      return { box, cant:arr.length, total:suma, prom:(n?suma/n:null) };
+    });
+    const totalMes = delMes.length;
+    cards.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">'+
+      resumen.map(r=>
+        '<div style="border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:var(--surface)">'+
+          '<div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#0891b2">'+lavEsc(r.box)+'</div>'+
+          '<div style="font-size:24px;font-weight:700;color:var(--text-1);line-height:1.1;margin-top:3px">'+r.cant+'</div>'+
+          '<div style="font-size:11.5px;color:var(--text-4)">lavados · prom. '+lavFmtDur(r.prom)+'</div>'+
+        '</div>'
+      ).join('')+
+      '</div>'+
+      '<div style="font-size:12px;color:var(--text-4);margin-top:8px">Total del mes: <b style="color:var(--text-2)">'+totalMes+'</b> lavado'+(totalMes===1?'':'s')+'.</div>';
+  }
+
+  // ── Tabla filtrada (texto + box) ──
+  const q = (document.getElementById('lav-q')||{}).value || '';
+  const qn = q.trim().toLowerCase();
+  const fbox = (document.getElementById('lav-fbox')||{}).value || '';
+
+  let filas = delMes.slice();
+  if(fbox) filas = filas.filter(l=>l.box===fbox);
+  if(qn) filas = filas.filter(l =>
+    String(l.dominio||'').toLowerCase().includes(qn) ||
+    String(l.modelo||'').toLowerCase().includes(qn));
+
+  if(!filas.length){
+    cont.innerHTML='<div class="eq-empty"><i class="ti ti-droplet"></i><div class="t">Sin lavados'+((qn||fbox)?' para ese filtro':' este mes')+'</div><div class="s">'+((qn||fbox)?'Probá con otro texto o cambiá el box.':'Cargá el primer lavado del mes con el botón "Cargar lavado".')+'</div></div>';
+    return;
+  }
+
+  const puede = lavPuedeCargar();
+  cont.innerHTML =
+    '<div class="table-wrap"><table><thead><tr>'+
+        '<th>Fecha</th><th>Dominio</th><th>Modelo</th><th style="width:11%">Box</th>'+
+        '<th style="width:9%">Inicio</th><th style="width:9%">Fin</th><th style="width:10%;text-align:right">Duración</th>'+
+        (puede?'<th style="width:11%"></th>':'')+
+      '</tr></thead><tbody>'+
+      filas.map(l=>{
+        const dur=lavDurMin(l.hora_inicio,l.hora_fin);
+        return '<tr>'+
+          '<td>'+lavEsc(lavDdmmyyyy(l.fecha))+'</td>'+
+          '<td style="font-weight:600">'+lavEsc(l.dominio||'—')+'</td>'+
+          '<td>'+lavEsc(l.modelo||'—')+'</td>'+
+          '<td><span class="eq-chip" style="background:#e0f2fe;color:#0369a1;border-color:#bae6fd">'+lavEsc(l.box||'—')+'</span></td>'+
+          '<td>'+lavEsc(String(l.hora_inicio||'').slice(0,5)||'—')+'</td>'+
+          '<td>'+lavEsc(String(l.hora_fin||'').slice(0,5)||'—')+'</td>'+
+          '<td style="text-align:right;font-variant-numeric:tabular-nums">'+lavFmtDur(dur)+'</td>'+
+          (puede?('<td style="text-align:right;white-space:nowrap">'+
+            '<button class="btn-sm" title="Editar" onclick="lavAbrirAlta('+l.id+')"><i class="ti ti-pencil"></i></button> '+
+            '<button class="btn-sm btn-del" title="Eliminar" onclick="lavEliminar('+l.id+')"><i class="ti ti-trash"></i></button>'+
+          '</td>'):'')+
+        '</tr>';
+      }).join('')+
+      '</tbody></table></div>';
+}
+
+function lavPreviewDur(){
+  const prev=document.getElementById('lav-dur-prev');
+  if(!prev) return;
+  const hi=(document.getElementById('lavf-ini')||{}).value;
+  const hf=(document.getElementById('lavf-fin')||{}).value;
+  const d=lavDurMin(hi,hf);
+  if(d===null){ prev.textContent=''; return; }
+  prev.innerHTML='Duración del lavado: <b style="color:#0891b2">'+lavFmtDur(d)+'</b> ('+Math.round(d)+' min)'+
+    (lavMinDelDia(hf)<lavMinDelDia(hi)?' · <span style="color:var(--text-4)">cruza la medianoche</span>':'');
+}
+
+function lavAbrirAlta(id){
+  if(!lavPuedeCargar()) return;
+  lavEditId = id || null;
+  const l = lavEditId ? lavados.find(x=>x.id===lavEditId) : null;
+  if(lavEditId && !l) return;
+  document.getElementById('lav-modal-tit').textContent = l ? 'Editar lavado' : 'Cargar lavado';
+  document.getElementById('lavf-fecha').value   = l ? (l.fecha||'') : lavHoy();
+  document.getElementById('lavf-box').value     = l ? (l.box||'BOX 1') : 'BOX 1';
+  document.getElementById('lavf-dominio').value = l ? (l.dominio||'') : '';
+  document.getElementById('lavf-modelo').value  = l ? (l.modelo||'') : '';
+  document.getElementById('lavf-ini').value     = l ? String(l.hora_inicio||'').slice(0,8) : '';
+  document.getElementById('lavf-fin').value     = l ? String(l.hora_fin||'').slice(0,8) : '';
+  const err=document.getElementById('lavf-err'); err.style.display='none';
+  lavPreviewDur();
+  document.getElementById('lav-modal').classList.add('open');
+}
+function lavCerrar(){ lavEditId=null; document.getElementById('lav-modal').classList.remove('open'); }
+
+async function lavGuardar(){
+  const err=document.getElementById('lavf-err'); err.style.display='none';
+  const fecha   = document.getElementById('lavf-fecha').value;
+  const box     = document.getElementById('lavf-box').value;
+  const dominio = document.getElementById('lavf-dominio').value.trim().toUpperCase();
+  const modelo  = document.getElementById('lavf-modelo').value.trim().toUpperCase();
+  const hi      = document.getElementById('lavf-ini').value;
+  const hf      = document.getElementById('lavf-fin').value;
+
+  if(!fecha){ err.textContent='Falta la fecha.'; err.style.display='block'; return; }
+  if(!dominio){ err.textContent='Falta el dominio.'; err.style.display='block'; return; }
+  if(!hi || !hf){ err.textContent='Cargá la hora de inicio y la de fin.'; err.style.display='block'; return; }
+
+  const datos={
+    fecha, box, dominio, modelo: modelo||null,
+    hora_inicio: hi, hora_fin: hf
+  };
+  const btn=document.getElementById('lavf-save');
+  btn.disabled=true; btn.textContent='Guardando...';
+  try{
+    if(lavEditId){
+      const {error}=await sb.from('lavados').update(datos).eq('id', lavEditId);
+      if(error) throw error;
+    }else{
+      datos.creado_por = (cu && cu.nombre) || null;
+      const {error}=await sb.from('lavados').insert([datos]);
+      if(error) throw error;
+    }
+    lavCerrar();
+    await cargarLavados();
+    showToast(lavEditId ? 'Lavado actualizado.' : 'Lavado cargado.');
+  }catch(e){
+    err.textContent='Error: '+(e.message||e); err.style.display='block';
+  }finally{
+    btn.disabled=false; btn.textContent='Guardar';
+  }
+}
+
+async function lavEliminar(id){
+  if(!lavPuedeCargar()) return;
+  const l=lavados.find(x=>x.id===id);
+  if(!l) return;
+  if(!confirm('¿Eliminar el lavado del dominio '+(l.dominio||'')+' ('+lavDdmmyyyy(l.fecha)+')?')) return;
+  try{
+    const {error}=await sb.from('lavados').delete().eq('id', id);
+    if(error) throw error;
+    await cargarLavados();
+    showToast('Lavado eliminado.');
+  }catch(e){
+    showToast('No se pudo eliminar: '+(e.message||e));
+  }
+}
+
+function lavExportarExcel(){
+  if(typeof XLSX === 'undefined'){ alert('No se pudo cargar el generador de Excel. Recargá la página e intentá de nuevo.'); return; }
+  const mes=(document.getElementById('lav-mes')||{}).value || lavMesActual();
+  const arr = lavDelMes().slice().sort((a,b)=>{
+    if(a.fecha!==b.fecha) return a.fecha<b.fecha?-1:1;
+    return String(a.hora_inicio||'').localeCompare(String(b.hora_inicio||''));
+  });
+  if(!arr.length){ alert('No hay lavados en el mes seleccionado.'); return; }
+
+  const filas = arr.map(l=>{
+    const d=lavDurMin(l.hora_inicio,l.hora_fin);
+    return {
+      'Fecha':        lavDdmmyyyy(l.fecha),
+      'Dominio':      l.dominio||'',
+      'Modelo':       l.modelo||'',
+      'Box':          l.box||'',
+      'Inicio':       String(l.hora_inicio||'').slice(0,8),
+      'Fin':          String(l.hora_fin||'').slice(0,8),
+      'Duración':     lavFmtDur(d),
+      'Duración (h:mm)': (d===null?0:d)/(24*60),   // valor de tiempo de Excel (promediable)
+      'Cargado por':  l.creado_por||''
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(filas);
+  // La columna "Duración (h:mm)" (índice 7) se formatea como tiempo real,
+  // así AVERAGE/SUM en Excel funcionan y se muestran como 0:30, 1:35, etc.
+  const COL_HMM = 7;
+  for(let i=0;i<filas.length;i++){
+    const ref=XLSX.utils.encode_cell({r:i+1,c:COL_HMM});
+    if(ws[ref]){ ws[ref].t='n'; ws[ref].z='[h]:mm'; }
+  }
+  // Resumen al pie: promedio y total de duración
+  const filaProm = filas.length + 3;
+  const rango = XLSX.utils.encode_cell({r:1,c:COL_HMM})+':'+XLSX.utils.encode_cell({r:filas.length,c:COL_HMM});
+  const colL = XLSX.utils.encode_col(COL_HMM-1);
+  const colV = XLSX.utils.encode_col(COL_HMM);
+  ws[colL+filaProm]     = { t:'s', v:'Promedio' };
+  ws[colV+filaProm]     = { t:'n', f:'AVERAGE('+rango+')', z:'[h]:mm' };
+  ws[colL+(filaProm+1)] = { t:'s', v:'Total' };
+  ws[colV+(filaProm+1)] = { t:'n', f:'SUM('+rango+')', z:'[h]:mm' };
+  const rangoHoja = XLSX.utils.decode_range(ws['!ref']);
+  if(rangoHoja.e.r < filaProm){ rangoHoja.e.r = filaProm; ws['!ref']=XLSX.utils.encode_range(rangoHoja); }
+
+  ws['!cols']=[{wch:12},{wch:12},{wch:16},{wch:9},{wch:10},{wch:10},{wch:10},{wch:14},{wch:18}];
+
+  // Segunda hoja: resumen por box (cantidad + promedio + total)
+  const resumen = LAV_BOXES.map(box=>{
+    const a=arr.filter(l=>l.box===box);
+    let suma=0,n=0;
+    a.forEach(l=>{ const d=lavDurMin(l.hora_inicio,l.hora_fin); if(d!==null){ suma+=d; n++; } });
+    return { 'Box':box, 'Cantidad':a.length, 'Duración promedio':lavFmtDur(n?suma/n:null), 'Duración total':lavFmtDur(suma) };
+  });
+  const ws2 = XLSX.utils.json_to_sheet(resumen);
+  ws2['!cols']=[{wch:9},{wch:10},{wch:18},{wch:16}];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Lavados');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Resumen por box');
+  XLSX.writeFile(wb, 'lavados_'+mes+'.xlsx');
 }
 
 function eqIrADia(f){
