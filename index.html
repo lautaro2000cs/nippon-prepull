@@ -9554,7 +9554,8 @@ function eqPorDia(arr, desc){
           (p.prioridad!=='normal'?' '+eqPrioPill(p.prioridad):'')+
           (p.nro_preor?'<div class="eq-dias">Pre-Or '+eqEsc(p.nro_preor)+'</div>':'')+'</td>'+
         '<td><strong>'+eqEsc(p.dominio||'—')+'</strong>'+
-          (p.codigo_turno?'<div class="eq-dias">'+eqEsc(p.codigo_turno)+'</div>':'')+'</td>'+
+          (p.codigo_turno?'<div class="eq-dias">'+eqEsc(p.codigo_turno)+'</div>':'')+
+          (p.vendedor?'<div style="font-size:11px;color:var(--text-5)">'+eqEsc(p.vendedor)+'</div>':'')+'</td>'+
         '<td>'+eqEsc(p.trabajo)+
           (p.estado_stock==='pedido'?'<div class="eq-dias" style="color:#1f5fa8">pieza en camino · llega '+fmtD(p.eta_pieza)+'</div>':'')+'</td>'+
         '<td>'+(p.tiempo_trabajo?'<span class="eq-chip">'+eqEsc(p.tiempo_trabajo)+'</span>':'—')+'</td>'+
