@@ -7430,13 +7430,14 @@ function renderRepHistorico(){
   if(!cont) return;
   if(!items.length){cont.innerHTML='<div class="empty"><i class="ti ti-history"></i>Sin turnos transcurridos en los últimos 7 días</div>';return;}
   cont.innerHTML=`<div class="table-wrap"><table><thead><tr>
-    <th style="width:8%">Pre-Or</th><th style="width:13%">Cliente</th><th style="width:8%">Dominio</th><th style="width:9%">Modelo</th>
-    <th style="width:9%">Sucursal</th><th style="width:10%">Fecha del turno</th><th style="width:10%">Tipo</th>
-    <th style="width:8%">Estado</th><th style="width:7%">No Show</th><th style="width:11%">Comentario Repuestos</th><th style="width:7%">Vale</th>
+    <th style="width:8%">Pre-Or</th><th style="width:12%">Cliente</th><th style="width:7%">Dominio</th><th style="width:8%">Modelo</th>
+    <th style="width:9%">Sucursal</th><th style="width:9%">Fecha del turno</th><th style="width:9%">Tipo</th>
+    <th style="width:7%">Estado</th><th style="width:6%">No Show</th><th style="width:9%">Comentario Citas</th><th style="width:9%">Comentario Repuestos</th><th style="width:6%">Vale</th>
   </tr></thead><tbody>${items.map(t=>{
     const nsBadge=t.no_show?'<span class="pill p-noshow"><i class="ti ti-user-x" style="font-size:11px"></i></span>':'—';
     const obsTag=`<span class="obs-badge" onclick="verObs('${t.id}','rep')" title="Comentarios de Repuestos"><i class="ti ti-message" style="font-size:11px"></i> ${comentariosDe(t.id,'repuestos').length||'+'}</span>`;
-    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}${t.nro_parte?`<div style="font-family:var(--mono);font-size:10.5px;color:var(--text-4);margin-top:3px">${escapeHtml(t.nro_parte)}</div>`:''}</td><td>${estPill(t.estado)}</td><td>${nsBadge}</td><td>${obsTag}</td><td>${valePill(t.vale)}</td></tr>`;
+    const obsCitaTag=`<span class="obs-badge" style="background:#E6F1FB;color:#0C447C" onclick="verObs('${t.id}','cita')" title="Comentarios de Citas"><i class="ti ti-notes" style="font-size:11px"></i> ${comentariosDe(t.id,'citas').length||'+'}</span>`;
+    return`<tr><td><strong>${t.preor}</strong></td><td>${t.cliente}</td><td>${t.dominio}</td><td>${t.modelo||'—'}</td><td>${t.sucursal}</td><td>${fmtD(t.fecha)}</td><td>${tipoDot(t.tipo)}${t.nro_parte?`<div style="font-family:var(--mono);font-size:10.5px;color:var(--text-4);margin-top:3px">${escapeHtml(t.nro_parte)}</div>`:''}</td><td>${estPill(t.estado)}</td><td>${nsBadge}</td><td>${obsCitaTag}</td><td>${obsTag}</td><td>${valePill(t.vale)}</td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
 
@@ -9094,7 +9095,7 @@ async function guardarEdicionComentario(cid){
     if(error) throw error;
     obsEditId = null;
     await cargarComentariosTurnos();
-    renderObsLista(); renderTurnos(); renderRepuestos();
+    renderObsLista(); renderTurnos(); renderRepuestos(); if(typeof renderRepHistorico==='function') renderRepHistorico();
   }catch(err){ alert('No se pudo editar: '+(err.message||'error')); }
 }
 async function enviarComentario(){
@@ -9106,7 +9107,7 @@ async function enviarComentario(){
     await cargarComentariosTurnos();
     document.getElementById('obs-modal-nuevo').value='';
     renderObsLista();
-    renderRepuestos(); renderTurnos && renderTurnos();
+    renderRepuestos(); renderTurnos && renderTurnos(); if(typeof renderRepHistorico==='function') renderRepHistorico();
   }catch(err){ alert('No se pudo agregar: '+(err.message||'error')); }
 }
 async function borrarComentario(cid){
