@@ -813,6 +813,10 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13a9 9 0 0 1 18 0"/><path d="M12 13v8"/><path d="M8 17v4"/><path d="M16 17v4"/></svg>
           Lavado
         </button>
+        <button class="nav-item" id="tab-auditorias" style="display:none" onclick="swTab('auditorias',this)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Auditorías
+        </button>
       </nav>
 
       <div class="sidebar-divider"></div>
@@ -1376,10 +1380,114 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
           <div id="lav-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
         </div>
 
+        <div class="tc" id="tc-auditorias">
+          <div class="sec-hdr">
+            <div class="sec-hdr-left">
+              <div class="sec-eyebrow">Seguridad Industrial · Planillas de control</div>
+              <h2>Auditorías</h2>
+              <div class="tb-sub" id="aud-sub" style="margin-top:4px"></div>
+            </div>
+            <div class="hdr-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <select id="aud-fsuc" class="filter-sel" onchange="audRender()"><option value="">Todas las sucursales</option></select>
+              <input type="month" id="aud-fmes" class="filter-sel" onchange="audRender()" style="padding:7px 9px" title="Filtrar por mes">
+              <button class="btn-sm" id="aud-btn-plantilla" onclick="audEditarPlantillas()" title="Editar las planillas (secciones, ítems y columnas)" style="border:1px solid var(--border-2);background:#fff;color:var(--text-2);font-weight:600"><i class="ti ti-adjustments" style="font-size:14px;vertical-align:-2px"></i> Editar planilla</button>
+              <button class="btn-add" id="aud-btn-nuevo" onclick="audNueva()"><i class="ti ti-plus"></i> Nueva auditoría</button>
+            </div>
+          </div>
+          <div class="filters-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <input type="text" class="search-input" id="aud-q" style="flex:1;min-width:220px" placeholder="Buscar por sucursal, N° de bahía o quién controló..." oninput="audRender()">
+          </div>
+          <div id="aud-cont"><div class="loading-spinner"><i class="ti ti-loader-2"></i> Cargando...</div></div>
+        </div>
+
       </div><!-- /main-inner -->
     </main>
 
   </div><!-- /app-body -->
+
+  <!-- MODAL AUDITORÍA (Control de Bahías) -->
+  <div class="modal-ov" id="aud-modal-ov">
+    <div class="modal" style="max-width:960px;max-height:92vh;overflow:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <h3 id="aud-modal-title" style="margin:0;font-size:19px">Nueva auditoría</h3>
+        <button onclick="audCerrar()" style="background:none;border:none;font-size:24px;line-height:1;color:var(--text-4);cursor:pointer">&times;</button>
+      </div>
+      <div class="sec-eyebrow" style="margin-bottom:12px">CONTROL DE BAHÍAS · FO_14.3 · Informe de seguridad industrial</div>
+      <div id="aud-modal-err" style="display:none;background:var(--accent-tint);color:var(--accent-h);padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:14px"></div>
+
+      <div class="drawer-field" id="aud-tpl-row" style="margin-bottom:12px;display:none">
+        <label class="drawer-label">Planilla</label>
+        <select class="drawer-input" id="aud-tpl-sel" onchange="audCambiarPlantilla()"></select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px">
+        <div class="drawer-field"><label class="drawer-label">Sucursal</label><input class="drawer-input" id="aud-suc" list="aud-suc-list" placeholder="Sucursal"><datalist id="aud-suc-list"></datalist></div>
+        <div class="drawer-field"><label class="drawer-label">Fecha</label><input class="drawer-input" id="aud-fecha" type="date"></div>
+        <div class="drawer-field"><label class="drawer-label">N° de bahía</label><input class="drawer-input" id="aud-bahia" placeholder="Ej: 3"></div>
+      </div>
+
+      <div style="margin-top:14px;padding:9px 13px;background:var(--surface-sub,#f6f7f9);border:1px solid var(--border-1);border-radius:9px;font-size:12.5px;color:var(--text-3)">
+        <b>Terminología:</b> Bien (B) · Mal (M) · Regular (R) · No Corresponde (NC). Dejá en blanco lo que no revisaste.
+      </div>
+
+      <div id="aud-items" style="margin-top:14px"></div>
+
+      <div class="drawer-field" style="margin-top:16px"><label class="drawer-label">Otros aspectos</label><textarea class="drawer-input" id="aud-otros" rows="2" style="resize:vertical" placeholder="Observaciones generales..."></textarea></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:12px">
+        <div class="drawer-field"><label class="drawer-label">Controló</label><input class="drawer-input" id="aud-controlo" placeholder="Nombre y apellido"></div>
+        <div class="drawer-field"><label class="drawer-label">Persona que toma conocimiento</label><input class="drawer-input" id="aud-conocimiento" placeholder="Nombre y apellido"></div>
+        <div class="drawer-field"><label class="drawer-label">Fecha y lugar</label><input class="drawer-input" id="aud-fechalugar" placeholder="Ej: Roca, 24/11/2026"></div>
+        <div class="drawer-field"><label class="drawer-label">Próximo control</label><input class="drawer-input" id="aud-proximo" type="date"></div>
+        <div class="drawer-field"><label class="drawer-label">Fecha en que se corrigieron las observaciones <span style="font-weight:400;color:var(--text-4)">(si corresponde)</span></label><input class="drawer-input" id="aud-correccion" type="date"></div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:20px">
+        <button class="btn-sm" onclick="audDescargarDesdeModal()" title="Descargar / imprimir esta planilla en PDF" style="border:1px solid #b45309;background:#fff7ed;color:#b45309;font-weight:600"><i class="ti ti-download" style="font-size:14px;vertical-align:-2px"></i> Descargar PDF</button>
+        <div style="display:flex;gap:10px">
+          <button class="btn-cancel" onclick="audCerrar()">Cancelar</button>
+          <button class="btn-add" id="aud-btn-save" onclick="audGuardar()"><i class="ti ti-device-floppy"></i> Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDITOR DE PLANILLAS DE AUDITORÍA -->
+  <div class="modal-ov" id="aud-tpl-modal-ov">
+    <div class="modal" style="max-width:860px;max-height:92vh;overflow:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <h3 style="margin:0;font-size:19px">Editar planillas</h3>
+        <button onclick="audTplCerrar()" style="background:none;border:none;font-size:24px;line-height:1;color:var(--text-4);cursor:pointer">&times;</button>
+      </div>
+      <div class="sec-eyebrow" style="margin-bottom:12px">Definí las secciones, los ítems, las columnas y la terminología de cada planilla</div>
+      <div id="aud-tpl-err" style="display:none;background:var(--accent-tint);color:var(--accent-h);padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:14px"></div>
+
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
+        <div class="drawer-field" style="flex:1;min-width:200px"><label class="drawer-label">Planilla a editar</label><select class="drawer-input" id="aud-tpl-picker" onchange="audTplCargar(this.value)"></select></div>
+        <button class="btn-sm" onclick="audTplNueva()"><i class="ti ti-plus"></i> Nueva planilla</button>
+      </div>
+
+      <div class="drawer-field"><label class="drawer-label">Nombre de la planilla</label><input class="drawer-input" id="aud-tpl-nombre" placeholder="Ej: Control de Bahías"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:11px">
+        <div class="drawer-field"><label class="drawer-label">Columnas de evaluación <span style="font-weight:400;color:var(--text-4)">(separadas por coma)</span></label><input class="drawer-input" id="aud-tpl-columnas" placeholder="Visual, Operación, Resultado"></div>
+        <div class="drawer-field"><label class="drawer-label">Opciones / terminología <span style="font-weight:400;color:var(--text-4)">(separadas por coma)</span></label><input class="drawer-input" id="aud-tpl-opciones" placeholder="B, M, R, NC"></div>
+      </div>
+
+      <div style="margin-top:16px;display:flex;align-items:center;justify-content:space-between">
+        <div class="drawer-label" style="margin:0">Secciones e ítems</div>
+        <button class="btn-sm" onclick="audTplAgregarSeccion()"><i class="ti ti-plus"></i> Agregar sección</button>
+      </div>
+      <div id="aud-tpl-secciones" style="margin-top:10px"></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:20px">
+        <button class="btn-sm btn-del" id="aud-tpl-del" onclick="audTplEliminar()" style="display:none"><i class="ti ti-trash"></i> Eliminar planilla</button>
+        <div style="display:flex;gap:10px;margin-left:auto">
+          <button class="btn-cancel" onclick="audTplCerrar()">Cerrar</button>
+          <button class="btn-add" id="aud-tpl-save" onclick="audTplGuardar()"><i class="ti ti-device-floppy"></i> Guardar planilla</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL VEHÍCULO DETENIDO -->
   <div class="modal-ov" id="det-modal-ov">
@@ -2480,6 +2588,13 @@ const MODULOS = {
     color: '#0891b2',
     icono: '<path d="M3 13a9 9 0 0 1 18 0"/><path d="M12 13v8"/><path d="M8 17v4"/><path d="M16 17v4"/><path d="M7 5l1-2"/><path d="M12 4V2"/><path d="M17 5l-1-2"/>'
   },
+  auditorias: {
+    id: 'auditorias',
+    nombre: 'Auditorías',
+    desc: 'Planillas de control (bahías / seguridad industrial). Se cargan, quedan registradas para editarlas y se descargan en PDF.',
+    color: '#b45309',
+    icono: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'
+  },
   admin: {
     id: 'admin',
     nombre: 'Administración',
@@ -2497,7 +2612,7 @@ const MODULOS = {
 // Roles creados después de la matriz de permisos de la base: todavía no tienen
 // filas en rol_permiso, así que se resuelven por la tabla de canFallback().
 // Cuando se siembren en la base, se los saca de acá y nada más cambia.
-const ROLES_SIN_MATRIZ = ['ambiente','equip_venta','equip_stock','equip_turnos','equip_turnos_esp','equip_ver','garantista','lavado_control'];
+const ROLES_SIN_MATRIZ = ['ambiente','equip_venta','equip_stock','equip_turnos','equip_turnos_esp','equip_ver','garantista','lavado_control','auditor'];
 
 function can(p){
   // El admin siempre tiene acceso a todo, sin depender de la matriz de la base.
@@ -2538,9 +2653,13 @@ function canFallback(p){
     equip_ver:    ['equipamiento.ver','equipamiento.especial.ver','equipamiento.equipar'],
     garantista:   ['garantias.ver','garantias.cargar','procedimientos.ver'],
     lavado_control: ['lavado.ver','lavado.cargar','procedimientos.ver'],
+    auditor: ['auditorias.ver','auditorias.cargar','procedimientos.ver'],
   };
   // admin y supervisor también ven el módulo de lavado
   if(cu.rol==='supervisor') M.supervisor.push('lavado.ver');
+  // supervisor y seguridad e higiene también ven/cargan auditorías
+  if(cu.rol==='supervisor'){ M.supervisor.push('auditorias.ver','auditorias.cargar'); }
+  if(cu.rol==='seguridad'){ M.seguridad.push('auditorias.ver','auditorias.cargar'); }
   const perms = new Set(M[cu.rol] || []);
   // overrides por usuario (mismos que en usuario_permiso)
   if(cu.username === 'repuestos.aguado'){ perms.add('prepull.compras.ver'); }
@@ -2628,7 +2747,7 @@ async function showApp(){
   document.getElementById('s-login').classList.remove('active');
   document.getElementById('s-app').classList.add('active');
   document.getElementById('tb-user').textContent=cu.nombre;
-  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene',ambiente:'Ambiente',equip_venta:'Equipamiento · Ventas',equip_stock:'Equipamiento · Stock',equip_turnos:'Equipamiento · Turnos',equip_turnos_esp:'Ventas Especiales · Turnos',equip_ver:'Equipamiento · Consulta',garantista:'Garantías',jefe_servicio:'Jefe de Servicio',lavado_control:'Lavado · Control'}[cu.rol]||cu.rol;
+  document.getElementById('tb-rol').textContent={admin:'Admin',citas:'Citas',repuestos:'Repuestos',compras:'Compras',supervisor:'Supervisor',asesor:'Asesor',seguridad:'Seguridad e Higiene',ambiente:'Ambiente',equip_venta:'Equipamiento · Ventas',equip_stock:'Equipamiento · Stock',equip_turnos:'Equipamiento · Turnos',equip_turnos_esp:'Ventas Especiales · Turnos',equip_ver:'Equipamiento · Consulta',garantista:'Garantías',jefe_servicio:'Jefe de Servicio',lavado_control:'Lavado · Control',auditor:'Auditorías'}[cu.rol]||cu.rol;
   const sucEl=document.getElementById('tb-suc');
   if(cu.sucursalFija){sucEl.style.display='inline-flex';sucEl.innerHTML=`<i class="ti ti-map-pin" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${cu.sucursalFija}`;}
   else sucEl.style.display='none';
@@ -2650,6 +2769,7 @@ async function showApp(){
   const enTsp = cu.modulo === 'tsp';
   const enGarantias = cu.modulo === 'garantias';
   const enLavado = cu.modulo === 'lavado';
+  const enAuditorias = cu.modulo === 'auditorias';
 
   document.getElementById('tab-dash').style.display=(enPrepull && can('prepull.dashboard.ver'))?'':'none';
   document.getElementById('tab-turnos').style.display=(enPrepull && can('prepull.turnos.ver'))?'':'none';
@@ -2679,6 +2799,8 @@ async function showApp(){
   if(tabGar) tabGar.style.display=enGarantias?'':'none';
   const tabLav = document.getElementById('tab-lavado');
   if(tabLav) tabLav.style.display=enLavado?'':'none';
+  const tabAud = document.getElementById('tab-auditorias');
+  if(tabAud) tabAud.style.display=enAuditorias?'':'none';
   // el botón flotante "+" es de Pre Pull (crear turno): ocultarlo en otros módulos
   const fab = document.getElementById('fab-nuevo');
   if(fab && !enPrepull) fab.style.display='none';
@@ -2702,6 +2824,8 @@ async function showApp(){
     startTab = 'garantias';
   } else if(enLavado){
     startTab = 'lavado';
+  } else if(enAuditorias){
+    startTab = 'auditorias';
   } else if(enAdmin){
     startTab = 'usuarios';
   } else {
@@ -2753,6 +2877,8 @@ async function showApp(){
     garModeloVista=null; cargarGarantias();
   } else if(enLavado){
     cargarLavados();
+  } else if(enAuditorias){
+    cargarAuditorias();
   } else if(enAdmin){
     await cargarUsuariosParaSelect();
     renderUsers();
@@ -7792,7 +7918,7 @@ function convertirAgente(id){
 function llenarRolesUsr(){
   const sel=document.getElementById('f-usr-rol');
   const roles = (RP_ROLES && RP_ROLES.length) ? RP_ROLES
-    : [{id:'admin',label:'Admin'},{id:'supervisor',label:'Supervisor'},{id:'citas',label:'Citas'},{id:'repuestos',label:'Repuestos'},{id:'compras',label:'Compras'},{id:'asesor',label:'Asesor'},{id:'jefe_servicio',label:'Jefe de Servicio'},{id:'seguridad',label:'Seguridad e Higiene'},{id:'equip_venta',label:'Equipamiento · Ventas'},{id:'equip_stock',label:'Equipamiento · Stock'},{id:'equip_turnos',label:'Equipamiento · Turnos'},{id:'equip_turnos_esp',label:'Ventas Especiales · Turnos'},{id:'equip_ver',label:'Equipamiento · Consulta'},{id:'garantista',label:'Garantías'},{id:'ambiente',label:'Ambiente'},{id:'lavado_control',label:'Lavado · Control'}];
+    : [{id:'admin',label:'Admin'},{id:'supervisor',label:'Supervisor'},{id:'citas',label:'Citas'},{id:'repuestos',label:'Repuestos'},{id:'compras',label:'Compras'},{id:'asesor',label:'Asesor'},{id:'jefe_servicio',label:'Jefe de Servicio'},{id:'seguridad',label:'Seguridad e Higiene'},{id:'equip_venta',label:'Equipamiento · Ventas'},{id:'equip_stock',label:'Equipamiento · Stock'},{id:'equip_turnos',label:'Equipamiento · Turnos'},{id:'equip_turnos_esp',label:'Ventas Especiales · Turnos'},{id:'equip_ver',label:'Equipamiento · Consulta'},{id:'garantista',label:'Garantías'},{id:'ambiente',label:'Ambiente'},{id:'lavado_control',label:'Lavado · Control'},{id:'auditor',label:'Auditorías'}];
   const actual = sel.value;
   sel.innerHTML='<option value="">Seleccionar...</option>'+roles.map(r=>`<option value="${r.id}">${escapeHtml(r.label)}</option>`).join('');
   if(actual) sel.value=actual;
@@ -9943,6 +10069,467 @@ function lavExportarExcel(){
   XLSX.utils.book_append_sheet(wb, ws, 'Lavados');
   XLSX.utils.book_append_sheet(wb, ws2, 'Resumen por box');
   XLSX.writeFile(wb, 'lavados_'+mes+'.xlsx');
+}
+
+// ============================================================
+//  MÓDULO AUDITORÍAS — Planillas de control (editables)
+//  Se cargan planillas de seguridad industrial, quedan registradas
+//  para consultarlas/editarlas y se descargan en PDF. Las planillas
+//  (secciones, ítems, columnas y terminología) son editables y se
+//  guardan en la base. Cada auditoría guarda una copia de su
+//  estructura, así editar una planilla no altera lo ya cargado.
+// ============================================================
+
+// Planilla por defecto (semilla) — Control de Bahías
+const AUD_ESTRUCTURA_DEFAULT = {
+  columnas:['Visual','Operación','Resultado'],
+  opciones:['B','M','R','NC'],
+  secciones:[
+    { nombre:'ELEVADOR', items:['Limpieza del equipo','Gomas de apoyo','Estado de brazos','Cable de tensión','Equipo hidráulico','Botonera','Estado de las columnas','Bulón de Anclaje','Otros'] },
+    { nombre:'BAHIA', items:['Orden y limpieza','Delimitación de áreas','Estado del piso','Rollo de papel','Estación ambiental','Otros'] },
+    { nombre:'EQUIPAMIENTO PARA ACEITE', items:['Enrollador de manguera','Recolector de aceite (chancha)','Pistola antigoteo','Instalación de aire comprimido','Bandeja de recolección de aceite','Otros'] },
+    { nombre:'EMERGENCIAS', items:['Cartelería','Extintores','Kit Antiderrames','Señalización','Balde con absorbente'] },
+  ]
+};
+
+let auditorias = [];
+let audPlantillas = [];
+let audEditId = null;
+let audFlatActual = [];
+let audEstructuraActual = null;
+let audPlantillaActual = null;
+let audTplEditId = null;
+let audTplBorrador = null;
+
+const audPuedeVer    = () => esAdmin() || can('auditorias.ver');
+const audPuedeCargar = () => esAdmin() || can('auditorias.cargar');
+function audEsc(s){ return escapeHtml(String(s ?? '')); }
+function audDdmmyyyy(f){ if(!f) return ''; const p=String(f).split('T')[0].split('-'); return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : f; }
+function audHoy(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+function audNormEstructura(e){
+  e = e || {};
+  return {
+    columnas: Array.isArray(e.columnas)&&e.columnas.length ? e.columnas.slice() : ['Visual','Operación','Resultado'],
+    opciones: Array.isArray(e.opciones)&&e.opciones.length ? e.opciones.slice() : ['B','M','R','NC'],
+    secciones: Array.isArray(e.secciones) ? e.secciones.map(s=>({nombre:s.nombre||'', items:Array.isArray(s.items)?s.items.slice():[]})) : []
+  };
+}
+function audListaPlantillas(){
+  if(audPlantillas.length) return audPlantillas;
+  return [{ id:null, nombre:'Control de Bahías', estructura:audNormEstructura(AUD_ESTRUCTURA_DEFAULT) }];
+}
+function audGetPlantilla(id){ return audListaPlantillas().find(p=>String(p.id)===String(id)) || audListaPlantillas()[0]; }
+function audEstructuraDe(a){
+  if(a && a.datos && a.datos.estructura) return audNormEstructura(a.datos.estructura);
+  if(a && a.plantilla_id!=null){ const p=audListaPlantillas().find(x=>String(x.id)===String(a.plantilla_id)); if(p) return audNormEstructura(p.estructura); }
+  return audNormEstructura(AUD_ESTRUCTURA_DEFAULT);
+}
+
+async function cargarAuditorias(){
+  const sub=document.getElementById('aud-sub');
+  if(sub) sub.textContent='Planillas de control. Se cargan, quedan registradas para editarlas y se descargan en PDF. La planilla es editable.';
+  const btnN=document.getElementById('aud-btn-nuevo');
+  if(btnN) btnN.style.display = audPuedeCargar() ? '' : 'none';
+  const btnP=document.getElementById('aud-btn-plantilla');
+  if(btnP) btnP.style.display = esAdmin() ? '' : 'none';   // editar la planilla: solo admin
+
+  const cont=document.getElementById('aud-cont');
+  try{
+    try{
+      const {data:tpl}=await sb.from('auditoria_plantillas').select('*').order('orden',{ascending:true}).order('id',{ascending:true});
+      audPlantillas=(tpl||[]).map(p=>({id:p.id,nombre:p.nombre,orden:p.orden,estructura:audNormEstructura(p.estructura)}));
+    }catch(e){ audPlantillas=[]; }
+
+    let todos=[], desde=0; const paso=1000;
+    for(;;){
+      const {data,error}=await sb.from('auditorias').select('*').order('fecha',{ascending:false}).order('id',{ascending:false}).range(desde,desde+paso-1);
+      if(error) throw error;
+      todos=todos.concat(data||[]);
+      if(!data || data.length<paso) break;
+      desde+=paso;
+    }
+    auditorias=todos;
+    const sucs=Array.from(new Set([...SUCURSALES, ...auditorias.map(a=>a.sucursal).filter(Boolean)]));
+    const fsuc=document.getElementById('aud-fsuc');
+    if(fsuc){ const cur=fsuc.value; fsuc.innerHTML='<option value="">Todas las sucursales</option>'+sucs.map(s=>`<option${s===cur?' selected':''}>${audEsc(s)}</option>`).join(''); }
+    const dl=document.getElementById('aud-suc-list');
+    if(dl) dl.innerHTML=sucs.map(s=>`<option value="${audEsc(s)}">`).join('');
+    audRender();
+  }catch(e){
+    console.error(e);
+    if(cont) cont.innerHTML='<div class="eq-empty"><i class="ti ti-alert-triangle"></i><div class="t">No se pudieron cargar las auditorías</div><div class="s">'+audEsc(e.message||e)+'</div></div>';
+  }
+}
+
+function audResumen(a){
+  const est=audEstructuraDe(a); const it=(a.datos&&a.datos.items)||{};
+  const tally={}; let ev=0;
+  Object.keys(it).forEach(k=>{
+    const c=(it[k]&&it[k].c)||{}; let val='';
+    est.columnas.forEach(col=>{ if(c[col]) val=c[col]; });
+    if(!val){ val = (it[k]&&(it[k].r||it[k].o||it[k].v))||''; }
+    if(val){ ev++; tally[val]=(tally[val]||0)+1; }
+  });
+  return {tally, ev};
+}
+
+function audRender(){
+  const cont=document.getElementById('aud-cont');
+  if(!cont) return;
+  const btnN=document.getElementById('aud-btn-nuevo');
+  if(btnN) btnN.style.display = audPuedeCargar() ? '' : 'none';
+
+  const fsuc=(document.getElementById('aud-fsuc')||{}).value||'';
+  const fmes=(document.getElementById('aud-fmes')||{}).value||'';
+  const q=((document.getElementById('aud-q')||{}).value||'').trim().toLowerCase();
+
+  let filas=auditorias.slice();
+  if(fsuc) filas=filas.filter(a=>a.sucursal===fsuc);
+  if(fmes) filas=filas.filter(a=>String(a.fecha||'').slice(0,7)===fmes);
+  if(q) filas=filas.filter(a=>[a.sucursal,a.nro_bahia,(a.datos&&a.datos.controlo)].some(v=>String(v||'').toLowerCase().includes(q)));
+
+  if(!filas.length){
+    cont.innerHTML='<div class="eq-empty"><i class="ti ti-clipboard-check"></i><div class="t">Sin auditorías'+((q||fsuc||fmes)?' para ese filtro':' cargadas')+'</div><div class="s">'+((q||fsuc||fmes)?'Probá con otro filtro.':'Cargá la primera con el botón "Nueva auditoría".')+'</div></div>';
+    return;
+  }
+
+  const puede=audPuedeCargar();
+  const nombreTpl=a=>{ if(a.datos&&a.datos.plantilla_nombre) return a.datos.plantilla_nombre; const p=a.plantilla_id!=null?audListaPlantillas().find(x=>String(x.id)===String(a.plantilla_id)):null; return p?p.nombre:'Control de Bahías'; };
+  cont.innerHTML='<div class="table-wrap"><table><thead><tr>'+
+    '<th style="width:10%">Fecha</th><th style="width:14%">Sucursal</th><th style="width:8%">N° Bahía</th><th style="width:15%">Planilla</th>'+
+    '<th style="width:15%">Controló</th><th style="width:16%">Resultado</th><th style="width:7%">Próx.</th>'+
+    '<th style="width:15%;text-align:right"></th>'+
+    '</tr></thead><tbody>'+
+    filas.map(a=>{
+      const r=audResumen(a);
+      const chip=(lbl,n,bg,fg,bd)=>n?'<span class="eq-chip" style="background:'+bg+';color:'+fg+';border-color:'+bd+'">'+n+' '+lbl+'</span> ':'';
+      const chips=chip('B',(r.tally['B']||0),'#dcfce7','#15803d','#bbf7d0')+chip('R',(r.tally['R']||0),'#fef9c3','#a16207','#fde68a')+chip('M',(r.tally['M']||0),'#fee2e2','#b91c1c','#fecaca')+chip('NC',(r.tally['NC']||0),'#eef2f5','#64748b','#e2e8f0');
+      return '<tr>'+
+        '<td>'+audEsc(audDdmmyyyy(a.fecha))+'</td>'+
+        '<td style="font-weight:600">'+audEsc(a.sucursal||'—')+'</td>'+
+        '<td>'+audEsc(a.nro_bahia||'—')+'</td>'+
+        '<td style="font-size:12px;color:var(--text-3)">'+audEsc(nombreTpl(a))+'</td>'+
+        '<td>'+audEsc((a.datos&&a.datos.controlo)||'—')+'</td>'+
+        '<td>'+(r.ev?chips:'<span style="color:var(--text-5);font-style:italic">sin datos</span>')+'</td>'+
+        '<td>'+audEsc(audDdmmyyyy((a.datos&&a.datos.proximo_control))||'')+'</td>'+
+        '<td style="text-align:right;white-space:nowrap">'+
+          '<button class="btn-sm" title="Descargar PDF" onclick="audDescargar('+a.id+')"><i class="ti ti-download"></i></button> '+
+          '<button class="btn-sm" title="'+(puede?'Editar':'Ver')+'" onclick="audAbrir('+a.id+')"><i class="ti ti-'+(puede?'pencil':'eye')+'"></i></button>'+
+          (puede?' <button class="btn-sm btn-del" title="Eliminar" onclick="audEliminar('+a.id+')"><i class="ti ti-trash"></i></button>':'')+
+        '</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table></div>';
+}
+
+function audBuildItems(est, datos){
+  est=audNormEstructura(est);
+  const it=(datos&&datos.items)||{};
+  const opts=['',...est.opciones];
+  const sel=(id,val)=>`<select id="${id}" class="filter-sel" style="padding:4px 6px;min-width:52px;font-size:12px">`+opts.map(o=>`<option${o===(val||'')?' selected':''}>${audEsc(o)}</option>`).join('')+`</select>`;
+  audFlatActual=[];
+  let n=0, html='';
+  est.secciones.forEach(s=>{
+    html+='<div style="margin-top:14px;font-size:12px;font-weight:700;letter-spacing:.04em;color:#b45309;text-transform:uppercase">'+audEsc(s.nombre)+'</div>'+
+      '<div class="table-wrap"><table style="font-size:13px"><thead><tr><th style="width:30%">Ítem</th>'+
+      est.columnas.map(c=>'<th style="width:10%">'+audEsc(c)+'</th>').join('')+
+      '<th>Observaciones</th></tr></thead><tbody>';
+    s.items.forEach(item=>{
+      const k=s.nombre+'|'+item; const d=it[k]||{}; const c=Object.assign({}, d.c||{});
+      if(!d.c && (d.v||d.o||d.r)){ c[est.columnas[0]]=d.v||''; if(est.columnas[1])c[est.columnas[1]]=d.o||''; if(est.columnas[2])c[est.columnas[2]]=d.r||''; }
+      html+='<tr><td>'+audEsc(item)+'</td>'+
+        est.columnas.map((col,ci)=>'<td>'+sel('aud-c-'+n+'-'+ci, c[col])+'</td>').join('')+
+        '<td><input id="aud-obs-'+n+'" class="drawer-input" style="padding:5px 8px;font-size:12.5px" value="'+audEsc(d.obs||'')+'"></td>'+
+        '</tr>';
+      audFlatActual.push({key:k, seccion:s.nombre, item});
+      n++;
+    });
+    html+='</tbody></table></div>';
+  });
+  document.getElementById('aud-items').innerHTML=html;
+}
+
+function audRecolectar(est){
+  est=audNormEstructura(est);
+  const items={};
+  audFlatActual.forEach((f,n)=>{
+    const c={}; let algo=false;
+    est.columnas.forEach((col,ci)=>{ const v=(document.getElementById('aud-c-'+n+'-'+ci)||{}).value||''; if(v){c[col]=v; algo=true;} });
+    const obs=((document.getElementById('aud-obs-'+n)||{}).value||'').trim();
+    if(algo || obs) items[f.key]={c,obs};
+  });
+  return {
+    sucursal:(document.getElementById('aud-suc').value||'').trim(),
+    fecha:document.getElementById('aud-fecha').value||null,
+    nro_bahia:(document.getElementById('aud-bahia').value||'').trim(),
+    datos:{
+      items,
+      otros_aspectos:(document.getElementById('aud-otros').value||'').trim(),
+      controlo:(document.getElementById('aud-controlo').value||'').trim(),
+      conocimiento:(document.getElementById('aud-conocimiento').value||'').trim(),
+      fecha_lugar:(document.getElementById('aud-fechalugar').value||'').trim(),
+      proximo_control:document.getElementById('aud-proximo').value||'',
+      correccion:document.getElementById('aud-correccion').value||'',
+    }
+  };
+}
+
+function audNueva(){ audAbrir(null); }
+
+function audAbrir(id){
+  audEditId = id || null;
+  const a = audEditId ? auditorias.find(x=>x.id===audEditId) : null;
+  if(audEditId && !a) return;
+  const puede = audPuedeCargar();
+  document.getElementById('aud-modal-title').textContent = a ? (puede?'Editar auditoría':'Ver auditoría') : 'Nueva auditoría';
+
+  const lista=audListaPlantillas();
+  const row=document.getElementById('aud-tpl-row');
+  const selTpl=document.getElementById('aud-tpl-sel');
+  if(a){
+    row.style.display='none';
+    audEstructuraActual=audEstructuraDe(a);
+    audPlantillaActual={ id:a.plantilla_id, nombre:(a.datos&&a.datos.plantilla_nombre)||null };
+  }else{
+    const pSel=lista[0];
+    audPlantillaActual={ id:pSel.id, nombre:pSel.nombre };
+    audEstructuraActual=audNormEstructura(pSel.estructura);
+    if(lista.length>1 && puede){
+      row.style.display='';
+      selTpl.innerHTML=lista.map(p=>`<option value="${p.id==null?'':p.id}">${audEsc(p.nombre)}</option>`).join('');
+      selTpl.value = pSel.id==null?'':pSel.id;
+    }else row.style.display='none';
+  }
+
+  const d = a ? (a.datos||{}) : {};
+  document.getElementById('aud-suc').value = a ? (a.sucursal||'') : (cu.sucursalFija||'');
+  document.getElementById('aud-fecha').value = a ? (a.fecha||'') : audHoy();
+  document.getElementById('aud-bahia').value = a ? (a.nro_bahia||'') : '';
+  document.getElementById('aud-otros').value = d.otros_aspectos||'';
+  document.getElementById('aud-controlo').value = a ? (d.controlo||'') : (cu.nombre||'');
+  document.getElementById('aud-conocimiento').value = d.conocimiento||'';
+  document.getElementById('aud-fechalugar').value = d.fecha_lugar||'';
+  document.getElementById('aud-proximo').value = d.proximo_control||'';
+  document.getElementById('aud-correccion').value = d.correccion||'';
+  audBuildItems(audEstructuraActual, d);
+
+  document.getElementById('aud-btn-save').style.display = puede?'':'none';
+  document.querySelectorAll('#aud-modal-ov input, #aud-modal-ov select, #aud-modal-ov textarea').forEach(el=>{ el.disabled = !puede; });
+  const err=document.getElementById('aud-modal-err'); err.style.display='none';
+  document.getElementById('aud-modal-ov').classList.add('open');
+}
+
+function audCambiarPlantilla(){
+  const v=document.getElementById('aud-tpl-sel').value;
+  const p=audGetPlantilla(v===''?null:v);
+  const actual=audRecolectar(audEstructuraActual);
+  audPlantillaActual={ id:p.id, nombre:p.nombre };
+  audEstructuraActual=audNormEstructura(p.estructura);
+  audBuildItems(audEstructuraActual, actual.datos);
+}
+
+function audCerrar(){ audEditId=null; document.getElementById('aud-modal-ov').classList.remove('open'); }
+
+async function audGuardar(){
+  const err=document.getElementById('aud-modal-err'); err.style.display='none';
+  const payload=audRecolectar(audEstructuraActual);
+  if(!payload.sucursal){ err.textContent='Falta la sucursal.'; err.style.display='block'; return; }
+  if(!payload.fecha){ err.textContent='Falta la fecha.'; err.style.display='block'; return; }
+  payload.datos.estructura=audEstructuraActual;
+  payload.datos.plantilla_nombre=(audPlantillaActual&&audPlantillaActual.nombre)||'Control de Bahías';
+  const plantilla_id=(audPlantillaActual&&audPlantillaActual.id!=null)?audPlantillaActual.id:null;
+  const btn=document.getElementById('aud-btn-save'); btn.disabled=true; btn.textContent='Guardando...';
+  try{
+    if(audEditId){
+      const {error}=await sb.from('auditorias').update({sucursal:payload.sucursal,fecha:payload.fecha,nro_bahia:payload.nro_bahia,datos:payload.datos,plantilla_id,actualizado_en:new Date().toISOString()}).eq('id',audEditId);
+      if(error) throw error;
+    }else{
+      const {error}=await sb.from('auditorias').insert([{sucursal:payload.sucursal,fecha:payload.fecha,nro_bahia:payload.nro_bahia,datos:payload.datos,plantilla_id,tipo:'control_bahias',creado_por:(cu&&cu.nombre)||null}]);
+      if(error) throw error;
+    }
+    audCerrar();
+    await cargarAuditorias();
+    showToast(audEditId?'Auditoría actualizada.':'Auditoría guardada.');
+  }catch(e){
+    err.textContent='Error: '+(e.message||e); err.style.display='block';
+  }finally{
+    btn.disabled=false; btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar';
+  }
+}
+
+async function audEliminar(id){
+  if(!audPuedeCargar()) return;
+  const a=auditorias.find(x=>x.id===id); if(!a) return;
+  if(!confirm('¿Eliminar la auditoría de '+(a.sucursal||'')+' · bahía '+(a.nro_bahia||'—')+' ('+audDdmmyyyy(a.fecha)+')?\n\nNo se puede deshacer.')) return;
+  try{
+    const {error}=await sb.from('auditorias').delete().eq('id',id);
+    if(error) throw error;
+    await cargarAuditorias();
+    showToast('Auditoría eliminada.');
+  }catch(e){ showToast('No se pudo eliminar: '+(e.message||e)); }
+}
+
+function audDescargar(id){ const a=auditorias.find(x=>x.id===id); if(a) audImprimir(a); }
+function audDescargarDesdeModal(){
+  const p=audRecolectar(audEstructuraActual);
+  audImprimir({sucursal:p.sucursal,fecha:p.fecha,nro_bahia:p.nro_bahia,plantilla_id:(audPlantillaActual&&audPlantillaActual.id),datos:{...p.datos,estructura:audEstructuraActual,plantilla_nombre:(audPlantillaActual&&audPlantillaActual.nombre)}});
+}
+function audImprimir(a){
+  const est=audEstructuraDe(a); const d=a.datos||{}; const it=d.items||{};
+  const titulo=(d.plantilla_nombre)|| 'Control de Bahías';
+  const logo=(document.querySelector('.tb-left img')||{}).src||'';
+  const nCols=est.columnas.length;
+  let filas='';
+  est.secciones.forEach(s=>{
+    filas+=`<tr class="sec"><td colspan="${nCols+2}">${audEsc(s.nombre)}</td></tr>`;
+    s.items.forEach(item=>{ const x=it[s.nombre+'|'+item]||{}; const c=x.c||{};
+      filas+=`<tr><td class="it">${audEsc(item)}</td>`+est.columnas.map(col=>`<td class="c">${audEsc(c[col]||'')}</td>`).join('')+`<td class="obs">${audEsc(x.obs||'')}</td></tr>`; });
+  });
+  const term=est.opciones.join(' · ');
+  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${audEsc(titulo)} ${audEsc(a.sucursal||'')} ${audDdmmyyyy(a.fecha)}</title>
+  <style>
+    *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:18px;font-size:11px}
+    table{border-collapse:collapse;width:100%}
+    .head{margin-bottom:10px} .head td{border:1.5px solid #000;padding:6px;text-align:center;vertical-align:middle}
+    .head .logo{width:34%} .head .logo img{max-height:46px;max-width:100%} .head .tit{width:38%;font-size:15px;font-weight:bold} .head .cod{width:28%;font-size:10px;line-height:1.5}
+    h1{font-size:14px;text-align:center;background:#d9d9d9;border:1.5px solid #000;margin:0 0 0;padding:6px;text-transform:uppercase}
+    .meta{border:1.5px solid #000;border-top:none;padding:7px 9px;font-size:11px} .meta .r{margin:3px 0}
+    .subt{text-align:center;font-weight:bold;border:1.5px solid #000;border-top:none;padding:4px;font-size:12px}
+    .term{text-align:center;border:1.5px solid #000;border-top:none;padding:4px;font-size:10.5px;background:#f2f2f2}
+    .chk{margin-top:10px} .chk th{background:#d9d9d9;border:1px solid #000;padding:4px 5px;font-size:10.5px;text-align:center}
+    .chk td{border:1px solid #000;padding:3px 5px;height:20px} .chk td.it{font-size:10.5px} .chk td.c{text-align:center;font-weight:bold} .chk td.obs{width:26%;font-size:10px}
+    .chk tr.sec td{background:#e8e8e8;font-weight:bold;font-size:10.5px;text-transform:uppercase}
+    .foot{border:1.5px solid #000;margin-top:12px;padding:9px 11px;font-size:11px;line-height:2}
+    .foot .line{border-bottom:1px solid #999;display:inline-block;min-width:160px}
+    @media print{ body{margin:8mm} .noprint{display:none} }
+    .noprint{text-align:center;margin-bottom:14px} .noprint button{font-size:13px;padding:8px 18px;border:none;border-radius:7px;background:#b45309;color:#fff;font-weight:600;cursor:pointer}
+  </style></head><body>
+  <div class="noprint"><button onclick="window.print()">Imprimir / Guardar como PDF</button></div>
+  <table class="head"><tr>
+    <td class="logo">${logo?`<img src="${logo}" alt="Nippon Car">`:'<b>NIPPON CAR</b>'}</td>
+    <td class="tit">${audEsc(titulo)}</td>
+    <td class="cod">FO_14.3<br>REVISION 00<br>FECHA: 15/04/2026</td>
+  </tr></table>
+  <h1>PLANILLA DE ${audEsc(titulo)}</h1>
+  <div class="meta">
+    <div class="r"><b>Sucursal:</b> ${audEsc(a.sucursal||'')} &nbsp;&nbsp;&nbsp; <b>FECHA:</b> ${audDdmmyyyy(a.fecha)}</div>
+    <div class="r"><b>N° DE BAHIA:</b> ${audEsc(a.nro_bahia||'')}</div>
+  </div>
+  <div class="subt">INFORME DE SEGURIDAD INDUSTRIAL</div>
+  <div class="term">TERMINOLOGÍA A UTILIZAR — ${audEsc(term)}</div>
+  <table class="chk"><thead><tr><th style="text-align:left">ÍTEM</th>${est.columnas.map(c=>`<th>${audEsc(c).toUpperCase()}</th>`).join('')}<th>OBSERVACIONES</th></tr></thead>
+  <tbody>${filas}</tbody></table>
+  <div class="foot">
+    <div><b>OTROS ASPECTOS:</b> ${audEsc(d.otros_aspectos||'')||'<span class="line"></span>'}</div>
+    <div style="margin-top:6px"><b>CONTROLÓ:</b> ${audEsc(d.controlo||'')||'<span class="line"></span>'} &nbsp;&nbsp; <b>FIRMA:</b> <span class="line"></span></div>
+    <div><b>PERSONA QUE TOMA CONOCIMIENTO:</b> ${audEsc(d.conocimiento||'')||'<span class="line"></span>'} &nbsp;&nbsp; <b>FIRMA:</b> <span class="line"></span></div>
+    <div><b>FECHA Y LUGAR:</b> ${audEsc(d.fecha_lugar||'')||'<span class="line"></span>'} &nbsp;&nbsp; <b>PRÓXIMO CONTROL:</b> ${audDdmmyyyy(d.proximo_control)||'____/____/____'}</div>
+    <div><b>FECHA QUE SE CORRIGIÓ LAS OBSERVACIONES</b> (solo cuando corresponda): ${audDdmmyyyy(d.correccion)||'____/____/____'}</div>
+  </div>
+  <script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>
+  </body></html>`;
+  const w=window.open('','_blank');
+  if(!w){ alert('El navegador bloqueó la ventana de impresión. Permití las ventanas emergentes para descargar el PDF.'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+// ════════════════ EDITOR DE PLANILLAS ════════════════
+function audEditarPlantillas(){
+  if(!esAdmin()) return;   // editar la estructura de las planillas: solo admin
+  const lista=audListaPlantillas();
+  const pick=document.getElementById('aud-tpl-picker');
+  pick.innerHTML=lista.map(p=>`<option value="${p.id==null?'':p.id}">${audEsc(p.nombre)}</option>`).join('');
+  audTplCargar(lista[0].id==null?'':lista[0].id);
+  document.getElementById('aud-tpl-err').style.display='none';
+  document.getElementById('aud-tpl-modal-ov').classList.add('open');
+}
+function audTplCargar(idRaw){
+  const id = idRaw===''||idRaw==null ? null : idRaw;
+  const p = audGetPlantilla(id);
+  audTplEditId = (audPlantillas.length? p.id : null);
+  audTplBorrador = { nombre:p.nombre, ...audNormEstructura(p.estructura) };
+  document.getElementById('aud-tpl-nombre').value = audTplBorrador.nombre;
+  document.getElementById('aud-tpl-columnas').value = audTplBorrador.columnas.join(', ');
+  document.getElementById('aud-tpl-opciones').value = audTplBorrador.opciones.join(', ');
+  document.getElementById('aud-tpl-del').style.display = (audPlantillas.length && p.id!=null) ? '' : 'none';
+  const pick=document.getElementById('aud-tpl-picker'); if(pick) pick.value = (p.id==null?'':p.id);
+  audTplRenderSecciones();
+}
+function audTplNueva(){
+  audTplEditId=null;
+  audTplBorrador={ nombre:'Nueva planilla', columnas:['Visual','Operación','Resultado'], opciones:['B','M','R','NC'], secciones:[{nombre:'SECCIÓN 1', items:['Ítem 1']}] };
+  document.getElementById('aud-tpl-nombre').value=audTplBorrador.nombre;
+  document.getElementById('aud-tpl-columnas').value=audTplBorrador.columnas.join(', ');
+  document.getElementById('aud-tpl-opciones').value=audTplBorrador.opciones.join(', ');
+  document.getElementById('aud-tpl-del').style.display='none';
+  const pick=document.getElementById('aud-tpl-picker'); if(pick) pick.value='';
+  audTplRenderSecciones();
+}
+function audTplRenderSecciones(){
+  const cont=document.getElementById('aud-tpl-secciones');
+  cont.innerHTML=audTplBorrador.secciones.map((s,i)=>
+    '<div style="border:1px solid var(--border-1);border-radius:10px;padding:11px 12px;margin-bottom:10px;background:var(--surface-sub,#f6f7f9)">'+
+      '<div style="display:flex;gap:8px;align-items:center;margin-bottom:7px">'+
+        '<input class="drawer-input" style="font-weight:600" value="'+audEsc(s.nombre)+'" oninput="audTplSetNombre('+i+',this.value)" placeholder="Nombre de la sección">'+
+        '<button class="btn-sm btn-del" title="Quitar sección" onclick="audTplQuitarSeccion('+i+')"><i class="ti ti-trash"></i></button>'+
+      '</div>'+
+      '<label class="drawer-label" style="font-size:11px">Ítems (uno por línea)</label>'+
+      '<textarea class="drawer-input" rows="'+Math.max(3,s.items.length+1)+'" style="resize:vertical;font-size:12.5px" oninput="audTplSetItems('+i+',this.value)" placeholder="Un ítem por línea">'+audEsc(s.items.join('\n'))+'</textarea>'+
+    '</div>'
+  ).join('')||'<div style="font-size:12.5px;color:var(--text-5)">Sin secciones. Agregá una con el botón de arriba.</div>';
+}
+function audTplSetNombre(i,v){ if(audTplBorrador.secciones[i]) audTplBorrador.secciones[i].nombre=v; }
+function audTplSetItems(i,v){ if(audTplBorrador.secciones[i]) audTplBorrador.secciones[i].items=v.split('\n').map(x=>x.trim()).filter(Boolean); }
+function audTplAgregarSeccion(){ audTplBorrador.secciones.push({nombre:'NUEVA SECCIÓN', items:['Ítem 1']}); audTplRenderSecciones(); }
+function audTplQuitarSeccion(i){ audTplBorrador.secciones.splice(i,1); audTplRenderSecciones(); }
+function audTplCerrar(){ document.getElementById('aud-tpl-modal-ov').classList.remove('open'); }
+
+async function audTplGuardar(){
+  const err=document.getElementById('aud-tpl-err'); err.style.display='none';
+  const nombre=(document.getElementById('aud-tpl-nombre').value||'').trim();
+  const columnas=(document.getElementById('aud-tpl-columnas').value||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const opciones=(document.getElementById('aud-tpl-opciones').value||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(!nombre){ err.textContent='Ponele un nombre a la planilla.'; err.style.display='block'; return; }
+  if(!columnas.length){ err.textContent='Necesitás al menos una columna de evaluación.'; err.style.display='block'; return; }
+  if(!opciones.length){ err.textContent='Necesitás al menos una opción (terminología).'; err.style.display='block'; return; }
+  const secciones=(audTplBorrador.secciones||[]).map(s=>({nombre:(s.nombre||'').trim(), items:(s.items||[]).filter(Boolean)})).filter(s=>s.nombre||s.items.length);
+  if(!secciones.length){ err.textContent='Agregá al menos una sección con ítems.'; err.style.display='block'; return; }
+  const estructura={columnas,opciones,secciones};
+
+  const btn=document.getElementById('aud-tpl-save'); btn.disabled=true; btn.textContent='Guardando...';
+  try{
+    if(audTplEditId!=null){
+      const {error}=await sb.from('auditoria_plantillas').update({nombre,estructura,actualizado_en:new Date().toISOString()}).eq('id',audTplEditId);
+      if(error) throw error;
+    }else{
+      const orden=(audPlantillas.reduce((m,p)=>Math.max(m,p.orden||0),0))+1;
+      const {error}=await sb.from('auditoria_plantillas').insert([{nombre,estructura,orden,creado_por:(cu&&cu.nombre)||null}]);
+      if(error) throw error;
+    }
+    await cargarAuditorias();
+    const lista=audListaPlantillas();
+    const pick=document.getElementById('aud-tpl-picker');
+    if(pick) pick.innerHTML=lista.map(p=>`<option value="${p.id==null?'':p.id}">${audEsc(p.nombre)}</option>`).join('');
+    showToast('Planilla guardada.');
+    audTplCerrar();
+  }catch(e){
+    err.textContent='Error: '+(e.message||e)+' · ¿Corriste el SQL de planillas?'; err.style.display='block';
+  }finally{
+    btn.disabled=false; btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar planilla';
+  }
+}
+
+async function audTplEliminar(){
+  if(audTplEditId==null) return;
+  if(!confirm('¿Eliminar esta planilla?\n\nLas auditorías ya cargadas NO se tocan (cada una guardó su propia copia). No se puede deshacer.')) return;
+  try{
+    const {error}=await sb.from('auditoria_plantillas').delete().eq('id',audTplEditId);
+    if(error) throw error;
+    await cargarAuditorias();
+    showToast('Planilla eliminada.');
+    audTplCerrar();
+  }catch(e){ alert('No se pudo eliminar: '+(e.message||e)); }
 }
 
 function eqIrADia(f){
