@@ -1383,7 +1383,7 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
         <div class="tc" id="tc-auditorias">
           <div class="sec-hdr">
             <div class="sec-hdr-left">
-              <div class="sec-eyebrow">Seguridad Industrial · Planillas de control</div>
+              <div class="sec-eyebrow">Registro y seguimiento de auditorías</div>
               <h2>Auditorías</h2>
               <div class="tb-sub" id="aud-sub" style="margin-top:4px"></div>
             </div>
@@ -1412,7 +1412,7 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
         <h3 id="aud-modal-title" style="margin:0;font-size:19px">Nueva auditoría</h3>
         <button onclick="audCerrar()" style="background:none;border:none;font-size:24px;line-height:1;color:var(--text-4);cursor:pointer">&times;</button>
       </div>
-      <div class="sec-eyebrow" style="margin-bottom:12px">CONTROL DE BAHÍAS · FO_14.3 · Informe de seguridad industrial</div>
+      <div class="sec-eyebrow" style="margin-bottom:12px" id="aud-modal-eyebrow">Planilla de control</div>
       <div id="aud-modal-err" style="display:none;background:var(--accent-tint);color:var(--accent-h);padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:14px"></div>
 
       <div class="drawer-field" id="aud-tpl-row" style="margin-bottom:12px;display:none">
@@ -1423,11 +1423,11 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px">
         <div class="drawer-field"><label class="drawer-label">Sucursal</label><input class="drawer-input" id="aud-suc" list="aud-suc-list" placeholder="Sucursal"><datalist id="aud-suc-list"></datalist></div>
         <div class="drawer-field"><label class="drawer-label">Fecha</label><input class="drawer-input" id="aud-fecha" type="date"></div>
-        <div class="drawer-field"><label class="drawer-label">N° de bahía</label><input class="drawer-input" id="aud-bahia" placeholder="Ej: 3"></div>
+        <div class="drawer-field" id="aud-f-bahia"><label class="drawer-label">N° de bahía</label><input class="drawer-input" id="aud-bahia" placeholder="Ej: 3"></div>
       </div>
 
       <div style="margin-top:14px;padding:9px 13px;background:var(--surface-sub,#f6f7f9);border:1px solid var(--border-1);border-radius:9px;font-size:12.5px;color:var(--text-3)">
-        <b>Terminología:</b> Bien (B) · Mal (M) · Regular (R) · No Corresponde (NC). Dejá en blanco lo que no revisaste.
+        <b>Terminología:</b> <span id="aud-term-nota"></span> Dejá en blanco lo que no revisaste.
       </div>
 
       <div id="aud-items" style="margin-top:14px"></div>
@@ -1435,11 +1435,11 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
       <div class="drawer-field" style="margin-top:16px"><label class="drawer-label">Otros aspectos</label><textarea class="drawer-input" id="aud-otros" rows="2" style="resize:vertical" placeholder="Observaciones generales..."></textarea></div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:12px">
-        <div class="drawer-field"><label class="drawer-label">Controló</label><input class="drawer-input" id="aud-controlo" placeholder="Nombre y apellido"></div>
-        <div class="drawer-field"><label class="drawer-label">Persona que toma conocimiento</label><input class="drawer-input" id="aud-conocimiento" placeholder="Nombre y apellido"></div>
-        <div class="drawer-field"><label class="drawer-label">Fecha y lugar</label><input class="drawer-input" id="aud-fechalugar" placeholder="Ej: Roca, 24/11/2026"></div>
-        <div class="drawer-field"><label class="drawer-label">Próximo control</label><input class="drawer-input" id="aud-proximo" type="date"></div>
-        <div class="drawer-field"><label class="drawer-label">Fecha en que se corrigieron las observaciones <span style="font-weight:400;color:var(--text-4)">(si corresponde)</span></label><input class="drawer-input" id="aud-correccion" type="date"></div>
+        <div class="drawer-field" id="aud-f-controlo"><label class="drawer-label" id="aud-lbl-controlo">Controló</label><input class="drawer-input" id="aud-controlo" placeholder="Nombre y apellido"></div>
+        <div class="drawer-field" id="aud-f-conocimiento"><label class="drawer-label">Persona que toma conocimiento</label><input class="drawer-input" id="aud-conocimiento" placeholder="Nombre y apellido"></div>
+        <div class="drawer-field" id="aud-f-fechalugar"><label class="drawer-label">Fecha y lugar</label><input class="drawer-input" id="aud-fechalugar" placeholder="Ej: Roca, 24/11/2026"></div>
+        <div class="drawer-field" id="aud-f-proximo"><label class="drawer-label">Próximo control</label><input class="drawer-input" id="aud-proximo" type="date"></div>
+        <div class="drawer-field" id="aud-f-correccion"><label class="drawer-label">Fecha en que se corrigieron las observaciones <span style="font-weight:400;color:var(--text-4)">(si corresponde)</span></label><input class="drawer-input" id="aud-correccion" type="date"></div>
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:20px">
@@ -1467,10 +1467,34 @@ tr.eq-ok{background:rgba(15,123,63,.05)}
         <button class="btn-sm" onclick="audTplNueva()"><i class="ti ti-plus"></i> Nueva planilla</button>
       </div>
 
-      <div class="drawer-field"><label class="drawer-label">Nombre de la planilla</label><input class="drawer-input" id="aud-tpl-nombre" placeholder="Ej: Control de Bahías"></div>
+      <div class="drawer-field"><label class="drawer-label">Nombre / título de la planilla</label><input class="drawer-input" id="aud-tpl-nombre" placeholder="Ej: Control de Bahías"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:11px">
         <div class="drawer-field"><label class="drawer-label">Columnas de evaluación <span style="font-weight:400;color:var(--text-4)">(separadas por coma)</span></label><input class="drawer-input" id="aud-tpl-columnas" placeholder="Visual, Operación, Resultado"></div>
-        <div class="drawer-field"><label class="drawer-label">Opciones / terminología <span style="font-weight:400;color:var(--text-4)">(separadas por coma)</span></label><input class="drawer-input" id="aud-tpl-opciones" placeholder="B, M, R, NC"></div>
+        <div class="drawer-field"><label class="drawer-label">Opciones del desplegable <span style="font-weight:400;color:var(--text-4)">(separadas por coma)</span></label><input class="drawer-input" id="aud-tpl-opciones" placeholder="B, M, R, NC"></div>
+      </div>
+
+      <div style="margin-top:16px;padding:12px 13px;border:1px solid var(--border-1);border-radius:10px;background:var(--surface-sub,#f6f7f9)">
+        <div class="drawer-label" style="margin:0 0 10px">Encabezado y textos del PDF</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px">
+          <div class="drawer-field"><label class="drawer-label">Texto del recuadro superior</label><input class="drawer-input" id="aud-tpl-encabezado" placeholder="Ej: REGISTRO DE AUDITORIA POSVENTA LAVADERO"></div>
+          <div class="drawer-field"><label class="drawer-label">Subtítulo</label><input class="drawer-input" id="aud-tpl-subtitulo" placeholder="Ej: REPORTE E INSPECCIÓN DE INSTALACIONES Y MATERIAL"></div>
+          <div class="drawer-field"><label class="drawer-label">Código</label><input class="drawer-input" id="aud-tpl-codigo" placeholder="Ej: FO-PV-1"></div>
+          <div class="drawer-field"><label class="drawer-label">Revisión</label><input class="drawer-input" id="aud-tpl-revision" placeholder="Ej: REVISION 01"></div>
+          <div class="drawer-field"><label class="drawer-label">Fecha de la revisión</label><input class="drawer-input" id="aud-tpl-fecharev" placeholder="Ej: 24/11/2026"></div>
+          <div class="drawer-field"><label class="drawer-label">Línea de terminología</label><input class="drawer-input" id="aud-tpl-terminologia" placeholder="Ej: Bien(Ok) – Faltante / Deteriorado (NG) - No Corresponde (NC)"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;padding:12px 13px;border:1px solid var(--border-1);border-radius:10px;background:var(--surface-sub,#f6f7f9)">
+        <div class="drawer-label" style="margin:0 0 10px">Campos del formulario</div>
+        <div class="drawer-field" style="max-width:300px;margin-bottom:10px"><label class="drawer-label">Cómo se llama quien firma</label><input class="drawer-input" id="aud-tpl-responsable" placeholder="Controló / Auditó"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--text-2)">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="aud-tplc-bahia"> N° de bahía</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="aud-tplc-conocimiento"> Persona que toma conocimiento</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="aud-tplc-fechalugar"> Fecha y lugar</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="aud-tplc-proximo"> Próximo control</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="aud-tplc-correccion"> Fecha de corrección</label>
+        </div>
       </div>
 
       <div style="margin-top:16px;display:flex;align-items:center;justify-content:space-between">
@@ -2591,7 +2615,7 @@ const MODULOS = {
   auditorias: {
     id: 'auditorias',
     nombre: 'Auditorías',
-    desc: 'Planillas de control (bahías / seguridad industrial). Se cargan, quedan registradas para editarlas y se descargan en PDF.',
+    desc: 'Auditorías internas de cualquier tipo. Se cargan las planillas, queda el registro de lo hecho para hacer seguimiento, editarlas y descargarlas en PDF.',
     color: '#b45309',
     icono: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'
   },
@@ -10072,16 +10096,24 @@ function lavExportarExcel(){
 }
 
 // ============================================================
-//  MÓDULO AUDITORÍAS — Planillas de control (editables)
-//  Se cargan planillas de seguridad industrial, quedan registradas
-//  para consultarlas/editarlas y se descargan en PDF. Las planillas
-//  (secciones, ítems, columnas y terminología) son editables y se
-//  guardan en la base. Cada auditoría guarda una copia de su
-//  estructura, así editar una planilla no altera lo ya cargado.
+//  MÓDULO AUDITORÍAS — registro y seguimiento de auditorías
+//  Se cargan las planillas, queda el registro de lo hecho para
+//  seguirlo, editarlo y descargarlo en PDF. Las planillas
+//  (secciones, ítems, columnas, encabezado y campos) las edita
+//  el admin. Cada auditoría guarda una copia de su estructura,
+//  así editar una planilla no altera lo ya registrado.
 // ============================================================
+
+const AUD_CAMPOS_DEF = {bahia:true, conocimiento:true, fechalugar:true, proximo:true, correccion:true};
 
 // Planilla por defecto (semilla) — Control de Bahías
 const AUD_ESTRUCTURA_DEFAULT = {
+  encabezado:'CONTROL DE BAHIAS',
+  subtitulo:'INFORME DE SEGURIDAD INDUSTRIAL',
+  codigo:'FO_14.3', revision:'REVISION 00', fecha_rev:'15/04/2026',
+  terminologia:'Bien (B) · Mal (M) · Regular (R) · No Corresponde (NC)',
+  responsable:'Controló',
+  campos:{bahia:true, conocimiento:true, fechalugar:true, proximo:true, correccion:true},
   columnas:['Visual','Operación','Resultado'],
   opciones:['B','M','R','NC'],
   secciones:[
@@ -10109,12 +10141,22 @@ function audHoy(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMo
 
 function audNormEstructura(e){
   e = e || {};
+  const columnas = Array.isArray(e.columnas)&&e.columnas.length ? e.columnas.slice() : ['Visual','Operación','Resultado'];
+  const opciones = Array.isArray(e.opciones)&&e.opciones.length ? e.opciones.slice() : ['B','M','R','NC'];
   return {
-    columnas: Array.isArray(e.columnas)&&e.columnas.length ? e.columnas.slice() : ['Visual','Operación','Resultado'],
-    opciones: Array.isArray(e.opciones)&&e.opciones.length ? e.opciones.slice() : ['B','M','R','NC'],
+    encabezado: e.encabezado||'',
+    subtitulo:  e.subtitulo||'',
+    codigo:     e.codigo||'',
+    revision:   e.revision||'',
+    fecha_rev:  e.fecha_rev||'',
+    terminologia: e.terminologia||'',
+    responsable: e.responsable||'Controló',
+    campos: Object.assign({}, AUD_CAMPOS_DEF, e.campos||{}),
+    columnas, opciones,
     secciones: Array.isArray(e.secciones) ? e.secciones.map(s=>({nombre:s.nombre||'', items:Array.isArray(s.items)?s.items.slice():[]})) : []
   };
 }
+function audTerminologia(est){ return est.terminologia || est.opciones.join(' · '); }
 function audListaPlantillas(){
   if(audPlantillas.length) return audPlantillas;
   return [{ id:null, nombre:'Control de Bahías', estructura:audNormEstructura(AUD_ESTRUCTURA_DEFAULT) }];
@@ -10128,7 +10170,7 @@ function audEstructuraDe(a){
 
 async function cargarAuditorias(){
   const sub=document.getElementById('aud-sub');
-  if(sub) sub.textContent='Planillas de control. Se cargan, quedan registradas para editarlas y se descargan en PDF. La planilla es editable.';
+  if(sub) sub.textContent='Registro de las auditorías hechas: cargalas, seguí lo que se hizo, editalas y descargalas en PDF.';
   const btnN=document.getElementById('aud-btn-nuevo');
   if(btnN) btnN.style.display = audPuedeCargar() ? '' : 'none';
   const btnP=document.getElementById('aud-btn-plantilla');
@@ -10173,6 +10215,14 @@ function audResumen(a){
   });
   return {tally, ev};
 }
+// color del chip según la opción (verde lo bueno, rojo lo malo, gris NC)
+function audChipColor(v){
+  const s=String(v).toUpperCase();
+  if(s==='B'||s==='OK'||s==='BIEN') return ['#dcfce7','#15803d','#bbf7d0'];
+  if(s==='R'||s==='REGULAR')        return ['#fef9c3','#a16207','#fde68a'];
+  if(s==='NC')                       return ['#eef2f5','#64748b','#e2e8f0'];
+  return ['#fee2e2','#b91c1c','#fecaca'];
+}
 
 function audRender(){
   const cont=document.getElementById('aud-cont');
@@ -10197,14 +10247,13 @@ function audRender(){
   const puede=audPuedeCargar();
   const nombreTpl=a=>{ if(a.datos&&a.datos.plantilla_nombre) return a.datos.plantilla_nombre; const p=a.plantilla_id!=null?audListaPlantillas().find(x=>String(x.id)===String(a.plantilla_id)):null; return p?p.nombre:'Control de Bahías'; };
   cont.innerHTML='<div class="table-wrap"><table><thead><tr>'+
-    '<th style="width:10%">Fecha</th><th style="width:14%">Sucursal</th><th style="width:8%">N° Bahía</th><th style="width:15%">Planilla</th>'+
-    '<th style="width:15%">Controló</th><th style="width:16%">Resultado</th><th style="width:7%">Próx.</th>'+
+    '<th style="width:10%">Fecha</th><th style="width:13%">Sucursal</th><th style="width:7%">Bahía</th><th style="width:17%">Planilla</th>'+
+    '<th style="width:14%">Responsable</th><th style="width:17%">Resultado</th><th style="width:7%">Próx.</th>'+
     '<th style="width:15%;text-align:right"></th>'+
     '</tr></thead><tbody>'+
     filas.map(a=>{
       const r=audResumen(a);
-      const chip=(lbl,n,bg,fg,bd)=>n?'<span class="eq-chip" style="background:'+bg+';color:'+fg+';border-color:'+bd+'">'+n+' '+lbl+'</span> ':'';
-      const chips=chip('B',(r.tally['B']||0),'#dcfce7','#15803d','#bbf7d0')+chip('R',(r.tally['R']||0),'#fef9c3','#a16207','#fde68a')+chip('M',(r.tally['M']||0),'#fee2e2','#b91c1c','#fecaca')+chip('NC',(r.tally['NC']||0),'#eef2f5','#64748b','#e2e8f0');
+      const chips=Object.keys(r.tally).map(k=>{ const [bg,fg,bd]=audChipColor(k); return '<span class="eq-chip" style="background:'+bg+';color:'+fg+';border-color:'+bd+'">'+r.tally[k]+' '+audEsc(k)+'</span> '; }).join('');
       return '<tr>'+
         '<td>'+audEsc(audDdmmyyyy(a.fecha))+'</td>'+
         '<td style="font-weight:600">'+audEsc(a.sucursal||'—')+'</td>'+
@@ -10227,13 +10276,14 @@ function audBuildItems(est, datos){
   est=audNormEstructura(est);
   const it=(datos&&datos.items)||{};
   const opts=['',...est.opciones];
-  const sel=(id,val)=>`<select id="${id}" class="filter-sel" style="padding:4px 6px;min-width:52px;font-size:12px">`+opts.map(o=>`<option${o===(val||'')?' selected':''}>${audEsc(o)}</option>`).join('')+`</select>`;
+  const anchoCol=Math.min(14, Math.max(8, Math.round(34/Math.max(1,est.columnas.length))));
+  const sel=(id,val)=>`<select id="${id}" class="filter-sel" style="padding:4px 6px;min-width:58px;font-size:12px">`+opts.map(o=>`<option${o===(val||'')?' selected':''}>${audEsc(o)}</option>`).join('')+`</select>`;
   audFlatActual=[];
   let n=0, html='';
   est.secciones.forEach(s=>{
     html+='<div style="margin-top:14px;font-size:12px;font-weight:700;letter-spacing:.04em;color:#b45309;text-transform:uppercase">'+audEsc(s.nombre)+'</div>'+
-      '<div class="table-wrap"><table style="font-size:13px"><thead><tr><th style="width:30%">Ítem</th>'+
-      est.columnas.map(c=>'<th style="width:10%">'+audEsc(c)+'</th>').join('')+
+      '<div class="table-wrap"><table style="font-size:13px"><thead><tr><th style="width:32%">Ítem</th>'+
+      est.columnas.map(c=>'<th style="width:'+anchoCol+'%">'+audEsc(c)+'</th>').join('')+
       '<th>Observaciones</th></tr></thead><tbody>';
     s.items.forEach(item=>{
       const k=s.nombre+'|'+item; const d=it[k]||{}; const c=Object.assign({}, d.c||{});
@@ -10275,6 +10325,21 @@ function audRecolectar(est){
   };
 }
 
+// Ajusta el modal (campos visibles, etiquetas, terminología) a la estructura
+function audAplicarEstructuraUI(est, nombre){
+  const C=est.campos||AUD_CAMPOS_DEF;
+  const show=(id,on)=>{ const el=document.getElementById(id); if(el) el.style.display=on?'':'none'; };
+  show('aud-f-bahia', C.bahia!==false);
+  show('aud-f-conocimiento', C.conocimiento!==false);
+  show('aud-f-fechalugar', C.fechalugar!==false);
+  show('aud-f-proximo', C.proximo!==false);
+  show('aud-f-correccion', C.correccion!==false);
+  const lbl=document.getElementById('aud-lbl-controlo'); if(lbl) lbl.textContent=est.responsable||'Controló';
+  const term=document.getElementById('aud-term-nota'); if(term) term.textContent=audTerminologia(est)+'.';
+  const eye=document.getElementById('aud-modal-eyebrow');
+  if(eye) eye.textContent=[nombre||'Planilla de control', est.codigo, est.subtitulo].filter(Boolean).join(' · ');
+}
+
 function audNueva(){ audAbrir(null); }
 
 function audAbrir(id){
@@ -10312,6 +10377,7 @@ function audAbrir(id){
   document.getElementById('aud-fechalugar').value = d.fecha_lugar||'';
   document.getElementById('aud-proximo').value = d.proximo_control||'';
   document.getElementById('aud-correccion').value = d.correccion||'';
+  audAplicarEstructuraUI(audEstructuraActual, (audPlantillaActual&&audPlantillaActual.nombre));
   audBuildItems(audEstructuraActual, d);
 
   document.getElementById('aud-btn-save').style.display = puede?'':'none';
@@ -10326,6 +10392,7 @@ function audCambiarPlantilla(){
   const actual=audRecolectar(audEstructuraActual);
   audPlantillaActual={ id:p.id, nombre:p.nombre };
   audEstructuraActual=audNormEstructura(p.estructura);
+  audAplicarEstructuraUI(audEstructuraActual, p.nombre);
   audBuildItems(audEstructuraActual, actual.datos);
 }
 
@@ -10337,7 +10404,7 @@ async function audGuardar(){
   if(!payload.sucursal){ err.textContent='Falta la sucursal.'; err.style.display='block'; return; }
   if(!payload.fecha){ err.textContent='Falta la fecha.'; err.style.display='block'; return; }
   payload.datos.estructura=audEstructuraActual;
-  payload.datos.plantilla_nombre=(audPlantillaActual&&audPlantillaActual.nombre)||'Control de Bahías';
+  payload.datos.plantilla_nombre=(audPlantillaActual&&audPlantillaActual.nombre)||'Planilla de control';
   const plantilla_id=(audPlantillaActual&&audPlantillaActual.id!=null)?audPlantillaActual.id:null;
   const btn=document.getElementById('aud-btn-save'); btn.disabled=true; btn.textContent='Guardando...';
   try{
@@ -10345,7 +10412,7 @@ async function audGuardar(){
       const {error}=await sb.from('auditorias').update({sucursal:payload.sucursal,fecha:payload.fecha,nro_bahia:payload.nro_bahia,datos:payload.datos,plantilla_id,actualizado_en:new Date().toISOString()}).eq('id',audEditId);
       if(error) throw error;
     }else{
-      const {error}=await sb.from('auditorias').insert([{sucursal:payload.sucursal,fecha:payload.fecha,nro_bahia:payload.nro_bahia,datos:payload.datos,plantilla_id,tipo:'control_bahias',creado_por:(cu&&cu.nombre)||null}]);
+      const {error}=await sb.from('auditorias').insert([{sucursal:payload.sucursal,fecha:payload.fecha,nro_bahia:payload.nro_bahia,datos:payload.datos,plantilla_id,tipo:'auditoria',creado_por:(cu&&cu.nombre)||null}]);
       if(error) throw error;
     }
     audCerrar();
@@ -10361,7 +10428,7 @@ async function audGuardar(){
 async function audEliminar(id){
   if(!audPuedeCargar()) return;
   const a=auditorias.find(x=>x.id===id); if(!a) return;
-  if(!confirm('¿Eliminar la auditoría de '+(a.sucursal||'')+' · bahía '+(a.nro_bahia||'—')+' ('+audDdmmyyyy(a.fecha)+')?\n\nNo se puede deshacer.')) return;
+  if(!confirm('¿Eliminar la auditoría de '+(a.sucursal||'')+' ('+audDdmmyyyy(a.fecha)+')?\n\nNo se puede deshacer.')) return;
   try{
     const {error}=await sb.from('auditorias').delete().eq('id',id);
     if(error) throw error;
@@ -10370,14 +10437,18 @@ async function audEliminar(id){
   }catch(e){ showToast('No se pudo eliminar: '+(e.message||e)); }
 }
 
+// ── Descargar / imprimir en PDF ──
 function audDescargar(id){ const a=auditorias.find(x=>x.id===id); if(a) audImprimir(a); }
 function audDescargarDesdeModal(){
   const p=audRecolectar(audEstructuraActual);
   audImprimir({sucursal:p.sucursal,fecha:p.fecha,nro_bahia:p.nro_bahia,plantilla_id:(audPlantillaActual&&audPlantillaActual.id),datos:{...p.datos,estructura:audEstructuraActual,plantilla_nombre:(audPlantillaActual&&audPlantillaActual.nombre)}});
 }
-function audImprimir(a){
+
+// Arma el HTML de la planilla lista para imprimir
+function audPlanillaHTML(a){
   const est=audEstructuraDe(a); const d=a.datos||{}; const it=d.items||{};
-  const titulo=(d.plantilla_nombre)|| 'Control de Bahías';
+  const C=est.campos||AUD_CAMPOS_DEF;
+  const titulo=(d.plantilla_nombre)||'Planilla de control';
   const logo=(document.querySelector('.tb-left img')||{}).src||'';
   const nCols=est.columnas.length;
   let filas='';
@@ -10386,55 +10457,93 @@ function audImprimir(a){
     s.items.forEach(item=>{ const x=it[s.nombre+'|'+item]||{}; const c=x.c||{};
       filas+=`<tr><td class="it">${audEsc(item)}</td>`+est.columnas.map(col=>`<td class="c">${audEsc(c[col]||'')}</td>`).join('')+`<td class="obs">${audEsc(x.obs||'')}</td></tr>`; });
   });
-  const term=est.opciones.join(' · ');
-  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${audEsc(titulo)} ${audEsc(a.sucursal||'')} ${audDdmmyyyy(a.fecha)}</title>
+  const hayCod = est.codigo||est.revision||est.fecha_rev;
+  const celdaCod = hayCod ? `<td class="cod">${[est.codigo,est.revision,est.fecha_rev?('FECHA: '+est.fecha_rev):''].filter(Boolean).map(audEsc).join('<br>')}</td>` : '';
+  const linea='<span class="line"></span>';
+  let pie='<div><b>OTROS ASPECTOS:</b> '+(audEsc(d.otros_aspectos||'')||linea)+'</div>';
+  pie+='<div style="margin-top:6px"><b>'+audEsc((est.responsable||'Controló').toUpperCase())+':</b> '+(audEsc(d.controlo||'')||linea)+' &nbsp;&nbsp; <b>FIRMA:</b> '+linea+'</div>';
+  if(C.conocimiento!==false) pie+='<div><b>PERSONA QUE TOMA CONOCIMIENTO:</b> '+(audEsc(d.conocimiento||'')||linea)+' &nbsp;&nbsp; <b>FIRMA:</b> '+linea+'</div>';
+  if(C.fechalugar!==false || C.proximo!==false){
+    const partes=[];
+    if(C.fechalugar!==false) partes.push('<b>FECHA Y LUGAR:</b> '+(audEsc(d.fecha_lugar||'')||linea));
+    if(C.proximo!==false)    partes.push('<b>PRÓXIMO CONTROL:</b> '+(audDdmmyyyy(d.proximo_control)||'____/____/____'));
+    pie+='<div>'+partes.join(' &nbsp;&nbsp; ')+'</div>';
+  }
+  if(C.correccion!==false) pie+='<div><b>FECHA QUE SE CORRIGIÓ LAS OBSERVACIONES</b> (solo cuando corresponda): '+(audDdmmyyyy(d.correccion)||'____/____/____')+'</div>';
+
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${audEsc(titulo)} ${audEsc(a.sucursal||'')} ${audDdmmyyyy(a.fecha)}</title>
   <style>
-    *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:18px;font-size:11px}
+    *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:14px;font-size:11px}
     table{border-collapse:collapse;width:100%}
     .head{margin-bottom:10px} .head td{border:1.5px solid #000;padding:6px;text-align:center;vertical-align:middle}
-    .head .logo{width:34%} .head .logo img{max-height:46px;max-width:100%} .head .tit{width:38%;font-size:15px;font-weight:bold} .head .cod{width:28%;font-size:10px;line-height:1.5}
-    h1{font-size:14px;text-align:center;background:#d9d9d9;border:1.5px solid #000;margin:0 0 0;padding:6px;text-transform:uppercase}
+    .head .logo{width:34%} .head .logo img{max-height:46px;max-width:100%} .head .tit{font-size:12.5px;font-weight:bold} .head .cod{width:26%;font-size:10px;line-height:1.5;font-weight:bold}
+    h1{font-size:14px;text-align:center;background:#d9d9d9;border:1.5px solid #000;margin:0;padding:6px;text-transform:uppercase}
     .meta{border:1.5px solid #000;border-top:none;padding:7px 9px;font-size:11px} .meta .r{margin:3px 0}
     .subt{text-align:center;font-weight:bold;border:1.5px solid #000;border-top:none;padding:4px;font-size:12px}
     .term{text-align:center;border:1.5px solid #000;border-top:none;padding:4px;font-size:10.5px;background:#f2f2f2}
     .chk{margin-top:10px} .chk th{background:#d9d9d9;border:1px solid #000;padding:4px 5px;font-size:10.5px;text-align:center}
-    .chk td{border:1px solid #000;padding:3px 5px;height:20px} .chk td.it{font-size:10.5px} .chk td.c{text-align:center;font-weight:bold} .chk td.obs{width:26%;font-size:10px}
+    .chk td{border:1px solid #000;padding:3px 5px;height:19px} .chk td.it{font-size:10.5px} .chk td.c{text-align:center;font-weight:bold} .chk td.obs{width:26%;font-size:10px}
     .chk tr.sec td{background:#e8e8e8;font-weight:bold;font-size:10.5px;text-transform:uppercase}
     .foot{border:1.5px solid #000;margin-top:12px;padding:9px 11px;font-size:11px;line-height:2}
-    .foot .line{border-bottom:1px solid #999;display:inline-block;min-width:160px}
-    @media print{ body{margin:8mm} .noprint{display:none} }
-    .noprint{text-align:center;margin-bottom:14px} .noprint button{font-size:13px;padding:8px 18px;border:none;border-radius:7px;background:#b45309;color:#fff;font-weight:600;cursor:pointer}
+    .foot .line{border-bottom:1px solid #999;display:inline-block;min-width:150px}
+    @page{size:A4 portrait;margin:10mm}
   </style></head><body>
-  <div class="noprint"><button onclick="window.print()">Imprimir / Guardar como PDF</button></div>
   <table class="head"><tr>
     <td class="logo">${logo?`<img src="${logo}" alt="Nippon Car">`:'<b>NIPPON CAR</b>'}</td>
-    <td class="tit">${audEsc(titulo)}</td>
-    <td class="cod">FO_14.3<br>REVISION 00<br>FECHA: 15/04/2026</td>
+    <td class="tit">${audEsc(est.encabezado||titulo)}</td>
+    ${celdaCod}
   </tr></table>
-  <h1>PLANILLA DE ${audEsc(titulo)}</h1>
+  <h1>${audEsc(titulo)}</h1>
   <div class="meta">
-    <div class="r"><b>Sucursal:</b> ${audEsc(a.sucursal||'')} &nbsp;&nbsp;&nbsp; <b>FECHA:</b> ${audDdmmyyyy(a.fecha)}</div>
-    <div class="r"><b>N° DE BAHIA:</b> ${audEsc(a.nro_bahia||'')}</div>
+    <div class="r"><b>Sucursal:</b> ${audEsc(a.sucursal||'')} &nbsp;&nbsp;&nbsp; <b>FECHA:</b> ${audDdmmyyyy(a.fecha)}${(C.bahia!==false)?(' &nbsp;&nbsp;&nbsp; <b>N° DE BAHIA:</b> '+audEsc(a.nro_bahia||'')):''}</div>
   </div>
-  <div class="subt">INFORME DE SEGURIDAD INDUSTRIAL</div>
-  <div class="term">TERMINOLOGÍA A UTILIZAR — ${audEsc(term)}</div>
-  <table class="chk"><thead><tr><th style="text-align:left">ÍTEM</th>${est.columnas.map(c=>`<th>${audEsc(c).toUpperCase()}</th>`).join('')}<th>OBSERVACIONES</th></tr></thead>
+  ${est.subtitulo?`<div class="subt">${audEsc(est.subtitulo)}</div>`:''}
+  <div class="term"><b>TERMINOLOGÍA A UTILIZAR</b> — ${audEsc(audTerminologia(est))}</div>
+  <table class="chk"><thead><tr><th style="text-align:left">ÍTEM</th>${est.columnas.map(c=>`<th style="width:${nCols<=2?15:9}%">${audEsc(c).toUpperCase()}</th>`).join('')}<th style="width:28%">OBSERVACIONES</th></tr></thead>
   <tbody>${filas}</tbody></table>
-  <div class="foot">
-    <div><b>OTROS ASPECTOS:</b> ${audEsc(d.otros_aspectos||'')||'<span class="line"></span>'}</div>
-    <div style="margin-top:6px"><b>CONTROLÓ:</b> ${audEsc(d.controlo||'')||'<span class="line"></span>'} &nbsp;&nbsp; <b>FIRMA:</b> <span class="line"></span></div>
-    <div><b>PERSONA QUE TOMA CONOCIMIENTO:</b> ${audEsc(d.conocimiento||'')||'<span class="line"></span>'} &nbsp;&nbsp; <b>FIRMA:</b> <span class="line"></span></div>
-    <div><b>FECHA Y LUGAR:</b> ${audEsc(d.fecha_lugar||'')||'<span class="line"></span>'} &nbsp;&nbsp; <b>PRÓXIMO CONTROL:</b> ${audDdmmyyyy(d.proximo_control)||'____/____/____'}</div>
-    <div><b>FECHA QUE SE CORRIGIÓ LAS OBSERVACIONES</b> (solo cuando corresponda): ${audDdmmyyyy(d.correccion)||'____/____/____'}</div>
-  </div>
-  <script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>
+  <div class="foot">${pie}</div>
   </body></html>`;
-  const w=window.open('','_blank');
-  if(!w){ alert('El navegador bloqueó la ventana de impresión. Permití las ventanas emergentes para descargar el PDF.'); return; }
-  w.document.open(); w.document.write(html); w.document.close();
 }
 
-// ════════════════ EDITOR DE PLANILLAS ════════════════
+// Imprime usando un iframe oculto (no depende de ventanas emergentes,
+// que es lo que bloquea el navegador cuando se abre una pestaña nueva).
+function audImprimir(a){
+  const html=audPlanillaHTML(a);
+  try{
+    const viejo=document.getElementById('aud-print-frame');
+    if(viejo) viejo.remove();
+    const fr=document.createElement('iframe');
+    fr.id='aud-print-frame';
+    fr.setAttribute('aria-hidden','true');
+    fr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(fr);
+    const doc=fr.contentWindow.document;
+    doc.open(); doc.write(html); doc.close();
+    const lanzar=()=>{
+      try{ fr.contentWindow.focus(); fr.contentWindow.print(); }
+      catch(e){ audDescargarHTML(html, a); }
+    };
+    if(doc.readyState==='complete') setTimeout(lanzar,250);
+    else { fr.onload=()=>setTimeout(lanzar,250); setTimeout(lanzar,900); }
+  }catch(e){
+    audDescargarHTML(html, a);
+  }
+}
+// Alternativa: si el navegador no deja imprimir, baja el archivo
+function audDescargarHTML(html, a){
+  try{
+    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    link.href=url;
+    link.download='auditoria_'+String(a.sucursal||'').replace(/\s+/g,'-')+'_'+String(a.fecha||'').replace(/-/g,'')+'.html';
+    document.body.appendChild(link); link.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); link.remove(); },1500);
+    showToast('Se descargó la planilla. Abrila y usá Imprimir para guardarla en PDF.');
+  }catch(e){ alert('No se pudo generar la planilla: '+(e.message||e)); }
+}
+
+// ════════════════ EDITOR DE PLANILLAS (solo admin) ════════════════
 function audEditarPlantillas(){
   if(!esAdmin()) return;   // editar la estructura de las planillas: solo admin
   const lista=audListaPlantillas();
@@ -10444,27 +10553,45 @@ function audEditarPlantillas(){
   document.getElementById('aud-tpl-err').style.display='none';
   document.getElementById('aud-tpl-modal-ov').classList.add('open');
 }
+function audTplPintar(){
+  const b=audTplBorrador;
+  const v=(id,val)=>{ const el=document.getElementById(id); if(el) el.value=val||''; };
+  const ck=(id,on)=>{ const el=document.getElementById(id); if(el) el.checked=!!on; };
+  v('aud-tpl-nombre', b.nombre);
+  v('aud-tpl-columnas', b.columnas.join(', '));
+  v('aud-tpl-opciones', b.opciones.join(', '));
+  v('aud-tpl-encabezado', b.encabezado);
+  v('aud-tpl-subtitulo', b.subtitulo);
+  v('aud-tpl-codigo', b.codigo);
+  v('aud-tpl-revision', b.revision);
+  v('aud-tpl-fecharev', b.fecha_rev);
+  v('aud-tpl-terminologia', b.terminologia);
+  v('aud-tpl-responsable', b.responsable);
+  const C=b.campos||AUD_CAMPOS_DEF;
+  ck('aud-tplc-bahia', C.bahia!==false);
+  ck('aud-tplc-conocimiento', C.conocimiento!==false);
+  ck('aud-tplc-fechalugar', C.fechalugar!==false);
+  ck('aud-tplc-proximo', C.proximo!==false);
+  ck('aud-tplc-correccion', C.correccion!==false);
+  audTplRenderSecciones();
+}
 function audTplCargar(idRaw){
   const id = idRaw===''||idRaw==null ? null : idRaw;
   const p = audGetPlantilla(id);
   audTplEditId = (audPlantillas.length? p.id : null);
   audTplBorrador = { nombre:p.nombre, ...audNormEstructura(p.estructura) };
-  document.getElementById('aud-tpl-nombre').value = audTplBorrador.nombre;
-  document.getElementById('aud-tpl-columnas').value = audTplBorrador.columnas.join(', ');
-  document.getElementById('aud-tpl-opciones').value = audTplBorrador.opciones.join(', ');
   document.getElementById('aud-tpl-del').style.display = (audPlantillas.length && p.id!=null) ? '' : 'none';
   const pick=document.getElementById('aud-tpl-picker'); if(pick) pick.value = (p.id==null?'':p.id);
-  audTplRenderSecciones();
+  audTplPintar();
 }
 function audTplNueva(){
   audTplEditId=null;
-  audTplBorrador={ nombre:'Nueva planilla', columnas:['Visual','Operación','Resultado'], opciones:['B','M','R','NC'], secciones:[{nombre:'SECCIÓN 1', items:['Ítem 1']}] };
-  document.getElementById('aud-tpl-nombre').value=audTplBorrador.nombre;
-  document.getElementById('aud-tpl-columnas').value=audTplBorrador.columnas.join(', ');
-  document.getElementById('aud-tpl-opciones').value=audTplBorrador.opciones.join(', ');
+  audTplBorrador={ nombre:'Nueva planilla', encabezado:'REGISTRO DE AUDITORIA', subtitulo:'', codigo:'', revision:'', fecha_rev:'', terminologia:'', responsable:'Auditó',
+    campos:{bahia:false,conocimiento:false,fechalugar:false,proximo:false,correccion:false},
+    columnas:['Resultado'], opciones:['Ok','NG','NC'], secciones:[{nombre:'SECCIÓN 1', items:['Ítem 1']}] };
   document.getElementById('aud-tpl-del').style.display='none';
   const pick=document.getElementById('aud-tpl-picker'); if(pick) pick.value='';
-  audTplRenderSecciones();
+  audTplPintar();
 }
 function audTplRenderSecciones(){
   const cont=document.getElementById('aud-tpl-secciones');
@@ -10487,15 +10614,23 @@ function audTplCerrar(){ document.getElementById('aud-tpl-modal-ov').classList.r
 
 async function audTplGuardar(){
   const err=document.getElementById('aud-tpl-err'); err.style.display='none';
-  const nombre=(document.getElementById('aud-tpl-nombre').value||'').trim();
-  const columnas=(document.getElementById('aud-tpl-columnas').value||'').split(',').map(x=>x.trim()).filter(Boolean);
-  const opciones=(document.getElementById('aud-tpl-opciones').value||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const g=id=>((document.getElementById(id)||{}).value||'').trim();
+  const gk=id=>!!(document.getElementById(id)||{}).checked;
+  const nombre=g('aud-tpl-nombre');
+  const columnas=g('aud-tpl-columnas').split(',').map(x=>x.trim()).filter(Boolean);
+  const opciones=g('aud-tpl-opciones').split(',').map(x=>x.trim()).filter(Boolean);
   if(!nombre){ err.textContent='Ponele un nombre a la planilla.'; err.style.display='block'; return; }
   if(!columnas.length){ err.textContent='Necesitás al menos una columna de evaluación.'; err.style.display='block'; return; }
-  if(!opciones.length){ err.textContent='Necesitás al menos una opción (terminología).'; err.style.display='block'; return; }
+  if(!opciones.length){ err.textContent='Necesitás al menos una opción para el desplegable.'; err.style.display='block'; return; }
   const secciones=(audTplBorrador.secciones||[]).map(s=>({nombre:(s.nombre||'').trim(), items:(s.items||[]).filter(Boolean)})).filter(s=>s.nombre||s.items.length);
   if(!secciones.length){ err.textContent='Agregá al menos una sección con ítems.'; err.style.display='block'; return; }
-  const estructura={columnas,opciones,secciones};
+  const estructura={
+    encabezado:g('aud-tpl-encabezado'), subtitulo:g('aud-tpl-subtitulo'),
+    codigo:g('aud-tpl-codigo'), revision:g('aud-tpl-revision'), fecha_rev:g('aud-tpl-fecharev'),
+    terminologia:g('aud-tpl-terminologia'), responsable:g('aud-tpl-responsable')||'Controló',
+    campos:{ bahia:gk('aud-tplc-bahia'), conocimiento:gk('aud-tplc-conocimiento'), fechalugar:gk('aud-tplc-fechalugar'), proximo:gk('aud-tplc-proximo'), correccion:gk('aud-tplc-correccion') },
+    columnas, opciones, secciones
+  };
 
   const btn=document.getElementById('aud-tpl-save'); btn.disabled=true; btn.textContent='Guardando...';
   try{
